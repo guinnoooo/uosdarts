@@ -1,0 +1,142 @@
+{{ define "main" }}
+
+{{ $csvPath := .Site.Params.rankingsCSV | default "data/rankings.csv" }}
+{{ $nameCol := .Site.Params.nameColumn | default "player_name" }}
+{{ $pointsCol := .Site.Params.pointsColumn | default "total_points" }}
+
+{{ $csvResource := resources.Get $csvPath }}
+
+<section class="hero">
+  <div class="wrap">
+    <h1>{{ .Site.Params.pageTitle }}</h1>
+    <p class="hero-sub">{{ .Site.Params.season }} season</p>
+  </div>
+</section>
+
+<section class="rankings wrap">
+  {{ if not $csvResource }}
+
+    <div class="notice">
+      <p><strong>No rankings data found yet.</strong></p>
+      <p>Add your CSV file at <code>assets/{{ $csvPath }}</code> with a header row that
+      includes a <code>{{ $nameCol }}</code> column and a <code>{{ $pointsCol }}</code> column,
+      then rebuild the site.</p>
+    </div>
+
+  {{ else }}
+
+    {{ $data := $csvResource | transform.Unmarshal (dict "delimiter" ",") }}
+    {{ $header := index $data 0 }}
+    {{ $rows := after 1 $data }}
+
+    {{ $nameIdx := -1 }}
+    {{ $pointsIdx := -1 }}
+    {{ range $i, $h := $header }}
+      {{ if eq (lower (trim $h " ")) (lower $nameCol) }}{{ $nameIdx = $i }}{{ end }}
+      {{ if eq (lower (trim $h " ")) (lower $pointsCol) }}{{ $pointsIdx = $i }}{{ end }}
+    {{ end }}
+    {{ if eq $nameIdx -1 }}{{ $nameIdx = 0 }}{{ end }}
+    {{ if eq $pointsIdx -1 }}{{ $pointsIdx = (sub (len $header) 1) }}{{ end }}
+
+    {{ $players := slice }}
+    {{ range $rows }}
+      {{ if gt (len .) $nameIdx }}
+        {{ $name := index . $nameIdx }}
+        {{ $ptsRaw := index . $pointsIdx }}
+        {{ if ne (trim $name " ") "" }}
+          {{ $pts := cast.ToFloat $ptsRaw }}
+          {{ $players = $players | append (dict "name" $name "points" $pts) }}
+        {{ end }}
+      {{ end }}
+    {{ end }}
+
+    {{ $sorted := sort $players "points" "desc" }}
+
+    {{ $ranked := slice }}
+    {{ $prevPoints := "" }}
+    {{ $rank := 0 }}
+    {{ range $i, $p := $sorted }}
+      {{ if eq $i 0 }}
+        {{ $rank = 1 }}
+      {{ else if eq $p.points $prevPoints }}
+      {{ else }}
+        {{ $rank = add $i 1 }}
+      {{ end }}
+      {{ $prevPoints = $p.points }}
+      {{ $ranked = $ranked | append (dict "name" $p.name "points" $p.points "rank" $rank) }}
+    {{ end }}
+
+    <div class="table-scroll">
+    <table class="oom-table">
+      <thead>
+        <tr>
+          <th class="col-rank">Rank</th>
+          <th class="col-name">Player</th>
+          <th class="col-points">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range $ranked }}
+          {{ $slug := urlize .name }}
+          {{ $info := index $.Site.Data.players $slug }}
+          <tr class="{{ if eq .rank 1 }}rank-gold{{ else if eq .rank 2 }}rank-silver{{ else if eq .rank 3 }}rank-bronze{{ end }}{{ if $info }} has-info{{ end }}"
+              {{ if $info }}onclick="document.getElementById('player-{{ $slug }}').showModal()"{{ end }}>
+            <td class="col-rank">
+              <span class="rank-badge">{{ .rank }}</span>
+            </td>
+            <td class="col-name">{{ .name }}</td>
+            <td class="col-points">{{ .points }}</td>
+          </tr>
+        {{ end }}
+      </tbody>
+    </table>
+    </div>
+
+    <p class="last-updated">Last updated {{ now.Format "2 January 2006" }}</p>
+
+    {{ range $ranked }}
+      {{ $slug := urlize .name }}
+      {{ $info := index $.Site.Data.players $slug }}
+      {{ if $info }}
+      <dialog id="player-{{ $slug }}" class="player-modal">
+        <div class="player-modal-topbar">
+          <span class="player-modal-rank">#{{ .rank }}</span>
+          <button class="player-modal-close" onclick="this.closest('dialog').close()">&times;</button>
+        </div>
+        <div class="player-modal-top">
+          {{ if $info.image }}
+            <img class="player-modal-photo" src="{{ $info.image | relURL }}" alt="{{ .name }}">
+          {{ else }}
+            <div class="player-modal-photo player-modal-photo-placeholder"></div>
+          {{ end }}
+          <div class="player-modal-heading">
+            <h2 class="player-modal-name">{{ .name }}</h2>
+            {{ if $info.nickname }}<p class="player-modal-nickname">{{ $info.nickname }}</p>{{ end }}
+            {{ if $info.year }}<p class="player-modal-year">{{ $info.year }}</p>{{ end }}
+          </div>
+        </div>
+        <div class="player-modal-bottom">
+          <div class="player-modal-stats">
+            <div class="stat"><span class="stat-label">PC Best:</span> <span class="stat-value">{{ with $info.pc_best }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="stat"><span class="stat-label">PC Wins:</span> <span class="stat-value">{{ with $info.pc_wins }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="stat"><span class="stat-label">Major Best:</span> <span class="stat-value">{{ with $info.major_best }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="stat"><span class="stat-label">Major Wins:</span> <span class="stat-value">{{ with $info.major_wins }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
+          </div>
+          {{ if or $info.national_champion $info.stage_winner }}
+          <div class="player-modal-badges">
+            {{ with $info.national_champion }}
+            <span class="badge badge-gold"><span class="badge-star">{{ range seq . }}&#9733;{{ end }}</span> National Champion</span>
+            {{ end }}
+            {{ with $info.stage_winner }}
+            <span class="badge badge-purple"><span class="badge-star">{{ range seq . }}&#9733;{{ end }}</span> Stage Winner</span>
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+      </dialog>
+      {{ end }}
+    {{ end }}
+  {{end}}
+</section>
+
+{{ end }}
