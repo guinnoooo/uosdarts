@@ -117,13 +117,17 @@
         </div>
         <div class="player-modal-bottom">
           <div class="player-modal-stats">
-            <div class="stat"><span class="stat-label">PC Best:</span> <span class="stat-value">{{ with $info.pc_best }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
-            <div class="stat"><span class="stat-label">PC Wins:</span> <span class="stat-value">{{ with $info.pc_wins }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
-            <div class="stat"><span class="stat-label">Major Best:</span> <span class="stat-value">{{ with $info.major_best }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
-            <div class="stat"><span class="stat-label">Major Wins:</span> <span class="stat-value">{{ with $info.major_wins }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
-            <div class="stat"><span class="stat-label">180s Hit:</span> <span class="stat-value">{{ if isset $info "hit_180s" }}{{ $info.hit_180s }}{{ else }}&ndash;{{ end }}</span></div>
-            <div class="stat"><span class="stat-label">100+ C/Os:</span> <span class="stat-value">{{ if isset $info "checkouts_100_plus" }}{{ $info.checkouts_100_plus }}{{ else }}&ndash;{{ end }}</span></div>
-            <div class="stat"><span class="stat-label">Sheet Legs:</span> <span class="stat-value">{{ if isset $info "sheet_legs" }}{{ $info.sheet_legs }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="player-modal-stats-row">
+              <div class="stat"><span class="stat-label">PC Best:</span> <span class="stat-value">{{ with $info.pc_best }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
+              <div class="stat"><span class="stat-label">PC Wins:</span> <span class="stat-value">{{ with $info.pc_wins }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
+              <div class="stat"><span class="stat-label">Major Best:</span> <span class="stat-value">{{ with $info.major_best }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
+              <div class="stat"><span class="stat-label">Major Wins:</span> <span class="stat-value">{{ with $info.major_wins }}{{ . }}{{ else }}&ndash;{{ end }}</span></div>
+            </div>
+            <div class="player-modal-stats-row">
+              <div class="stat"><span class="stat-label">180s Hit:</span> <span class="stat-value">{{ if isset $info "hit_180s" }}{{ $info.hit_180s }}{{ else }}&ndash;{{ end }}</span></div>
+              <div class="stat"><span class="stat-label">100+ C/Os:</span> <span class="stat-value">{{ if isset $info "checkouts_100_plus" }}{{ $info.checkouts_100_plus }}{{ else }}&ndash;{{ end }}</span></div>
+              <div class="stat"><span class="stat-label">Sheet Legs:</span> <span class="stat-value">{{ if isset $info "sheet_legs" }}{{ $info.sheet_legs }}{{ else }}&ndash;{{ end }}</span></div>
+            </div>
           </div>
           {{ if or $info.national_champion $info.stage_winner }}
           <div class="player-modal-badges">

@@ -190,12 +190,14 @@ dialog.player-modal::backdrop {
 
 .player-modal-stats {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.stat:nth-child(5) {
-  flex-basis: 100%;
+.player-modal-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 .stat { font-size: 0.75rem; white-space: nowrap; }
