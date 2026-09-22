@@ -4,8 +4,8 @@ year: "Student"
 image: "images/players/aidan-garratt.jpg"
 national_champion: 0
 stage_winner: 0
-pc_best: 'N/A'
-pc_wins: 0
+pc_best: 'Winner'
+pc_wins: 1
 major_best: 'N/A'
 major_wins: 0
 hit_180s: 0
