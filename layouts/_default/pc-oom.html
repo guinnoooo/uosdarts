@@ -33,18 +33,30 @@
 {{ range $fillers }}{{ $qualified = $qualified | append . }}{{ end }}
 {{ $qualified = sort $qualified "rank" "asc" }}
 
-<section class="qualifiers wrap">
-  <h2 class="section-heading">Top 16 &ndash; PC Finals Qualifiers</h2>
-  <div class="qualifiers-list">
-    {{ range $qualified }}
-      {{ $slug := urlize .name }}
-      {{ $info := index $.Site.Data.players $slug }}
-      {{ $pcWins := 0 }}
-      {{ if $info }}{{ if isset $info "pc_wins" }}{{ $pcWins = int $info.pc_wins }}{{ end }}{{ end }}
-      <div class="qualifier-row">
-        <span class="qualifier-rank">#{{ .rank }}</span>
-        <span class="qualifier-name">{{ .name }}</span>
-        {{ if ge $pcWins 1 }}<span class="qualifier-badge">&#9733; Winner</span>{{ end }}
+{{ $matchups := slice }}
+{{ range $i := seq 0 7 }}
+  {{ $j := sub 15 $i }}
+  {{ $playerA := dict }}
+  {{ $playerB := dict }}
+  {{ if lt $i (len $qualified) }}{{ $playerA = index $qualified $i }}{{ end }}
+  {{ if lt $j (len $qualified) }}{{ $playerB = index $qualified $j }}{{ end }}
+  {{ $matchups = $matchups | append (dict "seedA" (add $i 1) "playerA" $playerA "seedB" (add $j 1) "playerB" $playerB) }}
+{{ end }}
+
+<section class="bracket wrap">
+  <h2 class="section-heading">Round 1 &ndash; Provisional Bracket (Top 16)</h2>
+  <div class="bracket-list">
+    {{ range $matchups }}
+      <div class="bracket-match">
+        <div class="bracket-player">
+          <span class="bracket-seed">{{ .seedA }}</span>
+          <span class="bracket-name">{{ if .playerA }}{{ .playerA.name }}{{ else }}&ndash;{{ end }}</span>
+        </div>
+        <span class="bracket-vs">vs</span>
+        <div class="bracket-player">
+          <span class="bracket-name">{{ if .playerB }}{{ .playerB.name }}{{ else }}&ndash;{{ end }}</span>
+          <span class="bracket-seed">{{ .seedB }}</span>
+        </div>
       </div>
     {{ end }}
   </div>
