@@ -1,27 +1,18 @@
 {{ $ranked := .ranked }}
 {{ $site := .site }}
 
-<div class="table-scroll">
-  <table class="rankings-table">
-    <thead>
-      <tr>
-        <th class="col-rank">Rank</th>
-        <th class="col-name">Player</th>
-        <th class="col-points">Points</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{ range $ranked }}
-        {{ $slug := urlize .name }}
-        {{ $hasInfo := isset $site.Data.players $slug }}
-        <tr class="{{ if $hasInfo }}has-info{{ end }}"{{ if $hasInfo }} onclick="document.getElementById('player-{{ $slug }}').showModal()"{{ end }}>
-          <td class="col-rank{{ if eq .rank 1 }} rank-gold{{ else if eq .rank 2 }} rank-silver{{ else if eq .rank 3 }} rank-bronze{{ end }}">{{ .rank }}</td>
-          <td class="col-name">{{ .name }}</td>
-          <td class="col-points">{{ .points }}</td>
-        </tr>
-      {{ end }}
-    </tbody>
-  </table>
+<div class="ranking-list-wrap">
+  <div class="ranking-list">
+    {{ range $ranked }}
+      {{ $slug := urlize .name }}
+      {{ $hasInfo := isset $site.Data.players $slug }}
+      <div class="ranking-row{{ if $hasInfo }} has-info{{ end }}"{{ if $hasInfo }} onclick="document.getElementById('player-{{ $slug }}').showModal()"{{ end }}>
+        <span class="ranking-rank">#{{ .rank }}</span>
+        <span class="ranking-name">{{ .name }}</span>
+        <span class="ranking-points">{{ .points }}</span>
+      </div>
+    {{ end }}
+  </div>
 </div>
 
 {{ range $ranked }}

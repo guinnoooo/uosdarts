@@ -30,7 +30,14 @@ a { color: var(--gold); }
 
 .site-header { border-bottom: 1px solid var(--border); }
 
-.header-inner { display: flex; align-items: center; padding: 10px 24px; }
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 36px;
+  padding: 10px 24px;
+}
 
 .brand { text-decoration: none; }
 
@@ -62,49 +69,42 @@ a { color: var(--gold); }
 
 .notice code { color: var(--gold); }
 
-.oom-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--panel);
-}
-
-.oom-table thead th {
-  font-weight: 600;
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-}
-
-.oom-table tbody tr { border-bottom: 1px solid var(--border); }
-.oom-table tbody tr:last-child { border-bottom: none; }
-.oom-table td { padding: 13px 18px; }
-
-.col-rank { width: 70px; color: var(--text-dim); font-weight: 600; text-align: left; }
-.col-name { text-align: left; }
-.col-points { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
-
-tr.rank-gold .col-rank { color: var(--gold); }
-tr.rank-silver .col-rank { color: var(--silver); }
-tr.rank-bronze .col-rank { color: var(--bronze); }
-
 .last-updated { margin-top: 16px; text-align: right; color: var(--text-dim); font-size: 0.8rem; }
 
 /* ---------- Scrollable table ---------- */
 
-.table-scroll {
+.ranking-list-wrap {
   max-height: 720px;
   overflow-y: auto;
   border: 1px solid var(--border);
 }
 
-.table-scroll thead th {
-  position: sticky;
-  top: 0;
-  background: var(--panel);
-  z-index: 1;
+.ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ranking-row:last-child {
+  border-bottom: none;
+}
+
+.ranking-rank {
+  width: 36px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ranking-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.ranking-points {
+  font-weight: 600;
+  color: var(--text-dim);
 }
 
 .has-info { cursor: pointer; }
@@ -230,14 +230,14 @@ dialog.player-modal::backdrop {
   .oom-table th, .oom-table td { padding: 11px 10px; font-size: 0.9rem; }
 }
 
-
 .site-nav {
   display: flex;
-  gap: 20px;
+  align-items: center;
+  gap: 24px;
 }
 
 .nav-link {
-  color: var(--grey);
+  color: var(--text-dim);
   text-decoration: none;
   font-weight: 500;
   font-size: 0.95rem;
@@ -246,16 +246,12 @@ dialog.player-modal::backdrop {
 }
 
 .nav-link:hover {
-  color: var(--white);
+  color: var(--text);
 }
 
 .nav-link-active {
   color: var(--gold);
   border-bottom-color: var(--gold);
-}
-
-.qualifiers {
-  padding: 24px 0 8px;
 }
 
 .section-heading {
@@ -265,37 +261,54 @@ dialog.player-modal::backdrop {
   color: var(--gold);
 }
 
-.qualifiers-list {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
+/* ---------- Bracket (PC OoM Top 16, provisional Round 1) ---------- */
+
+.bracket {
+  padding: 24px 0 8px;
 }
 
-.qualifier-row {
+.bracket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bracket-match {
   display: flex;
   align-items: center;
   gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
 }
 
-.qualifier-row:last-child {
-  border-bottom: none;
-}
-
-.qualifier-rank {
-  width: 36px;
-  font-weight: 700;
-  color: var(--gold);
-}
-
-.qualifier-name {
+.bracket-player {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bracket-player:last-child {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.bracket-seed {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 20px;
+}
+
+.bracket-name {
   font-weight: 500;
 }
 
-.qualifier-badge {
+.bracket-vs {
+  color: var(--text-dim);
   font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--gold-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
