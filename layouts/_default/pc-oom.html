@@ -1,0 +1,56 @@
+{{ define "main" }}
+<section class="hero">
+  <div class="wrap">
+    <h1>{{ .Title }}</h1>
+    <p class="hero-sub">{{ .Site.Params.season }}</p>
+  </div>
+</section>
+
+{{ $ranked := partial "build-ranking.html" (dict "csvPath" .Site.Params.pcRankingsCSV "nameCol" .Site.Params.nameColumn "pointsCol" .Site.Params.pointsColumn) }}
+
+{{ $winners := slice }}
+{{ $nonWinners := slice }}
+{{ range $ranked }}
+  {{ $slug := urlize .name }}
+  {{ $info := index $.Site.Data.players $slug }}
+  {{ $pcWins := 0 }}
+  {{ if $info }}
+    {{ if isset $info "pc_wins" }}{{ $pcWins = int $info.pc_wins }}{{ end }}
+  {{ end }}
+  {{ if ge $pcWins 1 }}
+    {{ $winners = $winners | append . }}
+  {{ else }}
+    {{ $nonWinners = $nonWinners | append . }}
+  {{ end }}
+{{ end }}
+
+{{ $slotsLeft := sub 16 (len $winners) }}
+{{ if lt $slotsLeft 0 }}{{ $slotsLeft = 0 }}{{ end }}
+{{ $fillers := first $slotsLeft $nonWinners }}
+
+{{ $qualified := slice }}
+{{ range $winners }}{{ $qualified = $qualified | append . }}{{ end }}
+{{ range $fillers }}{{ $qualified = $qualified | append . }}{{ end }}
+{{ $qualified = sort $qualified "rank" "asc" }}
+
+<section class="qualifiers wrap">
+  <h2 class="section-heading">Top 16 &ndash; PC Finals Qualifiers</h2>
+  <div class="qualifiers-list">
+    {{ range $qualified }}
+      {{ $slug := urlize .name }}
+      {{ $info := index $.Site.Data.players $slug }}
+      {{ $pcWins := 0 }}
+      {{ if $info }}{{ if isset $info "pc_wins" }}{{ $pcWins = int $info.pc_wins }}{{ end }}{{ end }}
+      <div class="qualifier-row">
+        <span class="qualifier-rank">#{{ .rank }}</span>
+        <span class="qualifier-name">{{ .name }}</span>
+        {{ if ge $pcWins 1 }}<span class="qualifier-badge">&#9733; Winner</span>{{ end }}
+      </div>
+    {{ end }}
+  </div>
+</section>
+
+<section class="rankings wrap">
+  {{ partial "ranking-table.html" (dict "ranked" $ranked "site" .Site) }}
+</section>
+{{ end }}

@@ -7,6 +7,7 @@
   --text-dim: #8f8f8f;
   --silver: #b0b0b0;
   --bronze: #b5793d;
+  --gold-soft: #b8963f;
   --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -227,4 +228,74 @@ dialog.player-modal::backdrop {
 
 @media (max-width: 560px) {
   .oom-table th, .oom-table td { padding: 11px 10px; font-size: 0.9rem; }
+}
+
+
+.site-nav {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-link {
+  color: var(--grey);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-link:hover {
+  color: var(--white);
+}
+
+.nav-link-active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.qualifiers {
+  padding: 24px 0 8px;
+}
+
+.section-heading {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 16px;
+  color: var(--gold);
+}
+
+.qualifiers-list {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.qualifier-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.qualifier-row:last-child {
+  border-bottom: none;
+}
+
+.qualifier-rank {
+  width: 36px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.qualifier-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.qualifier-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gold-soft);
 }

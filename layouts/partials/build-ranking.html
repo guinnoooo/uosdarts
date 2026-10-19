@@ -1,0 +1,51 @@
+{{ $csvPath := .csvPath }}
+{{ $nameCol := .nameCol }}
+{{ $pointsCol := .pointsCol }}
+
+{{ $csvResource := resources.Get $csvPath }}
+
+{{ $ranked := slice }}
+
+{{ if $csvResource }}
+  {{ $data := $csvResource | transform.Unmarshal (dict "delimiter" ",") }}
+  {{ $header := index $data 0 }}
+  {{ $rows := after 1 $data }}
+
+  {{ $nameIdx := -1 }}
+  {{ $pointsIdx := -1 }}
+  {{ range $i, $h := $header }}
+    {{ if eq (lower (trim $h " ")) (lower $nameCol) }}{{ $nameIdx = $i }}{{ end }}
+    {{ if eq (lower (trim $h " ")) (lower $pointsCol) }}{{ $pointsIdx = $i }}{{ end }}
+  {{ end }}
+  {{ if eq $nameIdx -1 }}{{ $nameIdx = 0 }}{{ end }}
+  {{ if eq $pointsIdx -1 }}{{ $pointsIdx = (sub (len $header) 1) }}{{ end }}
+
+  {{ $players := slice }}
+  {{ range $rows }}
+    {{ if gt (len .) $nameIdx }}
+      {{ $name := index . $nameIdx }}
+      {{ $ptsRaw := index . $pointsIdx }}
+      {{ if ne (trim $name " ") "" }}
+        {{ $pts := cast.ToFloat $ptsRaw }}
+        {{ $players = $players | append (dict "name" $name "points" $pts) }}
+      {{ end }}
+    {{ end }}
+  {{ end }}
+
+  {{ $sorted := sort $players "points" "desc" }}
+
+  {{ $prevPoints := "" }}
+  {{ $rank := 0 }}
+  {{ range $i, $p := $sorted }}
+    {{ if eq $i 0 }}
+      {{ $rank = 1 }}
+    {{ else if eq $p.points $prevPoints }}
+    {{ else }}
+      {{ $rank = add $i 1 }}
+    {{ end }}
+    {{ $prevPoints = $p.points }}
+    {{ $ranked = $ranked | append (dict "name" $p.name "points" $p.points "rank" $rank) }}
+  {{ end }}
+{{ end }}
+
+{{ return $ranked }}

@@ -1,0 +1,75 @@
+{{ $ranked := .ranked }}
+{{ $site := .site }}
+
+<div class="table-scroll">
+  <table class="rankings-table">
+    <thead>
+      <tr>
+        <th class="col-rank">Rank</th>
+        <th class="col-name">Player</th>
+        <th class="col-points">Points</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range $ranked }}
+        {{ $slug := urlize .name }}
+        {{ $hasInfo := isset $site.Data.players $slug }}
+        <tr class="{{ if $hasInfo }}has-info{{ end }}"{{ if $hasInfo }} onclick="document.getElementById('player-{{ $slug }}').showModal()"{{ end }}>
+          <td class="col-rank{{ if eq .rank 1 }} rank-gold{{ else if eq .rank 2 }} rank-silver{{ else if eq .rank 3 }} rank-bronze{{ end }}">{{ .rank }}</td>
+          <td class="col-name">{{ .name }}</td>
+          <td class="col-points">{{ .points }}</td>
+        </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+
+{{ range $ranked }}
+  {{ $slug := urlize .name }}
+  {{ $info := index $site.Data.players $slug }}
+  {{ if $info }}
+    <dialog id="player-{{ $slug }}" class="player-modal">
+      <div class="player-modal-topbar">
+        <span class="player-modal-rank">#{{ .rank }}</span>
+        <button class="player-modal-close" onclick="document.getElementById('player-{{ $slug }}').close()">&times;</button>
+      </div>
+      <div class="player-modal-top">
+        {{ if isset $info "image" }}
+          <img class="player-modal-photo" src="{{ $info.image | relURL }}" alt="{{ .name }}">
+        {{ else }}
+          <div class="player-modal-placeholder"></div>
+        {{ end }}
+        <div class="player-modal-heading">
+          <p class="player-modal-name">{{ .name }}</p>
+          {{ if isset $info "nickname" }}{{ if ne $info.nickname "" }}<p class="player-modal-nickname">{{ $info.nickname }}</p>{{ end }}{{ end }}
+          {{ if isset $info "year" }}<p class="player-modal-year">{{ $info.year }}</p>{{ end }}
+        </div>
+      </div>
+      <div class="player-modal-bottom">
+        <div class="player-modal-stats">
+          <div class="player-modal-stats-row">
+            <div class="stat"><span class="stat-label">PC Best</span><span class="stat-value">{{ if isset $info "pc_best" }}{{ $info.pc_best }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="stat"><span class="stat-label">PC Wins</span><span class="stat-value">{{ if isset $info "pc_wins" }}{{ $info.pc_wins }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="stat"><span class="stat-label">Major Best</span><span class="stat-value">{{ if isset $info "major_best" }}{{ $info.major_best }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="stat"><span class="stat-label">Major Wins</span><span class="stat-value">{{ if isset $info "major_wins" }}{{ $info.major_wins }}{{ else }}&ndash;{{ end }}</span></div>
+          </div>
+          <div class="player-modal-stats-row">
+            <div class="stat"><span class="stat-label">180s Hit</span><span class="stat-value">{{ if isset $info "hit_180s" }}{{ $info.hit_180s }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="stat"><span class="stat-label">100+ C/Os</span><span class="stat-value">{{ if isset $info "checkouts_100_plus" }}{{ $info.checkouts_100_plus }}{{ else }}&ndash;{{ end }}</span></div>
+            <div class="stat"><span class="stat-label">Sheet Legs</span><span class="stat-value">{{ if isset $info "sheet_legs" }}{{ $info.sheet_legs }}{{ else }}&ndash;{{ end }}</span></div>
+          </div>
+        </div>
+        {{ if or (isset $info "national_champion") (isset $info "stage_winner") }}
+          <div class="player-modal-badges">
+            {{ if isset $info "national_champion" }}{{ if gt (int $info.national_champion) 0 }}
+              <span class="badge badge-gold">{{ range seq (int $info.national_champion) }}<span class="badge-star">&#9733;</span>{{ end }} National Champion</span>
+            {{ end }}{{ end }}
+            {{ if isset $info "stage_winner" }}{{ if gt (int $info.stage_winner) 0 }}
+              <span class="badge badge-purple">{{ range seq (int $info.stage_winner) }}<span class="badge-star">&#9733;</span>{{ end }} Stage Winner</span>
+            {{ end }}{{ end }}
+          </div>
+        {{ end }}
+      </div>
+    </dialog>
+  {{ end }}
+{{ end }}

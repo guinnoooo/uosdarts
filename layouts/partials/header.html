@@ -1,9 +1,11 @@
 <header class="site-header">
   <div class="wrap header-inner">
     <a class="brand" href="{{ "/" | relURL }}">
-      <span class="brand-text">
-        <span class="brand-name">{{ .Site.Params.societyName }}</span>
-      </span>
+      <span class="brand-name">{{ .Site.Params.societyName }}</span>
     </a>
+    <nav class="site-nav">
+      <a href="{{ "/" | relURL }}" class="nav-link{{ if .IsHome }} nav-link-active{{ end }}">Order of Merit</a>
+      <a href="{{ "/pc-oom/" | relURL }}" class="nav-link{{ if eq .File.ContentBaseName "pc-oom" }} nav-link-active{{ end }}">PC Order of Merit</a>
+    </nav>
   </div>
 </header>

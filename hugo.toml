@@ -16,6 +16,7 @@ buildDrafts = false
   # (not the top-level /data folder) so Hugo can read it at build time.
   # Path below is relative to the /assets folder.
   rankingsCSV = "data/rankings.csv"
+  pcRankingsCSV = "data/rankings.csv"
 
   # Column header names in your CSV (edit these two lines if your
   # column names ever change — nothing else in the site needs touching).
