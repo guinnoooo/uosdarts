@@ -44,7 +44,7 @@
 {{ end }}
 
 <section class="bracket wrap">
-  <h2 class="section-heading">Round 1 &ndash; Provisional Bracket (Top 16)</h2>
+  <h2 class="section-heading">PC Finals Provisional Bracket</h2>
   <div class="bracket-list">
     {{ range $matchups }}
       <div class="bracket-match">
@@ -63,6 +63,7 @@
 </section>
 
 <section class="rankings wrap">
+  <h2 class="section-heading">Full PC Order of Merit</h2>
   {{ partial "ranking-table.html" (dict "ranked" $ranked "site" .Site) }}
 </section>
 {{ end }}

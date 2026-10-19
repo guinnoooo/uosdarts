@@ -1,4 +1,4 @@
 ---
-title: "PC Order of Merit"
+title: "PC Finals"
 layout: "pc-oom"
 ---
