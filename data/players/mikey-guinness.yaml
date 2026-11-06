@@ -4,10 +4,10 @@ year: "Alumni"
 image: "images/players/mikey-guinness.jpg"
 national_champion: 1
 stage_winner: 1
-pc_best: 'N/A'
-pc_wins: 0
+pc_best: 'Winner'
+pc_wins: 1
 major_best: 'N/A'
 major_wins: 0
-hit_180s: 0
+hit_180s: 1
 checkouts_100_plus: 0
-sheet_legs: 0
+sheet_legs: 3
