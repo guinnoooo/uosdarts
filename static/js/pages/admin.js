@@ -309,23 +309,22 @@ function tournamentsSection() {
 // The weekly Monday fixtures. Numbers follow date order and are maintained
 // by the database, so moving or cancelling one reshuffles the rest.
 function pcSection(pcs) {
-  const future = pcs.filter(t => t.status !== 'complete')
+  const future = pcs.filter(t => t.status !== 'complete' && t.status !== 'cancelled')
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
   const shown = S.pcsAll ? future : future.slice(0, 6);
 
   const row = t => {
-    const cancelled = t.status === 'cancelled';
     const local = t.starts_at ? new Date(t.starts_at) : null;
     const value = local ? new Date(local.getTime() - local.getTimezoneOffset() * 60000)
       .toISOString().slice(0, 16) : '';
-    return `<div class="t-row pc-row${cancelled ? ' cancelled' : ''}${S.sel?.id === t.id ? ' current' : ''}">
-      <span class="pc-num">${cancelled ? '—' : (t.pc_number ?? '?')}</span>
+    return `<div class="t-row pc-row${S.sel?.id === t.id ? ' current' : ''}">
+      <span class="pc-num">${t.pc_number ?? '?'}</span>
       <span class="t-row-main">
-        <b>${esc(cancelled ? 'Cancelled' : t.name)}</b>
+        <b>${esc(t.name)}</b>
         <span class="muted small">${fmtDate(t.starts_at)}${t.status === 'live' ? ' · live' : ''}</span>
       </span>
       <input type="datetime-local" data-move="${t.id}" value="${value}" title="Move this fixture">
-      <button data-cancel="${t.id}" data-to="${cancelled ? 'false' : 'true'}">${cancelled ? 'Restore' : 'Cancel'}</button>
+      <button data-remove="${t.id}" data-name="${esc(t.name)}">Remove</button>
       <button data-manage="${t.id}">${S.sel?.id === t.id ? 'Managing' : 'Manage'}</button>
     </div>`;
   };
@@ -735,12 +734,13 @@ app.addEventListener('click', async e => {
     render();
     return;
   }
-  if (el.dataset.cancel) {
-    const to = el.dataset.to === 'true';
-    if (to && !confirm('Cancel this fixture? The ones after it will move up a number.')) return;
-    await run(async () => check(await sb.rpc('admin_set_cancelled', {
-      p_tournament: el.dataset.cancel, p_cancelled: to,
-    })), to ? 'Fixture cancelled' : 'Fixture restored');
+  if (el.dataset.remove) {
+    if (!confirm(`Remove ${el.dataset.name}? Any fixtures after it move up a number. `
+      + 'Anything already scored in it is deleted too.')) return;
+    await run(async () => {
+      check(await sb.from('tournaments').delete().eq('id', el.dataset.remove));
+      if (S.sel?.id === el.dataset.remove) S.sel = null;
+    }, 'Fixture removed');
     return;
   }
   if (el.dataset.edit) {
