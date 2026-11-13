@@ -255,9 +255,9 @@ function newTournamentSection() {
       <label class="groups-only" hidden>Group legs to win <input name="group_legs_to_win" type="number" value="2" min="1"></label>
       <label>Knockout legs to win <input name="knockout_legs_to_win" type="number" value="3" min="1"></label>
       <label>Scoring password <input name="scoring_password" type="text" autocomplete="off" placeholder="Leave blank for none"></label>
-      <section class="adv-box">
-        <div class="adv-head">Advanced settings</div>
-        <div class="adv-body">
+      <section class="panel settings-block" style="display:block;grid-column:1/-1">
+        <h3>Advanced settings</h3>
+        <div>
           ${pointsPanel(null)}
           <hr>
           <label class="inline-label">Expected players
@@ -438,9 +438,9 @@ function manageSection() {
         </div>
       </div>`}
 
-    <section class="adv-box">
-      <div class="adv-head">Advanced settings</div>
-      <div class="adv-body" id="adv-manage">
+    <section class="panel settings-block" style="display:block">
+      <h3>Advanced settings</h3>
+      <div id="adv-manage">
         ${pointsPanel(t)}
         ${hasFixtures ? '' : `<hr>${advBody({
           format: t.format,

@@ -592,3 +592,12 @@ label.chk {
 /* recently deleted */
 .panel.deleted-panel { border-color: #4a2a26; }
 .panel.deleted-panel h2 { color: #c98279; }
+
+/* Advanced settings: built on the same panel markup as every other visible
+   block on the admin page, with its own class so no older rule can match it. */
+.settings-block { border-color: var(--accent-dim); }
+.settings-block > h3 {
+  margin: 0 0 .8rem; padding-bottom: .5rem; font-size: .75rem; font-weight: 650;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--accent);
+  border-bottom: 1px solid var(--line);
+}
