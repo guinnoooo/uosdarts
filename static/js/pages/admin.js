@@ -1,8 +1,8 @@
-import { sb, showLoadError, esc, toast, fmtDate, matchLabel, MATCH_SELECT } from '../db.js';
+import { sb, showLoadError, esc, toast, fmtDate, matchLabel, toLoginEmail, toUsername, MATCH_SELECT } from '../db.js';
 import { roundRobin, allocateGroups, buildBracket, standings, bracketPlan } from '../fixtures.js';
 
 const app = document.getElementById('app');
-const S = { players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: false, picked: null, archiveOpen: false, pcsAll: false, editMatch: null,
+const S = { role: null, players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: false, picked: null, archiveOpen: false, pcsAll: false, editMatch: null,
   editLegs: null };                   // advanced settings on the manage panel
 
 const check = r => { if (r.error) throw r.error; return r.data; };
@@ -14,7 +14,7 @@ async function initInner() {
   if (!session || session.user.is_anonymous) return renderLogin(!!session?.user?.is_anonymous);
   const { data } = await sb.from('admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
   if (!data) {
-    app.innerHTML = `<div class="panel"><p>Signed in as ${esc(session.user.email)}, but this account isn't an admin.</p>
+    app.innerHTML = `<div class="panel"><p>Signed in as ${esc(toUsername(session.user.email))}, but this account isn't an admin.</p>
       <p class="muted">Add this user id to the admins table: <code>${session.user.id}</code></p>
       <div class="row"><a href="/">Back to the public site</a><button id="signout-2">Sign in as someone else</button></div></div>`;
     document.getElementById('signout-2').addEventListener('click', async () => {
@@ -23,6 +23,7 @@ async function initInner() {
     });
     return;
   }
+  S.role = (await sb.rpc('my_admin_role')).data ?? 'admin';
   await refresh();
 }
 
@@ -30,8 +31,8 @@ function renderLogin(asScorer = false) {
   app.innerHTML = `<form class="panel narrow" data-form="login">
     <h2>Committee sign in</h2>
     ${asScorer ? '<p class="muted small">You are currently signed in as a scorer. Signing in here will end that, so hand over any match you are scoring first.</p>' : ''}
-    <label>Email <input name="email" type="email" required></label>
-    <label>Password <input name="password" type="password" required></label>
+    <label>Username <input name="username" type="text" autocomplete="username" required autofocus></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
     <button class="primary">Sign in</button>
     <a href="/" class="muted small">Back to the public site</a>
   </form>`;
@@ -520,7 +521,9 @@ function finishBlock() {
 }
 
 function render() {
-  app.innerHTML = `<div class="admin-head"><h1>Admin</h1><button data-act="signout" class="link">Sign out</button></div>${manageSection()}${tournamentsSection()}${newTournamentSection()}${snapshotSection()}`;
+  app.innerHTML = `<div class="admin-head"><h1>Admin</h1>
+    <span>${S.role === 'super' ? '<a href="/super/" class="muted small">Super admin</a> · ' : ''}<button data-act="signout" class="link">Sign out</button></span>
+    </div>${manageSection()}${tournamentsSection()}${newTournamentSection()}${snapshotSection()}`;
   const form = app.querySelector('[data-form="tournament"]');
   if (form) syncFormatFields(form);
 }
@@ -672,7 +675,9 @@ app.addEventListener('submit', async e => {
   const kind = f.dataset.form;
 
   if (kind === 'login') {
-    const { error } = await sb.auth.signInWithPassword({ email: data.email, password: data.password });
+    const { error } = await sb.auth.signInWithPassword({
+      email: toLoginEmail(data.username), password: data.password,
+    });
     if (error) toast(error.message); else init();
     return;
   }

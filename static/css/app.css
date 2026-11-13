@@ -601,3 +601,22 @@ label.chk {
   text-transform: uppercase; letter-spacing: .08em; color: var(--accent);
   border-bottom: 1px solid var(--line);
 }
+
+/* super admin */
+.chips .chip {
+  cursor: pointer; font: inherit; font-size: .82rem;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--text-2);
+  padding: .18rem .55rem; border-radius: 3px;
+}
+.chips .chip:hover { border-color: var(--line-strong); color: var(--text); }
+.chips .chip.on { border-color: var(--accent); color: var(--accent); }
+.points-list { margin: .4rem 0 .6rem; }
+.points-list td, .points-list th { padding: .35rem .5rem; }
+.points-list .mono { font-family: var(--mono); }
+.points-list button { padding: .05rem .4rem; font-size: 1rem; line-height: 1; color: var(--text-3); }
+.points-list button:hover { color: var(--live); border-color: var(--live); }
+.row.manual-points, .row.merge-row {
+  border-top: 1px solid var(--line); padding-top: .8rem; margin-top: .4rem; align-items: end;
+}
+.row.manual-points input[type=text] { width: 9rem; }
+.row.manual-points input[type=number] { width: 6rem; }

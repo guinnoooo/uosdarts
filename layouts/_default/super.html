@@ -1,0 +1,9 @@
+{{ define "main" }}
+<div class="wrap app-wrap">
+  <div id="app"><p class="muted">Loading…</p></div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script type="module" src="{{ "js/pages/super.js" | relURL }}?v={{ now.Unix }}"></script>
+{{ end }}

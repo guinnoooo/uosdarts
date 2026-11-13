@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { roundName } from './fixtures.js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, LOGIN_DOMAIN } from './config.js';
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -74,4 +74,17 @@ export function showLoadError(el, e) {
   el.innerHTML = `<div class="panel center"><p class="error">${esc(msg)}</p>
     <p class="muted small">Check your connection and reload. If it keeps happening, tell the committee.</p></div>`;
   console.error('uosdarts: load failed', e);
+}
+
+// Admin accounts are identified by username. Supabase needs an email, so one
+// is built from the username. Anything already containing @ is left alone, so
+// accounts made before this change still sign in.
+export function toLoginEmail(username) {
+  const u = String(username ?? '').trim();
+  return u.includes('@') ? u.toLowerCase() : `${u.toLowerCase()}@${LOGIN_DOMAIN}`;
+}
+
+export function toUsername(email) {
+  const e = String(email ?? '');
+  return e.toLowerCase().endsWith(`@${LOGIN_DOMAIN}`) ? e.slice(0, e.lastIndexOf('@')) : e;
 }
