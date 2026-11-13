@@ -28,7 +28,12 @@
     </div>
     <div class="player-modal-top">
       {{ if isset $info "image" }}
-        <img class="player-modal-photo" src="{{ $info.image | relURL }}" alt="{{ $slug }}">
+        {{/* lazy: the photo is inside a closed dialog, so it only needs fetching when opened.
+             onerror: several players have an image listed but no file, so fall back to the placeholder. */}}
+        <img class="player-modal-photo" loading="lazy" decoding="async"
+             src="{{ $info.image | relURL }}"
+             alt="{{ humanize (replace $slug "-" " ") }}"
+             onerror="this.onerror=null;this.outerHTML='&lt;div class=&quot;player-modal-placeholder&quot;&gt;&lt;/div&gt;'">
       {{ else }}
         <div class="player-modal-placeholder"></div>
       {{ end }}

@@ -1,5 +1,5 @@
 import {
-  sb, showLoadError, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, MATCH_SELECT,
+  sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, MATCH_SELECT,
 } from '../db.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
@@ -488,6 +488,7 @@ document.addEventListener('visibilitychange', () => {
 
 // Entry point: never leaves the page sitting on "Loading…".
 async function load() {
+  if (!validId(id)) { showMissing(app, 'match'); return; }
   try {
     await loadInner();
   } catch (e) {

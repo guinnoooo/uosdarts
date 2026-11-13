@@ -2,7 +2,7 @@ import { sb, showLoadError, esc, toast, fmtDate, matchLabel, toLoginEmail, toUse
 import { roundRobin, allocateGroups, buildBracket, standings, bracketPlan } from '../fixtures.js';
 
 const app = document.getElementById('app');
-const S = { role: null, players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: false, picked: null, archiveOpen: false, pcsAll: false, editMatch: null,
+const S = { role: null, players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: { create: false, manage: false }, picked: null, archiveOpen: false, pcsAll: false, editMatch: null,
   editLegs: null };                   // advanced settings on the manage panel
 
 const check = r => { if (r.error) throw r.error; return r.data; };
@@ -83,7 +83,7 @@ const REACH_LABELS = [
   ['last_64', 'Last 64'], ['groups', 'Group stage only'],
 ];
 
-const PC_SCHEDULE = { winner: 1000, final: 700, semi: 400, quarter: 300, last_16: 200, last_32: 100, last_64: 50, groups: 0 };
+const PC_SCHEDULE = { winner: 1000, final: 700, semi: 400, quarter: 300, last_16: 200, last_32: 0, last_64: 0, groups: 0 };
 
 // Order of merit points for one tournament, by how far a player got.
 function pointsPanel(t) {
@@ -223,11 +223,13 @@ function newTournamentSection() {
       <label>Knockout legs to win <input name="knockout_legs_to_win" type="number" value="3" min="1"></label>
       <label>Scoring password <input name="scoring_password" type="text" autocomplete="off" placeholder="Leave blank for none"></label>
       <section class="panel settings-block" style="display:block;grid-column:1/-1">
-        <h3>Advanced settings</h3>
+        <details class="adv-fold" style="display:block" ${S.advOpen.create ? 'open' : ''}>
+        <summary>Advanced settings</summary>
         <div>
           ${pointsPanel(null)}
           <p class="muted small">Legs per round are set when you draw the fixtures, once the players are in.</p>
         </div>
+        </details>
       </section>
       <button class="primary">Create</button>
     </form>
@@ -402,7 +404,8 @@ function manageSection() {
       </div>`}
 
     <section class="panel settings-block" style="display:block">
-      <h3>Advanced settings</h3>
+      <details class="adv-fold" style="display:block" ${S.advOpen.manage ? 'open' : ''}>
+      <summary>Advanced settings</summary>
       <div id="adv-manage">
         ${pointsPanel(t)}
         ${hasFixtures ? '' : `<hr>${advBody({
@@ -416,6 +419,7 @@ function manageSection() {
           countLabel: `${plural(picked.length, 'player')} added`,
         })}`}
       </div>
+      </details>
     </section>
 
     ${hasFixtures ? '' : `<div class="row">
@@ -826,7 +830,7 @@ app.addEventListener('click', async e => {
       break;
     }
     case 'save-points': {
-      const box = app.querySelector('.oom-box');
+      const box = app.querySelector('#adv-manage .oom-box');
       const sched = {};
       box.querySelectorAll('[data-pts]').forEach(i => {
         sched[i.dataset.pts] = parseInt(i.value, 10) || 0;
@@ -896,6 +900,9 @@ app.addEventListener('click', async e => {
 app.addEventListener('toggle', e => {
   if (e.target.matches('details.entrant-box')) S.entrantsOpen = e.target.open;
   if (e.target.matches('details.archive-box')) S.archiveOpen = e.target.open;
+  if (e.target.matches('details.adv-fold')) {
+    S.advOpen[e.target.closest('form') ? 'create' : 'manage'] = e.target.open;
+  }
 }, true);
 
 function syncFormatFields(form) {

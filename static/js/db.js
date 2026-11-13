@@ -66,6 +66,17 @@ export function toast(msg, isError = true) {
 
 // Anything that stops the first load — no keys in config.js, Supabase
 // unreachable, a blocked network — should say so rather than sit on "Loading…".
+// A page opened without a valid ?id= should say so, not sit on "Loading…"
+// or show a raw Postgres error about uuid syntax.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function validId(v) { return typeof v === 'string' && UUID.test(v); }
+
+export function showMissing(el, what) {
+  el.innerHTML = `<div class="panel center"><p>That ${esc(what)} link doesn't look right.</p>
+    <p class="muted small">It may have been deleted, or the address was mistyped.</p>
+    <p><a href="/">Back to the tournaments</a></p></div>`;
+}
+
 export function showLoadError(el, e) {
   const placeholder = SUPABASE_URL.includes('YOUR-PROJECT-REF') || SUPABASE_ANON_KEY.includes('YOUR-');
   const msg = placeholder

@@ -1,4 +1,4 @@
-import { sb, showLoadError, qs, esc, fmtDate, debounce, roundName, MATCH_SELECT } from '../db.js';
+import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, roundName, MATCH_SELECT } from '../db.js';
 import { standings } from '../fixtures.js';
 import { matchCard } from '../ui.js';
 
@@ -169,6 +169,7 @@ setInterval(() => {
 
 // Entry point: never leaves the page sitting on "Loading…".
 async function load() {
+  if (!validId(id)) { showMissing(app, 'tournament'); return; }
   try {
     await loadInner();
   } catch (e) {

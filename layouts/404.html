@@ -1,0 +1,13 @@
+{{ define "main" }}
+<div class="wrap app-wrap">
+  <div class="panel center">
+    <h1>Page not found</h1>
+    <p class="muted">That address doesn't exist on this site. It may have been a tournament that has since been deleted.</p>
+    <p>
+      <a href="{{ "/" | relURL }}">Tournaments</a> ·
+      <a href="{{ "/order-of-merit/" | relURL }}">Order of Merit</a> ·
+      <a href="{{ "/pc-oom/" | relURL }}">PC Order of Merit</a>
+    </p>
+  </div>
+</div>
+{{ end }}
