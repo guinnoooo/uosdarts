@@ -588,3 +588,7 @@ label.chk {
   font-size: .76rem;
 }
 .inline-label input { width: 5rem; }
+
+/* recently deleted */
+.panel.deleted-panel { border-color: #4a2a26; }
+.panel.deleted-panel h2 { color: #c98279; }

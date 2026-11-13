@@ -5,5 +5,5 @@
 {{ end }}
 
 {{ define "scripts" }}
-<script type="module" src="{{ "js/pages/tournament.js" | relURL }}"></script>
+<script type="module" src="{{ "js/pages/tournament.js" | relURL }}?v={{ now.Unix }}"></script>
 {{ end }}

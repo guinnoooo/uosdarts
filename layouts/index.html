@@ -12,5 +12,5 @@
 {{ end }}
 
 {{ define "scripts" }}
-<script type="module" src="{{ "js/pages/index.js" | relURL }}"></script>
+<script type="module" src="{{ "js/pages/index.js" | relURL }}?v={{ now.Unix }}"></script>
 {{ end }}

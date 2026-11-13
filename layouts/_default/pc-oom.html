@@ -61,5 +61,5 @@
 {{ end }}
 
 {{ define "scripts" }}
-<script type="module" src="{{ "js/pages/oom.js" | relURL }}"></script>
+<script type="module" src="{{ "js/pages/oom.js" | relURL }}?v={{ now.Unix }}"></script>
 {{ end }}

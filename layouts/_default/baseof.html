@@ -10,8 +10,23 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="{{ "css/main.css" | relURL }}">
-  <link rel="stylesheet" href="{{ "css/app.css" | relURL }}">
+  {{/* The page scripts import these shared modules, whose URLs Hugo can't
+       version from here. The import map points them at a versioned URL so a
+       new build can never be mixed with cached copies of the old one. */}}
+  <script type="importmap">
+  {
+    "imports": {
+      "{{ "js/db.js" | relURL }}": "{{ "js/db.js" | relURL }}?v={{ now.Unix }}",
+      "{{ "js/darts.js" | relURL }}": "{{ "js/darts.js" | relURL }}?v={{ now.Unix }}",
+      "{{ "js/fixtures.js" | relURL }}": "{{ "js/fixtures.js" | relURL }}?v={{ now.Unix }}",
+      "{{ "js/ui.js" | relURL }}": "{{ "js/ui.js" | relURL }}?v={{ now.Unix }}",
+      "{{ "js/config.js" | relURL }}": "{{ "js/config.js" | relURL }}?v={{ now.Unix }}"
+    }
+  }
+  </script>
+
+  <link rel="stylesheet" href="{{ "css/main.css" | relURL }}?v={{ now.Unix }}">
+  <link rel="stylesheet" href="{{ "css/app.css" | relURL }}?v={{ now.Unix }}">
 </head>
 <body>
   {{ partial "header.html" . }}

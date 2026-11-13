@@ -47,6 +47,7 @@ async function signOut() {
 
 async function refresh() {
   S.players = check(await sb.from('players').select('*').order('name'));
+  await sb.rpc('admin_purge_expired');   // clears anything past its 24 hours
   S.tournaments = check(await sb.from('tournaments')
     .select('*, champion:players!tournaments_champion_id_fkey(id,name)')
     .order('starts_at', { ascending: false, nullsFirst: false })
@@ -271,11 +272,12 @@ function newTournamentSection() {
 }
 
 function tournamentsSection() {
-  const pcs = S.tournaments.filter(t => t.is_pc);
-  const other = S.tournaments.filter(t => !t.is_pc);
+  const alive = S.tournaments.filter(t => !t.deleted_at);
+  const pcs = alive.filter(t => t.is_pc);
+  const other = alive.filter(t => !t.is_pc);
   const live = other.filter(t => t.status === 'live').concat(pcs.filter(t => t.status === 'live'));
   const upcoming = other.filter(t => t.status === 'upcoming');
-  const done = S.tournaments.filter(t => t.status === 'complete');
+  const done = alive.filter(t => t.status === 'complete');
 
   const row = t => {
     const champ = t.champion?.name;
@@ -296,6 +298,8 @@ function tournamentsSection() {
 
     ${pcSection(pcs)}
 
+    ${deletedSection()}
+
     <section class="panel">
       <h2>Other tournaments</h2>
       ${upcoming.length ? upcoming.map(row).join('') : '<p class="muted">Nothing else scheduled.</p>'}
@@ -304,6 +308,34 @@ function tournamentsSection() {
         <div class="archive-body">${done.map(row).join('')}</div>
       </details>` : ''}
     </section>`;
+}
+
+// Deleting marks a tournament rather than removing it, so there is a day to
+// change your mind. Nothing inside it is touched in the meantime.
+function deletedSection() {
+  const gone = S.tournaments.filter(t => t.deleted_at)
+    .sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+  if (!gone.length) return '';
+
+  const left = t => {
+    const ms = new Date(t.deleted_at).getTime() + 24 * 3600 * 1000 - Date.now();
+    if (ms <= 0) return 'due to be cleared';
+    const h = Math.floor(ms / 3600000);
+    return h >= 1 ? `${h} hour${h === 1 ? '' : 's'} left` : `${Math.ceil(ms / 60000)} minutes left`;
+  };
+
+  return `<section class="panel deleted-panel">
+    <h2>Recently deleted</h2>
+    ${gone.map(t => `<div class="t-row">
+      <span class="t-row-main">
+        <b>${esc(t.name)}</b>
+        <span class="muted small">${fmtDate(t.starts_at)} · ${left(t)}</span>
+      </span>
+      <button data-act="restore" data-id="${t.id}" class="primary">Restore</button>
+      <button data-act="purge" data-id="${t.id}">Delete now</button>
+    </div>`).join('')}
+    <p class="muted small">Kept for 24 hours with everything scored in them intact, then cleared automatically.</p>
+  </section>`;
 }
 
 // The weekly Monday fixtures. Numbers follow date order and are maintained
@@ -735,12 +767,12 @@ app.addEventListener('click', async e => {
     return;
   }
   if (el.dataset.remove) {
-    if (!confirm(`Remove ${el.dataset.name}? Any fixtures after it move up a number. `
-      + 'Anything already scored in it is deleted too.')) return;
+    if (!confirm(`Remove ${el.dataset.name}? Fixtures after it move up a number. `
+      + 'You can restore it from Recently deleted for 24 hours.')) return;
     await run(async () => {
-      check(await sb.from('tournaments').delete().eq('id', el.dataset.remove));
+      check(await sb.rpc('admin_delete_tournament', { p_tournament: el.dataset.remove }));
       if (S.sel?.id === el.dataset.remove) S.sel = null;
-    }, 'Fixture removed');
+    }, 'Removed, restorable for 24 hours');
     return;
   }
   if (el.dataset.edit) {
@@ -879,11 +911,23 @@ app.addEventListener('click', async e => {
       }
       break;
     case 'delete':
-      if (confirm(`Delete ${t.name} completely?`)) {
+      if (confirm(`Delete ${t.name}? You can restore it from Recently deleted for 24 hours.`)) {
         await run(async () => {
-          check(await sb.from('tournaments').delete().eq('id', t.id));
+          check(await sb.rpc('admin_delete_tournament', { p_tournament: t.id }));
           S.sel = null;
-        }, 'Tournament deleted');
+        }, 'Deleted, restorable for 24 hours');
+      }
+      break;
+    case 'restore':
+      await run(async () => check(await sb.rpc('admin_restore_tournament', {
+        p_tournament: el.dataset.id,
+      })), 'Restored');
+      break;
+    case 'purge':
+      if (confirm('Delete this permanently? It cannot be undone.')) {
+        await run(async () => check(await sb.rpc('admin_purge_tournament', {
+          p_tournament: el.dataset.id,
+        })), 'Deleted permanently');
       }
       break;
   }
