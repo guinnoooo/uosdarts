@@ -35,7 +35,6 @@ async function load() {
       .eq('stage', 'knockout').order('round', { ascending: false }).limit(1);
     S.koRounds = r.data?.[0]?.round ?? 1;
   }
-  document.getElementById('back').href = `/tournament/?id=${S.match.tournament_id}`;
   render();
 }
 const reload = debounce(load, 120);

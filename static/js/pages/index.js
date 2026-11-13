@@ -1,7 +1,5 @@
 import { sb, esc, fmtDate, debounce } from '../db.js';
-import { OOM_URL } from '../config.js';
 
-document.getElementById('oom-link').href = OOM_URL;
 const app = document.getElementById('app');
 
 const FORMAT = {

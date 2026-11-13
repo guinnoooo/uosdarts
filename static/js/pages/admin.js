@@ -38,11 +38,10 @@ function renderLogin(asScorer = false) {
   </form>`;
 }
 
-document.getElementById('signout').addEventListener('click', async e => {
-  e.preventDefault();
+async function signOut() {
   await sb.auth.signOut();
   location.reload();
-});
+}
 
 // ---------------------------------------------------------------- data
 
@@ -486,7 +485,7 @@ function finishBlock() {
 }
 
 function render() {
-  app.innerHTML = `<h1>Admin</h1>${manageSection()}${tournamentsSection()}${newTournamentSection()}${playersSection()}${snapshotSection()}`;
+  app.innerHTML = `<div class="admin-head"><h1>Admin</h1><button data-act="signout" class="link">Sign out</button></div>${manageSection()}${tournamentsSection()}${newTournamentSection()}${playersSection()}${snapshotSection()}`;
   const form = app.querySelector('[data-form="tournament"]');
   if (form) syncFormatFields(form);
   refreshCreateAdv();
@@ -715,6 +714,9 @@ app.addEventListener('click', async e => {
           p_tournament: t.id, p_password: null,
         })), 'Password removed');
       }
+      break;
+    case 'signout':
+      await signOut();
       break;
     case 'snap-main':
       await run(() => downloadSnapshot(false), 'rankings.csv downloaded');

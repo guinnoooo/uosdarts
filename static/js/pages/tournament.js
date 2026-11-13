@@ -1,9 +1,7 @@
 import { sb, qs, esc, fmtDate, debounce, roundName, MATCH_SELECT } from '../db.js';
-import { OOM_URL } from '../config.js';
 import { standings } from '../fixtures.js';
 import { matchCard } from '../ui.js';
 
-document.getElementById('oom-link').href = OOM_URL;
 const app = document.getElementById('app');
 const id = qs('id');
 

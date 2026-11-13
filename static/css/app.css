@@ -551,3 +551,4 @@ label.chk {
 .ranking-note {
   margin: .9rem 0 0; font-size: .8rem; color: var(--text-3); text-align: center;
 }
+.admin-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
