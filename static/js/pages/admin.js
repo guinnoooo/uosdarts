@@ -3,7 +3,6 @@ import { roundRobin, allocateGroups, buildBracket, standings, bracketPlan } from
 
 const app = document.getElementById('app');
 const S = { players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: false, picked: null, archiveOpen: false, pcsAll: false, editMatch: null,
-  newLegs: { group: null, ko: {} },   // advanced settings on the create form
   editLegs: null };                   // advanced settings on the manage panel
 
 const check = r => { if (r.error) throw r.error; return r.data; };
@@ -176,29 +175,6 @@ function createFlags() {
   };
 }
 
-function createFormOpts() {
-  const f = app.querySelector('[data-form="tournament"]');
-  if (!f) return null;
-  const num = n => parseInt(f.querySelector(`[name=${n}]`).value, 10) || 0;
-  const players = num('expected_players') || 16;
-  return {
-    format: f.querySelector('[name=format]').value,
-    players,
-    groupCount: num('group_count'),
-    advancePerGroup: num('advance_per_group'),
-    legs: S.newLegs,
-    koDefault: num('knockout_legs_to_win') || 3,
-    groupDefault: num('group_legs_to_win') || 2,
-    countLabel: `Based on ${plural(players, 'player')} entering: adjust above if that changes`,
-  };
-}
-
-function refreshCreateAdv() {
-  const box = document.getElementById('adv-create');
-  const opts = createFormOpts();
-  if (box && opts) box.innerHTML = advBody(opts);
-}
-
 // ---------------------------------------------------------------- rendering
 
 // The order of merit pages render a CSV at build time so the table is never
@@ -229,16 +205,6 @@ async function downloadSnapshot(pcOnly) {
   URL.revokeObjectURL(a.href);
 }
 
-function playersSection() {
-  return `<section class="panel"><h2>Players (${S.players.length})</h2>
-    <form data-form="player" class="inline">
-      <input name="name" placeholder="Player name" required>
-      <button class="primary">Add</button>
-    </form>
-    <div class="chips">${S.players.map(p => `<span class="chip">${esc(p.name)}</span>`).join('')}</div>
-  </section>`;
-}
-
 function newTournamentSection() {
   return `<section class="panel"><h2>New tournament</h2>
     <form data-form="tournament" class="grid-form">
@@ -259,11 +225,7 @@ function newTournamentSection() {
         <h3>Advanced settings</h3>
         <div>
           ${pointsPanel(null)}
-          <hr>
-          <label class="inline-label">Expected players
-            <input name="expected_players" type="number" min="2" value="16">
-          </label>
-          <div id="adv-create"></div>
+          <p class="muted small">Legs per round are set when you draw the fixtures, once the players are in.</p>
         </div>
       </section>
       <button class="primary">Create</button>
@@ -558,10 +520,9 @@ function finishBlock() {
 }
 
 function render() {
-  app.innerHTML = `<div class="admin-head"><h1>Admin</h1><button data-act="signout" class="link">Sign out</button></div>${manageSection()}${tournamentsSection()}${newTournamentSection()}${playersSection()}${snapshotSection()}`;
+  app.innerHTML = `<div class="admin-head"><h1>Admin</h1><button data-act="signout" class="link">Sign out</button></div>${manageSection()}${tournamentsSection()}${newTournamentSection()}${snapshotSection()}`;
   const form = app.querySelector('[data-form="tournament"]');
   if (form) syncFormatFields(form);
-  refreshCreateAdv();
 }
 
 // ---------------------------------------------------------------- entrants
@@ -715,10 +676,6 @@ app.addEventListener('submit', async e => {
     if (error) toast(error.message); else init();
     return;
   }
-  if (kind === 'player') {
-    await run(async () => check(await sb.from('players').insert({ name: data.name.trim() })));
-    return;
-  }
   if (kind === 'tournament') {
     await run(async () => {
       const row = check(await sb.from('tournaments').insert({
@@ -730,7 +687,6 @@ app.addEventListener('submit', async e => {
         advance_per_group: Number(data.advance_per_group),
         group_legs_to_win: Number(data.group_legs_to_win),
         knockout_legs_to_win: Number(data.knockout_legs_to_win),
-        round_legs: legsFrom('adv-create'),
         ...createFlags(),
       }).select().single());
       if (data.scoring_password?.trim()) {
@@ -740,7 +696,6 @@ app.addEventListener('submit', async e => {
       }
       S.sel = row;
       S.picked = [];
-      S.newLegs = { group: null, ko: {} };
     }, 'Tournament created');
   }
 });
@@ -943,21 +898,9 @@ function syncFormatFields(form) {
   form.querySelectorAll('.groups-only').forEach(el => { el.hidden = !groups; });
 }
 
-// Typing in the create form reshapes the round plan, so redraw just that part.
-app.addEventListener('input', e => {
-  const inCreate = e.target.closest('[data-form="tournament"]');
-  if (!inCreate) return;
-  if (e.target.matches('[data-legs]')) {
-    S.newLegs = legsFrom('adv-create');
-  } else if (e.target.matches('[name=group_count], [name=advance_per_group], [name=knockout_legs_to_win], [name=group_legs_to_win], [name=expected_players]')) {
-    refreshCreateAdv();
-  }
-});
-
 app.addEventListener('change', async e => {
   if (e.target.matches('[name=format]')) {
     syncFormatFields(e.target.closest('form'));
-    refreshCreateAdv();
   } else if (e.target.matches('#adv-manage [data-legs]')) {
     S.editLegs = legsFrom('adv-manage');
   } else if (e.target.matches('[data-status]')) {
