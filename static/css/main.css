@@ -205,19 +205,19 @@ dialog.player-modal::backdrop {
 .stat-label { color: var(--text-dim); }
 .stat-value { color: var(--text); font-weight: 600; margin-left: 3px; }
 
-.player-modal-badges {
+.player-modal-awards {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   gap: 16px;
 }
 
-.badge { font-size: 0.85rem; display: flex; align-items: center; gap: 6px; font-weight: 700; }
-.badge-star { font-size: 1.15rem; letter-spacing: 1px; position: relative; top: -1px; }
-.badge-gold { color: #b3975e; }
-.badge-gold .badge-star { color: var(--gold); }
-.badge-purple { color: #9a86b3; }
-.badge-purple .badge-star { color: #a56cf0; }
+.award { font-size: 0.85rem; display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.award-star { font-size: 1.15rem; letter-spacing: 1px; position: relative; top: -1px; }
+.award-gold { color: #b3975e; }
+.award-gold .award-star { color: var(--gold); }
+.award-purple { color: #9a86b3; }
+.award-purple .award-star { color: #a56cf0; }
 
 /* ---------- Footer ---------- */
 

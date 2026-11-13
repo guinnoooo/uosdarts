@@ -1,24 +1,22 @@
 baseURL = "https://uosdarts.com/"
 languageCode = "en-gb"
-title = "UOS Darts – Order of Merit"
+title = "UOS Darts"
 
-# Set to false once you're happy with the site; true hides draft content.
 buildDrafts = false
 
 [params]
-  # Society / site branding
   societyName = "UOS Darts"
   pageTitle = "Order of Merit"
   season = "2026/27"
 
-  # --- Ranking data source ---
-  # This is the file you update every week. It lives in /assets/data/
-  # (not the top-level /data folder) so Hugo can read it at build time.
-  # Path below is relative to the /assets folder.
+  # --- Ranking fallback ---
+  # Live points come from Supabase. This CSV is the copy rendered into the page
+  # at build time so the table is never blank: refresh it from the admin page
+  # when you want the published fallback brought up to date.
   rankingsCSV = "data/rankings.csv"
-  pcRankingsCSV = "data/rankings.csv"
-
-  # Column header names in your CSV (edit these two lines if your
-  # column names ever change — nothing else in the site needs touching).
+  pcRankingsCSV = "data/pc-rankings.csv"
   nameColumn = "player_name"
   pointsColumn = "total_points"
+
+[markup.goldmark.renderer]
+  unsafe = true

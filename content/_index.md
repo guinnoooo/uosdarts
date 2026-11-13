@@ -1,3 +1,3 @@
 ---
-title: "Order of Merit"
+title: "Tournaments"
 ---

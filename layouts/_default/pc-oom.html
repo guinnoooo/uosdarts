@@ -2,9 +2,19 @@
 <section class="hero">
   <div class="wrap">
     <h1>{{ .Title }}</h1>
-    <p class="hero-sub">{{ .Site.Params.season }}</p>
+    <p class="hero-sub">{{ .Site.Params.season }} · weekly Players Championships only</p>
   </div>
 </section>
+
+{{/* pc_wins decides who qualifies automatically, so hand it to the script
+     that rebuilds the provisional matchups from live points. */}}
+{{ $wins := dict }}
+{{ range $slug, $info := .Site.Data.players }}
+  {{ $w := 0 }}
+  {{ if isset $info "pc_wins" }}{{ $w = int $info.pc_wins }}{{ end }}
+  {{ $wins = merge $wins (dict $slug $w) }}
+{{ end }}
+<script type="application/json" id="pc-wins">{{ $wins | jsonify }}</script>
 
 {{ $ranked := partial "build-ranking.html" (dict "csvPath" .Site.Params.pcRankingsCSV "nameCol" .Site.Params.nameColumn "pointsCol" .Site.Params.pointsColumn) }}
 
@@ -14,48 +24,30 @@
   {{ $slug := urlize .name }}
   {{ $info := index $.Site.Data.players $slug }}
   {{ $pcWins := 0 }}
-  {{ if $info }}
-    {{ if isset $info "pc_wins" }}{{ $pcWins = int $info.pc_wins }}{{ end }}
-  {{ end }}
-  {{ if ge $pcWins 1 }}
-    {{ $winners = $winners | append . }}
-  {{ else }}
-    {{ $nonWinners = $nonWinners | append . }}
-  {{ end }}
+  {{ if $info }}{{ if isset $info "pc_wins" }}{{ $pcWins = int $info.pc_wins }}{{ end }}{{ end }}
+  {{ if ge $pcWins 1 }}{{ $winners = $winners | append . }}{{ else }}{{ $nonWinners = $nonWinners | append . }}{{ end }}
 {{ end }}
-
 {{ $slotsLeft := sub 16 (len $winners) }}
 {{ if lt $slotsLeft 0 }}{{ $slotsLeft = 0 }}{{ end }}
-{{ $fillers := first $slotsLeft $nonWinners }}
-
-{{ $qualified := slice }}
-{{ range $winners }}{{ $qualified = $qualified | append . }}{{ end }}
-{{ range $fillers }}{{ $qualified = $qualified | append . }}{{ end }}
-{{ $qualified = sort $qualified "rank" "asc" }}
-
-{{ $matchups := slice }}
-{{ range $i := seq 0 7 }}
-  {{ $j := sub 15 $i }}
-  {{ $playerA := dict }}
-  {{ $playerB := dict }}
-  {{ if lt $i (len $qualified) }}{{ $playerA = index $qualified $i }}{{ end }}
-  {{ if lt $j (len $qualified) }}{{ $playerB = index $qualified $j }}{{ end }}
-  {{ $matchups = $matchups | append (dict "seedA" (add $i 1) "playerA" $playerA "seedB" (add $j 1) "playerB" $playerB) }}
-{{ end }}
+{{ $qualified := sort ($winners | append (first $slotsLeft $nonWinners)) "rank" "asc" }}
 
 <section class="bracket wrap">
   <h2 class="section-heading">PC Finals Provisional Matches</h2>
-  <div class="bracket-list">
-    {{ range $matchups }}
+  <div class="bracket-list" id="pc-bracket">
+    {{ range $i := seq 0 7 }}
+      {{ $j := sub 15 $i }}
+      {{ $a := "" }}{{ $b := "" }}
+      {{ if lt $i (len $qualified) }}{{ $a = (index $qualified $i).name }}{{ end }}
+      {{ if lt $j (len $qualified) }}{{ $b = (index $qualified $j).name }}{{ end }}
       <div class="bracket-match">
         <div class="bracket-player">
-          <span class="bracket-seed">{{ .seedA }}</span>
-          <span class="bracket-name">{{ if .playerA }}{{ .playerA.name }}{{ else }}&ndash;{{ end }}</span>
+          <span class="bracket-seed">{{ add $i 1 }}</span>
+          <span class="bracket-name">{{ if $a }}{{ $a }}{{ else }}&ndash;{{ end }}</span>
         </div>
         <span class="bracket-vs">vs</span>
         <div class="bracket-player">
-          <span class="bracket-name">{{ if .playerB }}{{ .playerB.name }}{{ else }}&ndash;{{ end }}</span>
-          <span class="bracket-seed">{{ .seedB }}</span>
+          <span class="bracket-name">{{ if $b }}{{ $b }}{{ else }}&ndash;{{ end }}</span>
+          <span class="bracket-seed">{{ add $j 1 }}</span>
         </div>
       </div>
     {{ end }}
@@ -64,6 +56,10 @@
 
 <section class="rankings wrap">
   <h2 class="section-heading">Full PC Order of Merit</h2>
-  {{ partial "ranking-table.html" (dict "ranked" $ranked "site" .Site) }}
+  {{ partial "ranking-table.html" (dict "ranked" $ranked "site" .Site "pcOnly" true) }}
 </section>
+{{ end }}
+
+{{ define "scripts" }}
+<script type="module" src="{{ "js/pages/oom.js" | relURL }}"></script>
 {{ end }}

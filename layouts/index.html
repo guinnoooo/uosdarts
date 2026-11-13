@@ -1,13 +1,16 @@
 {{ define "main" }}
 <section class="hero">
   <div class="wrap">
-    <h1>{{ .Site.Params.pageTitle }}</h1>
+    <h1>Tournaments</h1>
     <p class="hero-sub">{{ .Site.Params.season }}</p>
   </div>
 </section>
 
-<section class="rankings wrap">
-  {{ $ranked := partial "build-ranking.html" (dict "csvPath" .Site.Params.rankingsCSV "nameCol" .Site.Params.nameColumn "pointsCol" .Site.Params.pointsColumn) }}
-  {{ partial "ranking-table.html" (dict "ranked" $ranked "site" .Site) }}
-</section>
+<div class="wrap app-wrap">
+  <div id="app"><p class="muted">Loading…</p></div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script type="module" src="{{ "js/pages/index.js" | relURL }}"></script>
 {{ end }}

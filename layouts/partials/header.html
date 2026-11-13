@@ -4,8 +4,11 @@
       <span class="brand-name">{{ .Site.Params.societyName }}</span>
     </a>
     <nav class="site-nav">
-      <a href="{{ "/" | relURL }}" class="nav-link{{ if .IsHome }} nav-link-active{{ end }}">Order of Merit</a>
-      <a href="{{ "/pc-oom/" | relURL }}" class="nav-link{{ if eq .File.ContentBaseName "pc-oom" }} nav-link-active{{ end }}">PC Order of Merit</a>
+      {{ $p := .RelPermalink }}
+      <a href="{{ "/" | relURL }}" class="nav-link{{ if .IsHome }} nav-link-active{{ end }}">Tournaments</a>
+      <a href="{{ "/order-of-merit/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/order-of-merit/") }} nav-link-active{{ end }}">Order of Merit</a>
+      <a href="{{ "/pc-oom/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/pc-oom/") }} nav-link-active{{ end }}">PC Order of Merit</a>
+      <a href="{{ "/admin/" | relURL }}" class="nav-link nav-link-quiet">Admin</a>
     </nav>
   </div>
 </header>
