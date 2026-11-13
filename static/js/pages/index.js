@@ -1,4 +1,4 @@
-import { sb, esc, fmtDate, debounce } from '../db.js';
+import { sb, showLoadError, esc, fmtDate, debounce } from '../db.js';
 
 const app = document.getElementById('app');
 
@@ -23,7 +23,7 @@ function section(title, list, empty) {
   </section>`;
 }
 
-async function load() {
+async function loadInner() {
   const { data, error } = await sb.from('tournaments').select('*, champion:players!tournaments_champion_id_fkey(id,name)')
     .order('starts_at', { ascending: true, nullsFirst: false });
   if (error) {
@@ -43,3 +43,12 @@ load();
 sb.channel('tournaments')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments' }, debounce(load))
   .subscribe();
+
+// Entry point: never leaves the page sitting on "Loading…".
+async function load() {
+  try {
+    await loadInner();
+  } catch (e) {
+    showLoadError(app, e);
+  }
+}

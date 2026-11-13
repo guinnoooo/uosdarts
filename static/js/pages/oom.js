@@ -78,6 +78,28 @@ function rebuildBracket(rows) {
   }).join('');
 }
 
+// Profile stats come from matches actually scored on the site. The values
+// Hugo rendered from data/players stay put for anything the database has no
+// figure for yet.
+async function liveStats() {
+  const season = list.dataset.season || '2026/27';
+  const { data, error } = await sb.rpc('player_stats', { p_season: season });
+  if (error || !data) return;
+  for (const r of data) {
+    const box = document.getElementById(`player-${r.player_slug}`);
+    if (!box) continue;
+    for (const [key, value] of Object.entries(r)) {
+      if (key.startsWith('player_')) continue;
+      const el = box.querySelector(`[data-stat="${key}"]`);
+      if (!el) continue;
+      if (value === null || value === undefined) continue;
+      // A zero from the database is real for counts, but for "best run" it
+      // means nothing has been played yet, so leave the published value.
+      if (typeof value === 'string' || Number.isFinite(value)) el.textContent = value;
+    }
+  }
+}
+
 async function run() {
   const pcOnly = list.dataset.pcOnly === 'true';
   const season = list.dataset.season || '2026/27';
@@ -89,6 +111,7 @@ async function run() {
     list.innerHTML = data.map(row).join('');
     fillModals(data);
     rebuildBracket(data);
+    await liveStats();
   } catch (e) {
     // Leave the table built at deploy time in place and say so quietly.
     if (note) {

@@ -1,8 +1,8 @@
-import { sb, esc, toast, fmtDate, matchLabel, MATCH_SELECT } from '../db.js';
+import { sb, showLoadError, esc, toast, fmtDate, matchLabel, MATCH_SELECT } from '../db.js';
 import { roundRobin, allocateGroups, buildBracket, standings, bracketPlan } from '../fixtures.js';
 
 const app = document.getElementById('app');
-const S = { players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: false, archiveOpen: false, pcsAll: false, editMatch: null,
+const S = { players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: false, picked: null, archiveOpen: false, pcsAll: false, editMatch: null,
   newLegs: { group: null, ko: {} },   // advanced settings on the create form
   editLegs: null };                   // advanced settings on the manage panel
 
@@ -10,7 +10,7 @@ const check = r => { if (r.error) throw r.error; return r.data; };
 
 // ---------------------------------------------------------------- auth
 
-async function init() {
+async function initInner() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session || session.user.is_anonymous) return renderLogin(!!session?.user?.is_anonymous);
   const { data } = await sb.from('admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
@@ -86,16 +86,18 @@ const PC_SCHEDULE = { winner: 1000, final: 700, semi: 400, quarter: 300, last_16
 
 // Order of merit points for one tournament, by how far a player got.
 function pointsPanel(t) {
-  const sched = { ...PC_SCHEDULE, ...(t.points_schedule ?? {}) };
+  const sched = { ...PC_SCHEDULE, ...(t?.points_schedule ?? {}) };
+  const isNew = !t;
   return `<div class="oom-box">
     <label class="chk">
-      <input type="checkbox" data-oom-counts ${t.counts_for_oom ? 'checked' : ''}>
+      <input type="checkbox" data-oom-counts ${isNew || t.counts_for_oom ? 'checked' : ''}>
       Counts towards the order of merit
     </label>
     <label class="chk">
-      <input type="checkbox" data-oom-pc ${t.is_pc ? 'checked' : ''} ${t.is_pc ? 'disabled' : ''}>
-      Weekly PC${t.is_pc ? ` (PC ${t.pc_number ?? '–'}, counts towards the PC order of merit)` : ''}
+      <input type="checkbox" data-oom-major ${t?.is_major ? 'checked' : ''}>
+      Major (counts towards Major Best and Major Wins on player profiles)
     </label>
+    ${t?.is_pc ? `<p class="muted small">Weekly PC ${t.pc_number ?? ''}: also counts towards the PC order of merit.</p>` : ''}
     <table class="points-plan">
       <thead><tr><th>Reached</th><th>Points</th></tr></thead>
       <tbody>${REACH_LABELS.map(([k, label]) => `<tr>
@@ -103,10 +105,11 @@ function pointsPanel(t) {
         <td><input type="number" min="0" step="50" data-pts="${k}" value="${sched[k] ?? 0}"></td>
       </tr>`).join('')}</tbody>
     </table>
-    <div class="row">
-      <span class="muted small">Applied when you award points for this tournament.</span>
-      <button data-act="save-points" class="primary">Save points</button>
-    </div>
+    ${isNew ? '<p class="muted small">Saved with the tournament when you press Create.</p>'
+      : `<div class="row">
+          <span class="muted small">Applied when you award points for this tournament.</span>
+          <button data-act="save-points" class="primary">Save points</button>
+        </div>`}
   </div>`;
 }
 
@@ -157,6 +160,19 @@ function collectLegs(scope) {
     else out.ko[i.dataset.legs] = v;
   });
   return out;
+}
+
+// Reads the order of merit controls on the create form.
+function createFlags() {
+  const box = app.querySelector('[data-form="tournament"] .oom-box');
+  if (!box) return {};
+  const sched = {};
+  box.querySelectorAll('[data-pts]').forEach(i => { sched[i.dataset.pts] = parseInt(i.value, 10) || 0; });
+  return {
+    points_schedule: sched,
+    counts_for_oom: box.querySelector('[data-oom-counts]').checked,
+    is_major: box.querySelector('[data-oom-major]').checked,
+  };
 }
 
 function createFormOpts() {
@@ -238,11 +254,15 @@ function newTournamentSection() {
       <label class="groups-only" hidden>Group legs to win <input name="group_legs_to_win" type="number" value="2" min="1"></label>
       <label>Knockout legs to win <input name="knockout_legs_to_win" type="number" value="3" min="1"></label>
       <label>Scoring password <input name="scoring_password" type="text" autocomplete="off" placeholder="Leave blank for none"></label>
-      <button class="primary">Create</button>
       <details class="adv-box" ${S.advOpen ? 'open' : ''}>
-        <summary>Advanced settings</summary>
-        <div class="adv-body" id="adv-create"></div>
+        <summary>Advanced settings: legs per round, order of merit points, major</summary>
+        <div class="adv-body">
+          ${pointsPanel(null)}
+          <hr>
+          <div id="adv-create"></div>
+        </div>
       </details>
+      <button class="primary">Create</button>
     </form>
   </section>`;
 }
@@ -328,9 +348,8 @@ function manageSection() {
   const koRounds = Math.max(0, ...koMatches.map(m => m.round));
   const canDrawKo = t.format === 'groups_knockout' && groupMatches.length > 0 &&
     groupMatches.every(m => m.status === 'complete') && koMatches.length === 0;
-  const seedOf = id => S.entrants.find(e => e.player_id === id)?.seed ?? '';
-  // Nothing saved yet means everyone plays, so a new tournament is one click from a draw.
-  const playing = S.entrants.length ? S.entrants.map(e => e.player_id) : S.players.map(p => p.id);
+  // Starts empty: players are added by name rather than unticked from everyone.
+  const picked = S.picked ?? S.entrants.map(e => ({ player_id: e.player_id, seed: e.seed }));
 
   return `<section class="panel manage">
     <h2>${esc(t.name)}${t.is_pc && !/^PC \d+$/.test(t.name) ? ` <span class="tag">PC ${t.pc_number ?? '–'}</span>` : ''}</h2>
@@ -353,17 +372,37 @@ function manageSection() {
     </div>
 
     ${hasFixtures ? '' : `
-      <details class="entrant-box" ${S.entrantsOpen ? 'open' : ''}>
-        <summary>Players in this tournament: <b>${playing.length} of ${S.players.length}</b></summary>
-        <div class="entrant-body">
-          <p class="muted">Everyone is in by default. Untick anyone sitting out. Seeds are optional; 1 is the top seed, and anyone without one is drawn at random.</p>
-          <div class="entrants">${S.players.map(p => `<label class="entrant" data-entrant="${p.id}">
-            <input type="checkbox" ${playing.includes(p.id) ? 'checked' : ''}> ${esc(p.name)}
-            <input type="number" min="1" placeholder="seed" value="${seedOf(p.id)}">
-          </label>`).join('') || '<p class="muted">Add some players first.</p>'}</div>
-          <button data-act="save-entrants">Save selection</button>
+      <div class="entrant-box">
+        <div class="entrant-head">
+          <b>Players in this tournament</b><span class="count">${picked.length}</span>
         </div>
-      </details>`}
+        <div class="entrant-body">
+          <div class="player-add">
+            <input type="text" id="player-search" list="player-options" autocomplete="off"
+                   placeholder="Type a name, then press Enter">
+            <datalist id="player-options">
+              ${S.players.filter(p => !picked.some(x => x.player_id === p.id))
+                .map(p => `<option value="${esc(p.name)}"></option>`).join('')}
+            </datalist>
+            <button data-act="add-entrant" class="primary">Add</button>
+          </div>
+          <p class="muted small">Suggests from the ${S.players.length} players on file. A name that isn't on the list can be added as a new profile.</p>
+
+          ${picked.length ? `<div class="picked">${picked.map(e => {
+            const pl = S.players.find(x => x.id === e.player_id);
+            return `<div class="picked-row">
+              <span class="picked-name">${esc(pl?.name ?? 'Unknown')}</span>
+              <input type="number" min="1" placeholder="seed" data-seed="${e.player_id}" value="${e.seed ?? ''}">
+              <button data-drop="${e.player_id}" title="Remove">&times;</button>
+            </div>`;
+          }).join('')}</div>` : '<p class="muted">No players added yet.</p>'}
+
+          <div class="row">
+            <span class="muted small">Seeds are optional; 1 is the top seed, anyone without one is drawn at random.</span>
+            <button data-act="save-entrants">Save selection</button>
+          </div>
+        </div>
+      </div>`}
 
     <details class="adv-box" ${S.advOpen ? 'open' : ''}>
       <summary>Advanced settings</summary>
@@ -371,20 +410,20 @@ function manageSection() {
         ${pointsPanel(t)}
         ${hasFixtures ? '' : `<hr>${advBody({
           format: t.format,
-          players: playing.length,
+          players: picked.length,
           groupCount: t.group_count,
           advancePerGroup: t.advance_per_group,
           legs: S.editLegs ?? t.round_legs ?? {},
           koDefault: t.knockout_legs_to_win,
           groupDefault: t.group_legs_to_win,
-          countLabel: `${plural(playing.length, 'player')} selected`,
+          countLabel: `${plural(picked.length, 'player')} added`,
         })}`}
       </div>
     </details>
 
     ${hasFixtures ? '' : `<div class="row">
-      <span class="muted">${playing.length < 2 ? 'Needs at least 2 players.' : `Ready to draw with ${playing.length} players.`}</span>
-      <button data-act="draw" class="primary" ${playing.length < 2 ? 'disabled' : ''}>Draw fixtures</button>
+      <span class="muted">${picked.length < 2 ? 'Add at least 2 players.' : `Ready to draw with ${picked.length} players.`}</span>
+      <button data-act="draw" class="primary" ${picked.length < 2 ? 'disabled' : ''}>Draw fixtures</button>
     </div>`}
 
     ${canDrawKo ? '<div class="row"><button data-act="draw-ko" class="primary">Group stage done: draw knockout</button></div>' : ''}
@@ -495,17 +534,52 @@ function render() {
 
 // Reads the tick boxes on screen. If the panel isn't rendered, everyone plays.
 async function saveEntrants(t) {
-  const boxes = [...app.querySelectorAll('[data-entrant]')];
-  const rows = boxes.length
-    ? boxes.filter(r => r.querySelector('input[type=checkbox]').checked).map(r => ({
-        tournament_id: t.id,
-        player_id: r.dataset.entrant,
-        seed: parseInt(r.querySelector('input[type=number]').value, 10) || null,
-      }))
-    : S.players.map(p => ({ tournament_id: t.id, player_id: p.id, seed: null }));
-  if (rows.length < 2) throw new Error('Pick at least 2 players');
+  syncSeeds();
+  const rows = (S.picked ?? S.entrants.map(e => ({ player_id: e.player_id, seed: e.seed })))
+    .map(e => ({ tournament_id: t.id, player_id: e.player_id, seed: e.seed ?? null }));
+  if (rows.length < 2) throw new Error('Add at least 2 players');
   check(await sb.from('tournament_players').delete().eq('tournament_id', t.id));
   check(await sb.from('tournament_players').insert(rows));
+}
+
+// Seeds live in the inputs until something needs them.
+function syncSeeds() {
+  if (!S.picked) return;
+  app.querySelectorAll('[data-seed]').forEach(i => {
+    const row = S.picked.find(e => e.player_id === i.dataset.seed);
+    if (row) row.seed = parseInt(i.value, 10) || null;
+  });
+}
+
+function currentPicked() {
+  if (!S.picked) S.picked = S.entrants.map(e => ({ player_id: e.player_id, seed: e.seed }));
+  return S.picked;
+}
+
+// Adds whoever is typed in the search box, creating the player if the name
+// isn't one of the ones already on file.
+async function addEntrant() {
+  const input = app.querySelector('#player-search');
+  const name = (input?.value ?? '').trim();
+  if (!name) return;
+  syncSeeds();
+
+  const match = S.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+  let id = match?.id;
+
+  if (!id) {
+    if (!confirm(`"${name}" isn't on the player list. Create a profile for them?`)) return;
+    id = check(await sb.rpc('admin_add_player', { p_name: name }));
+    S.players = check(await sb.from('players').select('*').order('name'));
+  }
+  const picked = currentPicked();
+  if (picked.some(e => e.player_id === id)) {
+    toast(`${name} is already in this tournament`);
+    return;
+  }
+  picked.push({ player_id: id, seed: null });
+  render();
+  app.querySelector('#player-search')?.focus();
 }
 
 async function refreshSelection(t) {
@@ -589,6 +663,13 @@ async function run(fn, okMsg) {
   await refresh();
 }
 
+app.addEventListener('keydown', async e => {
+  if (e.target.id === 'player-search' && e.key === 'Enter') {
+    e.preventDefault();
+    await run(addEntrant);
+  }
+});
+
 app.addEventListener('submit', async e => {
   e.preventDefault();
   const f = e.target;
@@ -616,6 +697,7 @@ app.addEventListener('submit', async e => {
         group_legs_to_win: Number(data.group_legs_to_win),
         knockout_legs_to_win: Number(data.knockout_legs_to_win),
         round_legs: legsFrom('adv-create'),
+        ...createFlags(),
       }).select().single());
       if (data.scoring_password?.trim()) {
         check(await sb.rpc('admin_set_scoring_password', {
@@ -623,6 +705,7 @@ app.addEventListener('submit', async e => {
         }));
       }
       S.sel = row;
+      S.picked = [];
       S.newLegs = { group: null, ko: {} };
     }, 'Tournament created');
   }
@@ -635,11 +718,18 @@ app.addEventListener('click', async e => {
 
   if (el.dataset.manage) {
     S.sel = S.tournaments.find(x => x.id === el.dataset.manage);
+    S.picked = null;   // rebuilt from whatever that tournament already has
     await refresh();
     return;
   }
   if (el.dataset.release) {
     await run(async () => check(await sb.rpc('release_match', { p_match: el.dataset.release })), 'Scorer released');
+    return;
+  }
+  if (el.dataset.drop) {
+    syncSeeds();
+    S.picked = currentPicked().filter(e => e.player_id !== el.dataset.drop);
+    render();
     return;
   }
   if (el.dataset.cancel) {
@@ -681,6 +771,9 @@ app.addEventListener('click', async e => {
   }
 
   switch (el.dataset.act) {
+    case 'add-entrant':
+      await run(addEntrant);
+      break;
     case 'save-entrants':
       await run(() => saveEntrants(t), 'Selection saved');
       break;
@@ -746,6 +839,7 @@ app.addEventListener('click', async e => {
       await run(async () => check(await sb.from('tournaments').update({
         points_schedule: sched,
         counts_for_oom: box.querySelector('[data-oom-counts]').checked,
+        is_major: box.querySelector('[data-oom-major]').checked,
       }).eq('id', t.id)), 'Points saved');
       break;
     }
@@ -836,3 +930,11 @@ app.addEventListener('change', async e => {
 });
 
 init();
+
+async function init() {
+  try {
+    await initInner();
+  } catch (e) {
+    showLoadError(app, e);
+  }
+}

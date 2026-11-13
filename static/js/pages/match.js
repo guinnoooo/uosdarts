@@ -1,5 +1,5 @@
 import {
-  sb, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, MATCH_SELECT,
+  sb, showLoadError, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, MATCH_SELECT,
 } from '../db.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
@@ -14,7 +14,7 @@ const S = {
 
 // ---------------------------------------------------------------- data
 
-async function load() {
+async function loadInner() {
   const [m, l, v] = await Promise.all([
     sb.from('matches').select(`${MATCH_SELECT}, tournament:tournaments(id,name,requires_password)`).eq('id', id).single(),
     sb.from('legs').select('*').eq('match_id', id).order('leg_no'),
@@ -485,3 +485,12 @@ setInterval(() => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') reload();
 });
+
+// Entry point: never leaves the page sitting on "Loading…".
+async function load() {
+  try {
+    await loadInner();
+  } catch (e) {
+    showLoadError(app, e);
+  }
+}

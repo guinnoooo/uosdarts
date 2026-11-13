@@ -1,4 +1,4 @@
-import { sb, qs, esc, fmtDate, debounce, roundName, MATCH_SELECT } from '../db.js';
+import { sb, showLoadError, qs, esc, fmtDate, debounce, roundName, MATCH_SELECT } from '../db.js';
 import { standings } from '../fixtures.js';
 import { matchCard } from '../ui.js';
 
@@ -11,7 +11,7 @@ let S = {
 };
 let subscribed = false;
 
-async function load() {
+async function loadInner() {
   const [t, e, m] = await Promise.all([
     sb.from('tournaments').select('*, champion:players!tournaments_champion_id_fkey(id,name)').eq('id', id).single(),
     sb.from('tournament_players').select('*, players(id,name)').eq('tournament_id', id),
@@ -166,3 +166,12 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
   if (document.visibilityState === 'visible') load();
 }, 120000);
+
+// Entry point: never leaves the page sitting on "Loading…".
+async function load() {
+  try {
+    await loadInner();
+  } catch (e) {
+    showLoadError(app, e);
+  }
+}

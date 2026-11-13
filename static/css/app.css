@@ -552,3 +552,25 @@ label.chk {
   margin: .9rem 0 0; font-size: .8rem; color: var(--text-3); text-align: center;
 }
 .admin-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+
+/* entrant picker */
+.entrant-box { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface-2); margin: .7rem 0; }
+.entrant-head {
+  display: flex; align-items: center; gap: .5rem; padding: .6rem .85rem;
+  font-size: .85rem; border-bottom: 1px solid var(--line);
+}
+.entrant-head .count {
+  font-family: var(--mono); font-size: .75rem; color: var(--accent);
+  border: 1px solid var(--accent-dim); border-radius: 3px; padding: 0 6px;
+}
+.player-add { display: flex; gap: .5rem; margin-bottom: .5rem; }
+.player-add input { flex: 1; min-width: 0; }
+.picked { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .3rem; margin: .7rem 0; }
+.picked-row {
+  display: flex; align-items: center; gap: .5rem; padding: .3rem .5rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+}
+.picked-name { flex: 1; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picked-row input[type=number] { width: 4rem; }
+.picked-row button { padding: .1rem .45rem; font-size: 1rem; line-height: 1; color: var(--text-3); }
+.picked-row button:hover { color: var(--live); border-color: var(--live); }

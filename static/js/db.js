@@ -63,3 +63,15 @@ export function toast(msg, isError = true) {
   clearTimeout(el._t);
   el._t = setTimeout(() => { el.className = ''; }, 3500);
 }
+
+// Anything that stops the first load — no keys in config.js, Supabase
+// unreachable, a blocked network — should say so rather than sit on "Loading…".
+export function showLoadError(el, e) {
+  const placeholder = SUPABASE_URL.includes('YOUR-PROJECT-REF') || SUPABASE_ANON_KEY.includes('YOUR-');
+  const msg = placeholder
+    ? 'This site has not been connected to its database yet: fill in js/config.js with the Supabase project URL and publishable key.'
+    : `Could not reach the scoring database. ${esc(e?.message ?? e ?? 'Unknown error')}`;
+  el.innerHTML = `<div class="panel center"><p class="error">${esc(msg)}</p>
+    <p class="muted small">Check your connection and reload. If it keeps happening, tell the committee.</p></div>`;
+  console.error('uosdarts: load failed', e);
+}
