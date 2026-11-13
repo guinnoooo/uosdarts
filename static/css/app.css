@@ -365,11 +365,20 @@ td { padding: .42rem .5rem; border-bottom: 1px solid var(--line); }
   padding: .18rem .55rem; border-radius: 3px; font-size: .82rem; color: var(--text-2);
 }
 
-details.entrant-box, details.adv-box {
+details.entrant-box {
   border: 1px solid var(--line); border-radius: var(--r-lg);
   background: var(--surface-2); margin: .7rem 0;
 }
-details.adv-box { grid-column: 1 / -1; }
+.adv-box {
+  display: block; grid-column: 1 / -1;
+  border: 1px solid var(--accent-dim); border-radius: var(--r-lg);
+  background: var(--surface-2); margin: .9rem 0;
+}
+.adv-head {
+  padding: .6rem .85rem; font-size: .75rem; font-weight: 650;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--accent);
+  border-bottom: 1px solid var(--line);
+}
 details.entrant-box > summary, details.adv-box > summary {
   cursor: pointer; padding: .6rem .85rem; font-size: .85rem; font-weight: 600;
   list-style: none; display: flex; align-items: center; gap: .4rem; color: var(--text);
@@ -574,3 +583,8 @@ label.chk {
 .picked-row input[type=number] { width: 4rem; }
 .picked-row button { padding: .1rem .45rem; font-size: 1rem; line-height: 1; color: var(--text-3); }
 .picked-row button:hover { color: var(--live); border-color: var(--live); }
+.inline-label {
+  flex-direction: row; align-items: center; gap: .6rem; margin-bottom: .6rem;
+  font-size: .76rem;
+}
+.inline-label input { width: 5rem; }

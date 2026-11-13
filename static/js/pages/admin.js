@@ -179,7 +179,7 @@ function createFormOpts() {
   const f = app.querySelector('[data-form="tournament"]');
   if (!f) return null;
   const num = n => parseInt(f.querySelector(`[name=${n}]`).value, 10) || 0;
-  const players = S.players.length;
+  const players = num('expected_players') || 16;
   return {
     format: f.querySelector('[name=format]').value,
     players,
@@ -188,7 +188,7 @@ function createFormOpts() {
     legs: S.newLegs,
     koDefault: num('knockout_legs_to_win') || 3,
     groupDefault: num('group_legs_to_win') || 2,
-    countLabel: `${plural(players, 'player')} on the list, and everyone plays by default`,
+    countLabel: `Based on ${plural(players, 'player')} entering: adjust above if that changes`,
   };
 }
 
@@ -254,14 +254,17 @@ function newTournamentSection() {
       <label class="groups-only" hidden>Group legs to win <input name="group_legs_to_win" type="number" value="2" min="1"></label>
       <label>Knockout legs to win <input name="knockout_legs_to_win" type="number" value="3" min="1"></label>
       <label>Scoring password <input name="scoring_password" type="text" autocomplete="off" placeholder="Leave blank for none"></label>
-      <details class="adv-box" ${S.advOpen ? 'open' : ''}>
-        <summary>Advanced settings: legs per round, order of merit points, major</summary>
+      <section class="adv-box">
+        <div class="adv-head">Advanced settings</div>
         <div class="adv-body">
           ${pointsPanel(null)}
           <hr>
+          <label class="inline-label">Expected players
+            <input name="expected_players" type="number" min="2" value="16">
+          </label>
           <div id="adv-create"></div>
         </div>
-      </details>
+      </section>
       <button class="primary">Create</button>
     </form>
   </section>`;
@@ -404,8 +407,8 @@ function manageSection() {
         </div>
       </div>`}
 
-    <details class="adv-box" ${S.advOpen ? 'open' : ''}>
-      <summary>Advanced settings</summary>
+    <section class="adv-box">
+      <div class="adv-head">Advanced settings</div>
       <div class="adv-body" id="adv-manage">
         ${pointsPanel(t)}
         ${hasFixtures ? '' : `<hr>${advBody({
@@ -419,7 +422,7 @@ function manageSection() {
           countLabel: `${plural(picked.length, 'player')} added`,
         })}`}
       </div>
-    </details>
+    </section>
 
     ${hasFixtures ? '' : `<div class="row">
       <span class="muted">${picked.length < 2 ? 'Add at least 2 players.' : `Ready to draw with ${picked.length} players.`}</span>
@@ -888,7 +891,6 @@ app.addEventListener('click', async e => {
 
 app.addEventListener('toggle', e => {
   if (e.target.matches('details.entrant-box')) S.entrantsOpen = e.target.open;
-  if (e.target.matches('details.adv-box')) S.advOpen = e.target.open;
   if (e.target.matches('details.archive-box')) S.archiveOpen = e.target.open;
 }, true);
 
@@ -903,7 +905,7 @@ app.addEventListener('input', e => {
   if (!inCreate) return;
   if (e.target.matches('[data-legs]')) {
     S.newLegs = legsFrom('adv-create');
-  } else if (e.target.matches('[name=group_count], [name=advance_per_group], [name=knockout_legs_to_win], [name=group_legs_to_win]')) {
+  } else if (e.target.matches('[name=group_count], [name=advance_per_group], [name=knockout_legs_to_win], [name=group_legs_to_win], [name=expected_players]')) {
     refreshCreateAdv();
   }
 });
