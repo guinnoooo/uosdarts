@@ -68,8 +68,8 @@ roles:
 
 # What an empty seat says in its section.
 waiting:
-  pick: One of the Ben's four picks.
-  qualifier: Goes to a qualifier winner.
+  pick: One of Ben's four picks.
+  qualifier: Goes to a quals winner.
 
 seats:
   - order: 1

@@ -354,7 +354,13 @@
   /* Seven across is too wide for a phone, so the cast and its names scroll
      together as one block and keep their alignment. */
   .ds-cast-wrap {
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    /* Sideways only. Setting overflow-x alone makes the browser allow
+       vertical scrolling here too, and touch-action keeps an up-and-down
+       swipe scrolling the page rather than being caught by this strip. */
+    overflow-x: auto; overflow-y: hidden;
+    touch-action: pan-x pinch-zoom;
+    overscroll-behavior-x: contain;      /* no back-swipe at the ends */
+    -webkit-overflow-scrolling: touch;
     /* fade the figures out at the edges instead of slicing them off */
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
     mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
