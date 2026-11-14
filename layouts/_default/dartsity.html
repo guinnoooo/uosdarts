@@ -1,0 +1,175 @@
+{{ define "main" }}
+{{ $d := .Site.Data.dartsity }}
+{{ $seats := sort $d.seats "order" }}
+
+{{/* Two orders. Left to right across the stage the captain sits in the
+     middle. Scrolling down he comes first, then his picks in order, then
+     the qualifiers. */}}
+{{ $captain := where $seats "role" "captain" }}
+{{ $picks   := sort (where $seats "role" "pick") "number" }}
+{{ $quals   := sort (where $seats "role" "qualifier") "number" }}
+{{ $sections := $captain | append $picks | append $quals }}
+
+{{/* The masthead face, loaded only on this page. To change it, swap the
+     name here and in .ds-title in css/dartsity.css. Alternatives noted there:
+     family=Archivo+Black  or  family=Oswald:wght@700 */}}
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ "css/dartsity.css" | relURL }}?v={{ now.Unix }}">
+
+<div class="ds" data-event-date="{{ $d.event.date }}" data-season="{{ .Site.Params.season }}">
+
+  {{/* ---------------------------------------------------------- the stage */}}
+  <section class="ds-stage" id="ds-stage">
+    <div class="ds-stage-inner">
+      <div class="ds-mark" aria-hidden="true"></div>
+      <p class="ds-kicker">{{ $d.event.dateLabel }}</p>
+      <h1 class="ds-title">{{ $d.event.name }}</h1>
+      {{ with $d.event.tagline }}<p class="ds-tagline">{{ . }}</p>{{ end }}
+
+      {{/* Billing line, set the way a poster would. */}}
+      <p class="ds-billing">
+        <span>{{ len $captain }} captain</span><i>/</i><span>{{ len $picks }} picks</span><i>/</i><span>{{ len $quals }} qualifiers</span>
+      </p>
+      {{ with $d.event.venue }}<p class="ds-venue">{{ . }}</p>{{ end }}
+
+      {{/* The cast: cut-out figures standing together, the captain in the
+           middle and slightly in front, the rest stepping back either side.
+           Names go in their own row underneath so overlapping figures never
+           collide with their labels. */}}
+      {{ $centre := 4 }}
+      {{ with index $captain 0 }}{{ $centre = .order }}{{ end }}
+
+      <div class="ds-cast-wrap" style="--n: {{ len $seats }}">
+        <ol class="ds-cast" aria-label="The seven players">
+          {{ range $seats }}
+          {{/* How many steps out from the captain this seat sits. Always
+               subtract the smaller from the larger: some Hugo builds type
+               these YAML numbers as unsigned, where 1 - 4 wraps round to a
+               vast positive number instead of going negative. */}}
+          {{ $step := 0 }}
+          {{ if ge .order $centre }}{{ $step = sub .order $centre }}{{ else }}{{ $step = sub $centre .order }}{{ end }}
+          <li class="ds-cast-fig{{ if .tbd }} is-tbd{{ else }} is-named{{ end }}"
+              style="--d: {{ $step }}; --z: {{ sub 10 $step }}; --i: {{ .order }}">
+            {{ if .tbd }}
+              {{ partial "dartsity-silhouette.html" . }}
+            {{ else }}
+              <img src="{{ (or .image (printf "/images/dartsity/%s.png" .slug)) | relURL }}"
+                   alt="{{ .name }}" loading="eager" decoding="async"
+                   onerror="this.closest('.ds-cast-fig').classList.add('img-missing');this.remove()">
+              {{/* shown by the stylesheet if that photo is missing */}}
+              <span class="ds-sil-fallback">{{ partial "dartsity-silhouette.html" . }}</span>
+            {{ end }}
+          </li>
+          {{ end }}
+        </ol>
+
+        {{/* The lit floor they stand on, at the cast's baseline. */}}
+        <div class="ds-floor" aria-hidden="true"></div>
+
+        <ol class="ds-cast-names">
+          {{ range $seats }}
+          {{ $label := index $d.roles .role }}
+          {{ if .number }}{{ $label = printf "%s %d" $label .number }}{{ end }}
+          <li class="{{ if .tbd }}is-tbd{{ else }}is-named{{ end }}">
+            <p class="ds-cast-role">{{ $label }}</p>
+            <p class="ds-cast-name">{{ if .tbd }}TBC{{ else }}{{ .name }}{{ end }}</p>
+          </li>
+          {{ end }}
+        </ol>
+      </div>
+
+      <p class="ds-blurb">{{ $d.event.blurb }}</p>
+      <p class="ds-countdown" id="ds-countdown" aria-live="polite"></p>
+    </div>
+
+    <a class="ds-scroll-cue" href="#seat-1" aria-label="Scroll to the players">
+      <span>The line-up</span>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+  </section>
+
+  {{/* -------------------------------------------------------- one per seat */}}
+  {{ range $i, $s := $sections }}
+  {{ $label := index $d.roles $s.role }}
+  {{ if $s.number }}{{ $label = printf "%s %d" $label $s.number }}{{ end }}
+  <section class="ds-player{{ if $s.tbd }} is-tbd{{ end }}"
+           id="seat-{{ add $i 1 }}"
+           {{ with $s.slug }}data-slug="{{ . }}"{{ end }}>
+    <div class="ds-player-inner">
+
+      <div class="ds-player-art">
+        {{ if $s.tbd }}
+          {{ partial "dartsity-silhouette.html" $s }}
+        {{ else }}
+          <img src="{{ (printf "/images/players/%s.jpg" $s.slug) | relURL }}"
+               alt="{{ $s.name }}" loading="lazy" decoding="async"
+               onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ds-figure-fallback'}))">
+        {{ end }}
+      </div>
+
+      {{/* Their profile in data/players/<slug>.yaml, where the nickname and
+           the award stars already live. */}}
+      {{ $info := false }}
+      {{ if and (not $s.tbd) $s.slug }}{{ $info = index $.Site.Data.players $s.slug }}{{ end }}
+
+      {{/* The nickname comes from the profile unless this file overrides it. */}}
+      {{ $nick := $s.nickname }}
+      {{ if not $nick }}{{ with $info }}{{ $nick = .nickname }}{{ end }}{{ end }}
+
+      <div class="ds-player-body">
+        <p class="ds-player-role">{{ $label }}</p>
+
+        <h2 class="ds-player-name">{{ if $s.tbd }}To be confirmed{{ else }}{{ $s.name }}{{ end }}</h2>
+
+        {{ with $nick }}<p class="ds-player-nickname">&ldquo;{{ . }}&rdquo;</p>{{ end }}
+
+        {{ if not $s.tbd }}
+        <p class="ds-player-meta">
+          {{ with $s.hometown }}<span>{{ . }}</span>{{ end }}
+          {{/* Filled in live from the order of merit; removed if they aren't on it. */}}
+          <span data-oom-for="{{ $s.slug }}" hidden></span>
+        </p>
+        {{ end }}
+
+        <p class="ds-player-blurb">
+          {{ if $s.tbd }}{{ index $d.waiting $s.role }}{{ else }}{{ $s.blurb }}{{ end }}
+        </p>
+
+        {{/* The same stars the player profiles use, from data/players/<slug>.yaml */}}
+        {{ with $info }}
+        {{ $nat := 0 }}{{ with .national_champion }}{{ $nat = int . }}{{ end }}
+        {{ $stage := 0 }}{{ with .stage_winner }}{{ $stage = int . }}{{ end }}
+        {{ if or (gt $nat 0) (gt $stage 0) }}
+        <div class="ds-awards">
+          {{ if gt $nat 0 }}
+          <span class="award award-gold">{{ range seq $nat }}<span class="award-star">&#9733;</span>{{ end }} National Champion</span>
+          {{ end }}
+          {{ if gt $stage 0 }}
+          <span class="award award-purple">{{ range seq $stage }}<span class="award-star">&#9733;</span>{{ end }} Stage Winner</span>
+          {{ end }}
+        </div>
+        {{ end }}
+        {{ end }}
+      </div>
+
+    </div>
+  </section>
+  {{ end }}
+
+  <section class="ds-outro">
+    <div class="ds-outro-inner">
+      <p class="ds-kicker">{{ $d.event.dateLabel }}</p>
+      <h2>{{ $d.event.name }}</h2>
+      {{ with $d.event.tagline }}<p class="ds-tagline">{{ . }}</p>{{ end }}
+    </div>
+  </section>
+
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script type="module" src="{{ "js/pages/dartsity.js" | relURL }}?v={{ now.Unix }}"></script>
+{{ end }}

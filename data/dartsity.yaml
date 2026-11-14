@@ -1,0 +1,112 @@
+# Everything on the Dartsity page comes from this file. Edit it, push, done.
+#
+# Seven seats. Ben is the captain. Four seats are his picks, two go to the
+# winners of the qualifiers.
+#
+# To fill a seat, delete its `tbd: true` line and add `slug:` and `name:`.
+# The page then pulls that player's live stats and puts them in the line-up.
+#
+#   - order: 3
+#     role: pick
+#     number: 1
+#     slug: luke-egan
+#     name: Luke Egan
+#     nickname: The Eagle
+#     hometown: Sheffield
+#     blurb: >-
+#       Whatever you want to say about him.
+#
+# `hometown` shows under the name, next to their current order of merit
+# place, which is read live from the site.
+#
+# `nickname` is taken from that player's own profile in
+# data/players/<slug>.yaml, so Ben's reads "The Undertaker" without being
+# typed here. Set `nickname:` on a seat only to show something different for
+# this event. Leave a field out and that part is simply not shown.
+#
+# PHOTOS
+# The line-up at the top needs cut-out shots: face on, from the midriff up,
+# background removed, saved as PNG with transparency. Put them in
+#   static/images/dartsity/<slug>.png
+# so Luke Egan's is static/images/dartsity/luke-egan.png. Shoot or crop them
+# consistently (head near the top, cut at the same point on the body) and
+# they will line up with each other. Anyone without one keeps the silhouette,
+# so a missing photo never breaks the row.
+#
+# To point a seat at a different file, add `image: /images/dartsity/whatever.png`.
+#
+# The sections further down the page use the existing round headshots from
+# /images/players/<slug>.jpg, which are unchanged.
+#
+# `slug` has to match the player's slug on the site. It is their name in
+# lower case with spaces as hyphens and apostrophes removed, so
+# Joseph D'Ambrosio is joseph-dambrosio.
+#
+# `order` is the left-to-right position on the stage row at the top, 1 to 7,
+# with the captain at 4. The sections lower down ignore it: they run captain,
+# then picks 1 to 4, then qualifiers 1 and 2.
+
+event:
+  name: Dartsity
+  date: 2027-03-03          # ISO format; drives the countdown
+  dateLabel: Wednesday 3 March 2027
+  tagline:
+  venue: "Forge Warehouse"                 # optional; shows under the tagline when set
+  blurb: >-
+    Ben O'Callaghan captains the side, picking 4 other players. The final two being decided as
+    the winners of the SCD Qualifiers.
+
+# The order of merit place under each name is read live from the site, and
+# the gold National Champion and purple Stage Winner stars come from that
+# player's own profile in data/players/<slug>.yaml. Neither is set here.
+
+# Wording for the three kinds of seat. Shown above each name.
+roles:
+  captain: Captain
+  pick: Pick
+  qualifier: Qualifier
+
+# What an empty seat says in its section.
+waiting:
+  pick: One of the Ben's four picks.
+  qualifier: Goes to a qualifier winner.
+
+seats:
+  - order: 1
+    role: qualifier
+    number: 1
+    tbd: true
+
+  - order: 2
+    role: pick
+    number: 3
+    tbd: true
+
+  - order: 3
+    role: pick
+    number: 1
+    tbd: true
+
+  - order: 4
+    role: captain
+    slug: ben-ocallaghan
+    name: Ben O'Callaghan
+    hometown: "Oldham"          # nickname comes from his profile: "The Undertaker"
+    blurb: >-
+      Sheffield's A team captain bolstering a 2-0 stage record, he'll be looking
+      to make it 3 for 3 come March.
+
+  - order: 5
+    role: pick
+    number: 2
+    tbd: true
+
+  - order: 6
+    role: pick
+    number: 4
+    tbd: true
+
+  - order: 7
+    role: qualifier
+    number: 2
+    tbd: true
