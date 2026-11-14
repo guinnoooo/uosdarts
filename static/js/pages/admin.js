@@ -609,12 +609,10 @@ async function insertBracket(t, seededIds) {
   for (let r = rounds; r >= 1; r--) {
     check(await sb.from('matches').insert(rows.filter(x => x.round === r)));
   }
-  // Byes: a first-round match with one player is won automatically (the trigger advances them)
-  for (const m of rows.filter(x => x.round === 1 && (!x.player1_id || !x.player2_id))) {
-    check(await sb.from('matches').update({
-      status: 'complete', winner_id: m.player1_id ?? m.player2_id, finished_at: new Date().toISOString(),
-    }).eq('id', m.id));
-  }
+  // Byes: a first-round match with one player is won automatically (the trigger
+  // advances them). The database does the whole set in one statement, so a 40 or
+  // 80 player draw is one request rather than 24 or 48, and it cannot half-finish.
+  check(await sb.rpc('admin_resolve_byes', { p_tournament: t.id }));
 }
 
 async function drawFixtures() {
