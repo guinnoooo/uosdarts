@@ -2,7 +2,7 @@ import { sb, showLoadError, esc, toast, fmtDate, matchLabel, toLoginEmail, toUse
 import { roundRobin, allocateGroups, buildBracket, standings, bracketPlan } from '../fixtures.js';
 
 const app = document.getElementById('app');
-const S = { role: null, players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: { create: false, manage: false }, picked: null, archiveOpen: false, pcsAll: false, editMatch: null,
+const S = { role: null, players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: { create: false, manage: false }, picked: null, archiveOpen: false, allPlayersOpen: false, playerFilter: '', pcsAll: false, editMatch: null,
   editLegs: null };                   // advanced settings on the manage panel
 
 const check = r => { if (r.error) throw r.error; return r.data; };
@@ -436,8 +436,32 @@ function manageSection() {
 
     ${finishBlock()}
 
+    ${allPlayersBlock(picked)}
+
     <div class="row danger"><button data-act="delete">Delete tournament</button></div>
   </section>`;
+}
+
+// Everyone with a profile, closed by default and below the working parts of
+// the panel. It's there to look things up, so it shows whether the
+// tournament has been drawn or not. Filtering hides rows in place rather
+// than re-rendering, so the box keeps focus while you type.
+function allPlayersBlock(inThis) {
+  const ids = new Set(inThis.map(e => e.player_id));
+  const q = S.playerFilter.trim().toLowerCase();
+  return `<details class="players-box" ${S.allPlayersOpen ? 'open' : ''}>
+    <summary>All players <span class="count">${S.players.length}</span></summary>
+    <div class="players-body">
+      <input type="search" id="all-players-filter" placeholder="Filter by name"
+             autocomplete="off" value="${esc(S.playerFilter)}">
+      <ul class="players-list">
+        ${S.players.map(p => `<li data-name="${esc(p.name.toLowerCase())}"${q && !p.name.toLowerCase().includes(q) ? ' hidden' : ''}>
+          <span>${esc(p.name)}</span>${ids.has(p.id) ? '<span class="tag">In this tournament</span>' : ''}
+        </li>`).join('')}
+      </ul>
+      <p class="muted small">Everyone with a profile on the site. ${ids.size} of them ${ids.size === 1 ? 'is' : 'are'} in this tournament.</p>
+    </div>
+  </details>`;
 }
 
 function matchRow(m, koRounds) {
@@ -662,6 +686,15 @@ async function run(fn, okMsg) {
   }
   await refresh();
 }
+
+app.addEventListener('input', e => {
+  if (e.target.id !== 'all-players-filter') return;
+  S.playerFilter = e.target.value;
+  const q = S.playerFilter.trim().toLowerCase();
+  app.querySelectorAll('.players-list li').forEach(li => {
+    li.hidden = !!q && !li.dataset.name.includes(q);
+  });
+});
 
 app.addEventListener('keydown', async e => {
   if (e.target.id === 'player-search' && e.key === 'Enter') {
@@ -898,6 +931,7 @@ app.addEventListener('click', async e => {
 app.addEventListener('toggle', e => {
   if (e.target.matches('details.entrant-box')) S.entrantsOpen = e.target.open;
   if (e.target.matches('details.archive-box')) S.archiveOpen = e.target.open;
+  if (e.target.matches('details.players-box')) S.allPlayersOpen = e.target.open;
   if (e.target.matches('details.adv-fold')) {
     S.advOpen[e.target.closest('form') ? 'create' : 'manage'] = e.target.open;
   }

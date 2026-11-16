@@ -461,23 +461,41 @@ details.adv-box[open] > summary { border-bottom: 1px solid var(--line); }
   content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--live);
 }
 
-details.archive-box { border-top: 1px solid var(--line); margin-top: .5rem; }
-details.archive-box > summary {
+details.archive-box, details.players-box { border-top: 1px solid var(--line); margin-top: .5rem; }
+details.archive-box > summary, details.players-box > summary {
   cursor: pointer; list-style: none; padding: .6rem 0 .2rem;
   font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
   color: var(--text-3); display: flex; align-items: center; gap: .5rem;
 }
-details.archive-box > summary::-webkit-details-marker { display: none; }
-details.archive-box > summary:hover { color: var(--accent-mid); }
-details.archive-box > summary::after {
+details.archive-box > summary::-webkit-details-marker,
+details.players-box > summary::-webkit-details-marker { display: none; }
+details.archive-box > summary:hover, details.players-box > summary:hover { color: var(--accent-mid); }
+details.archive-box > summary::after, details.players-box > summary::after {
   content: "\25BE"; margin-left: auto; font-size: .8rem;
 }
-details.archive-box[open] > summary::after { content: "\25B4"; }
-details.archive-box > summary .count {
+details.archive-box[open] > summary::after,
+details.players-box[open] > summary::after { content: "\25B4"; }
+details.archive-box > summary .count, details.players-box > summary .count {
   font-family: var(--mono); font-size: .7rem; color: var(--text-2);
   border: 1px solid var(--line-strong); border-radius: 3px; padding: 0 5px;
 }
 .archive-body .t-row { opacity: .72; }
+
+/* All players, at the foot of the manage panel. */
+details.players-box { margin-top: 1.4rem; }
+.players-body { padding: .6rem 0 .2rem; }
+.players-body input[type="search"] { width: 100%; max-width: 320px; margin-bottom: .7rem; }
+.players-list {
+  list-style: none; margin: 0; padding: 0;
+  columns: 3 220px; column-gap: 1.5rem;
+  max-height: 420px; overflow-y: auto;
+}
+.players-list li {
+  break-inside: avoid; display: flex; align-items: center; gap: .5rem;
+  padding: .3rem 0; border-bottom: 1px solid var(--line); font-size: .88rem;
+}
+.players-list li[hidden] { display: none; }
+.players-list .tag { font-size: .62rem; }
 .archive-body .t-row:hover { opacity: 1; }
 
 /* ---------------------------------------------------------------- toast */
