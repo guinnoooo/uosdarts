@@ -5,6 +5,13 @@ const app = document.getElementById('app');
 const S = { role: null, players: [], tournaments: [], sel: null, entrants: [], matches: [], entrantsOpen: false, advOpen: { create: false, manage: false }, picked: null, archiveOpen: false, pcsAll: false, editMatch: null,
   editLegs: null };                   // advanced settings on the manage panel
 
+// The new-player profile form, while it's open: { name } prefilled from the
+// search box. Opening it is followed by a refresh that redraws the panel, so
+// rather than focus once (and lose it to the redraw) the cursor is put in the
+// form on any redraw in the first couple of seconds after it opens.
+S.newPlayer = null;
+S.focusNewPlayerUntil = 0;
+
 const check = r => { if (r.error) throw r.error; return r.data; };
 
 // ---------------------------------------------------------------- auth
@@ -376,7 +383,7 @@ function manageSection() {
           <b>Players in this tournament</b><span class="count">${picked.length}</span>
         </div>
         <div class="entrant-body">
-          <div class="player-add">
+          ${S.newPlayer ? newPlayerForm() : `<div class="player-add">
             <input type="text" id="player-search" list="player-options" autocomplete="off"
                    placeholder="Type a name, then press Enter">
             <datalist id="player-options">
@@ -385,7 +392,7 @@ function manageSection() {
             </datalist>
             <button data-act="add-entrant" class="primary">Add</button>
           </div>
-          <p class="muted small">Suggests from the ${S.players.length} players on file. A name that isn't on the list can be added as a new profile.</p>
+          <p class="muted small">Suggests from the ${S.players.length} players on file. A name that isn't on the list opens a new profile.</p>`}
 
           ${picked.length ? `<div class="picked">${picked.map(e => {
             const pl = S.players.find(x => x.id === e.player_id);
@@ -530,6 +537,9 @@ function render() {
     </div>${manageSection()}${tournamentsSection()}${newTournamentSection()}${snapshotSection()}`;
   const form = app.querySelector('[data-form="tournament"]');
   if (form) syncFormatFields(form);
+  if (S.newPlayer && Date.now() < S.focusNewPlayerUntil) {
+    app.querySelector('.new-player [name="nickname"]')?.focus();
+  }
 }
 
 // ---------------------------------------------------------------- entrants
@@ -570,9 +580,11 @@ async function addEntrant() {
   let id = match?.id;
 
   if (!id) {
-    if (!confirm(`"${name}" isn't on the player list. Create a profile for them?`)) return;
-    id = check(await sb.rpc('admin_add_player', { p_name: name }));
-    S.players = check(await sb.from('players').select('*').order('name'));
+    // Not on file: open a profile form for them rather than creating a bare name.
+    S.newPlayer = { name };
+    S.focusNewPlayerUntil = Date.now() + 2500;
+    render();
+    return;
   }
   const picked = currentPicked();
   if (picked.some(e => e.player_id === id)) {
@@ -582,6 +594,34 @@ async function addEntrant() {
   picked.push({ player_id: id, seed: null });
   render();
   app.querySelector('#player-search')?.focus();
+}
+
+// A new player's profile, filled in once when they're first added. It is
+// stored with the player in the database, and the order of merit pages build
+// their profile from it, so there's no yaml file to write.
+function newPlayerForm() {
+  return `<form class="new-player" data-form="new-player" autocomplete="off">
+    <p class="new-player-title">New player profile</p>
+    <div class="new-player-grid">
+      <label>Name <input name="name" required value="${esc(S.newPlayer.name)}"></label>
+      <label>Nickname <input name="nickname" placeholder="Optional"></label>
+    </div>
+    <div class="seg" role="radiogroup" aria-label="Student or alumni">
+      <label><input type="radio" name="year" value="Student" checked> Student</label>
+      <label><input type="radio" name="year" value="Alumni"> Alumni</label>
+    </div>
+    <p class="muted small">Their totals so far, from before live scoring. Leave at 0 if there are none.
+      Anything scored on this site from now on is added automatically.</p>
+    <div class="new-player-stats">
+      <label>180s <input type="number" name="s180" min="0" step="1" value="0" inputmode="numeric"></label>
+      <label>100+ checkouts <input type="number" name="s100" min="0" step="1" value="0" inputmode="numeric"></label>
+      <label>Sheet legs <input type="number" name="sheets" min="0" step="1" value="0" inputmode="numeric"></label>
+    </div>
+    <div class="row">
+      <button type="button" data-act="cancel-new-player">Cancel</button>
+      <button class="primary">Create and add</button>
+    </div>
+  </form>`;
 }
 
 async function refreshSelection(t) {
@@ -683,6 +723,29 @@ app.addEventListener('submit', async e => {
     if (error) toast(error.message); else init();
     return;
   }
+  if (kind === 'new-player') {
+    const name = (data.name ?? '').trim();
+    await run(async () => {
+      if (!name) throw new Error('Give the player a name');
+      if (S.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+        throw new Error(`${name} is already on file. Cancel and add them from the box.`);
+      }
+      const n = k => Math.max(0, parseInt(data[k], 10) || 0);
+      const id = check(await sb.rpc('admin_add_player', {
+        p_name: name,
+        p_year: data.year || null,
+        p_nickname: (data.nickname ?? '').trim() || null,
+        p_180s: n('s180'),
+        p_100_plus: n('s100'),
+        p_sheet_legs: n('sheets'),
+      }));
+      syncSeeds();
+      const picked = currentPicked();
+      if (!picked.some(e => e.player_id === id)) picked.push({ player_id: id, seed: null });
+      S.newPlayer = null;
+    }, `${name} created and added`);
+    return;
+  }
   if (kind === 'tournament') {
     await run(async () => {
       const row = check(await sb.from('tournaments').insert({
@@ -708,6 +771,12 @@ app.addEventListener('submit', async e => {
 });
 
 app.addEventListener('click', async e => {
+  if (e.target.closest('[data-act="cancel-new-player"]')) {
+    S.newPlayer = null;
+    render();
+    app.querySelector('#player-search')?.focus();
+    return;
+  }
   const el = e.target.closest('button');
   if (!el || el.closest('form')) return;
   const t = S.sel;
