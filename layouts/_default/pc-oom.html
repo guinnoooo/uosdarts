@@ -14,7 +14,10 @@
   {{ if isset $info "pc_wins" }}{{ $w = int $info.pc_wins }}{{ end }}
   {{ $wins = merge $wins (dict $slug $w) }}
 {{ end }}
-<script type="application/json" id="pc-wins">{{ $wins | jsonify }}</script>
+{{/* safeJS: without it Hugo writes the JSON as a quoted string, the script
+     reads one long piece of text, and every player looks like they have no
+     PC wins. */}}
+<script type="application/json" id="pc-wins">{{ $wins | jsonify | safeJS }}</script>
 
 {{ $ranked := partial "build-ranking.html" (dict "csvPath" .Site.Params.pcRankingsCSV "nameCol" .Site.Params.nameColumn "pointsCol" .Site.Params.pointsColumn) }}
 

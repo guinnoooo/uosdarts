@@ -97,13 +97,28 @@ function fillModals(rows) {
 
 // The provisional PC Finals draw: anyone who has won a PC qualifies, the rest
 // of the 16 places go on ranking, then it's 1 v 16, 2 v 15 and so on.
-function rebuildBracket(rows) {
+//
+// Who has won a PC comes from two places. The yaml files (baked into the page
+// at build time) hold wins from before live scoring; the database knows about
+// every PC finished on the site. A player counts as a winner if either says
+// so, so nobody already qualified can drop out if the two disagree, and a PC
+// won tonight counts straight away without anyone editing a yaml file.
+function rebuildBracket(rows, stats) {
   const box = document.getElementById('pc-bracket');
   const winsTag = document.getElementById('pc-wins');
   if (!box || !winsTag) return;
 
   let wins = {};
-  try { wins = JSON.parse(winsTag.textContent); } catch { return; }
+  try {
+    wins = JSON.parse(winsTag.textContent);
+    // Older builds wrote the list as a quoted string; unwrap it if so.
+    if (typeof wins === 'string') wins = JSON.parse(wins);
+    if (!wins || typeof wins !== 'object') wins = {};
+  } catch { wins = {}; }
+  for (const r of stats ?? []) {
+    if (!r.player_slug) continue;
+    wins[r.player_slug] = Math.max(Number(wins[r.player_slug]) || 0, Number(r.pc_wins) || 0);
+  }
 
   const won = [];
   const rest = [];
@@ -134,10 +149,13 @@ function rebuildBracket(rows) {
 // Profile stats come from matches actually scored on the site. The values
 // Hugo rendered from data/players stay put for anything the database has no
 // figure for yet.
-async function liveStats() {
-  const season = list.dataset.season || '2026/27';
+async function fetchStats(season) {
   const { data, error } = await sb.rpc('player_stats', { p_season: season });
-  if (error || !data) return;
+  return error ? null : data;
+}
+
+function liveStats(data) {
+  if (!data) return;
   for (const r of data) {
     const box = document.getElementById(`player-${r.player_slug}`);
     if (!box) continue;
@@ -170,8 +188,10 @@ async function run() {
     await addMissingModals(data);
     list.innerHTML = data.map(row).join('');
     fillModals(data);
-    rebuildBracket(data);
-    await liveStats();
+    // One stats fetch serves both the profiles and the PC Finals draw.
+    const stats = await fetchStats(season);
+    rebuildBracket(data, stats);
+    liveStats(stats);
   } catch (e) {
     // Leave the table built at deploy time in place and say so quietly.
     if (note) {
