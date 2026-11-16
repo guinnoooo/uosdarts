@@ -31,6 +31,59 @@ function row(r) {
   </div>`;
 }
 
+// Players created on the site have no yaml file, so the build couldn't make
+// them a profile. Build one here from what's stored with them: name, nickname
+// and Student/Alumni. Their stats are filled by liveStats like everyone else's,
+// and already include the starting totals entered when they were created.
+// If the extra columns can't be read, they still get a profile with their name.
+async function addMissingModals(rows) {
+  const missing = [...new Set(rows.map(r => r.player_slug || slugify(r.player_name)))]
+    .filter(slug => slug && !hasModal(slug));
+  if (!missing.length) return;
+
+  const { data } = await sb.from('players').select('slug, name, nickname, year').in('slug', missing);
+  const bySlug = new Map((data ?? []).map(p => [p.slug, p]));
+  const host = document.querySelector('.ranking-list-wrap')?.parentElement ?? document.body;
+
+  for (const slug of missing) {
+    const fromRow = rows.find(r => (r.player_slug || slugify(r.player_name)) === slug);
+    const p = bySlug.get(slug) ?? { slug, name: fromRow?.player_name ?? slug };
+    host.insertAdjacentHTML('beforeend', modalHtml(p));
+  }
+}
+
+function modalHtml(p) {
+  const slug = esc(p.slug);
+  const stat = (key, label) => `<div class="stat"><span class="stat-label">${label}</span>`
+    + `<span class="stat-value" data-stat="${key}">&ndash;</span></div>`;
+  return `<dialog id="player-${slug}" class="player-modal">
+    <div class="player-modal-topbar">
+      <span class="player-modal-rank" data-rank-for="${slug}"></span>
+      <button class="player-modal-close" onclick="this.closest('dialog').close()">&times;</button>
+    </div>
+    <div class="player-modal-top">
+      <img class="player-modal-photo" loading="lazy" decoding="async"
+           src="/images/players/${slug}.jpg" alt="${esc(p.name)}"
+           onerror="this.onerror=null;this.outerHTML='&lt;div class=&quot;player-modal-placeholder&quot;&gt;&lt;/div&gt;'">
+      <div class="player-modal-heading">
+        <p class="player-modal-name" data-name-for="${slug}">${esc(p.name)}</p>
+        ${p.nickname ? `<p class="player-modal-nickname">${esc(p.nickname)}</p>` : ''}
+        ${p.year ? `<p class="player-modal-year">${esc(p.year)}</p>` : ''}
+      </div>
+    </div>
+    <div class="player-modal-bottom">
+      <div class="player-modal-stats">
+        <div class="player-modal-stats-row">
+          ${stat('pc_best', 'PC Best')}${stat('pc_wins', 'PC Wins')}${stat('major_best', 'Major Best')}${stat('major_wins', 'Major Wins')}
+        </div>
+        <div class="player-modal-stats-row">
+          ${stat('hit_180s', '180s Hit')}${stat('checkouts_100_plus', '100+ C/Os')}${stat('sheet_legs', 'Sheet Legs')}
+        </div>
+      </div>
+    </div>
+  </dialog>`;
+}
+
 // Fill in the rank and name on each profile modal, which the build can't know.
 function fillModals(rows) {
   for (const r of rows) {
@@ -114,6 +167,7 @@ async function run() {
     if (error) throw error;
     if (!data?.length) throw new Error('no rows');
 
+    await addMissingModals(data);
     list.innerHTML = data.map(row).join('');
     fillModals(data);
     rebuildBracket(data);

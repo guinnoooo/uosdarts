@@ -69,6 +69,38 @@ function playersPanel() {
   </section>`;
 }
 
+// The profile shown on the order of merit. Players created on the site keep
+// it in the database and can be edited here. Players with a yaml file keep it
+// in that file, so the boxes aren't offered: entering stats here as well would
+// count their history twice.
+function profileBlock(p) {
+  if (YAML.has(p.slug)) {
+    return `<div class="row"><span class="muted small">Profile: <code>data/players/${esc(p.slug)}.yaml</code>.
+      Edit that file to change their nickname, Student/Alumni or stats.</span></div>`;
+  }
+  const yr = p.year ?? '';
+  return `<div class="profile-edit">
+    <p class="new-player-title">Profile</p>
+    <div class="new-player-grid">
+      <label>Nickname <input type="text" id="pf-nick" value="${esc(p.nickname ?? '')}" placeholder="Optional"></label>
+      <label>Student or alumni
+        <select id="pf-year">
+          <option value="" ${yr === '' ? 'selected' : ''}>Not set</option>
+          <option ${yr === 'Student' ? 'selected' : ''}>Student</option>
+          <option ${yr === 'Alumni' ? 'selected' : ''}>Alumni</option>
+          ${yr && !['Student', 'Alumni'].includes(yr) ? `<option selected>${esc(yr)}</option>` : ''}
+        </select></label>
+    </div>
+    <p class="muted small">Totals from before live scoring. Anything scored on the site is added on top.</p>
+    <div class="new-player-stats">
+      <label>180s <input type="number" id="pf-180" min="0" step="1" value="${p.base_180s ?? 0}"></label>
+      <label>100+ checkouts <input type="number" id="pf-100" min="0" step="1" value="${p.base_100_plus ?? 0}"></label>
+      <label>Sheet legs <input type="number" id="pf-sheets" min="0" step="1" value="${p.base_sheet_legs ?? 0}"></label>
+    </div>
+    <div class="row"><button data-act="save-profile" class="primary">Save profile</button></div>
+  </div>`;
+}
+
 function playerPanel() {
   const p = S.sel;
   if (!p) return '';
@@ -81,8 +113,10 @@ function playerPanel() {
     <div class="row">
       <label>Name <input type="text" id="p-name" value="${esc(p.name)}"></label>
       <button data-act="rename" class="primary">Save name</button>
-      <span class="muted small">Profile file: <code>${esc(p.slug)}.yaml</code></span>
+      <span class="muted small">Slug: <code>${esc(p.slug)}</code></span>
     </div>
+
+    ${profileBlock(p)}
 
     <div class="row">
       <span class="muted small">In ${u.matches} match${u.matches === 1 ? '' : 'es'},
@@ -182,6 +216,10 @@ async function run(fn, okMsg) {
 
 const val = id => app.querySelector(id)?.value.trim() ?? '';
 
+// Players with a yaml file in data/players, published by the build.
+let YAML = new Set();
+try { YAML = new Set(JSON.parse(document.getElementById('yaml-profiles')?.textContent || '[]')); } catch {}
+
 app.addEventListener('click', async e => {
   const el = e.target.closest('button');
   if (!el) return;
@@ -212,6 +250,18 @@ app.addEventListener('click', async e => {
         const id = check(await sb.rpc('admin_add_player', { p_name: name }));
         S.sel = { id, name };
       }, `${name} added`);
+      break;
+    }
+    case 'save-profile': {
+      const n = id => Math.max(0, parseInt(val(id), 10) || 0);
+      await run(async () => check(await sb.rpc('super_set_player_profile', {
+        p_player: S.sel.id,
+        p_year: val('#pf-year') || null,
+        p_nickname: val('#pf-nick') || null,
+        p_180s: n('#pf-180'),
+        p_100_plus: n('#pf-100'),
+        p_sheet_legs: n('#pf-sheets'),
+      })), 'Profile saved');
       break;
     }
     case 'rename': {

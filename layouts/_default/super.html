@@ -2,6 +2,10 @@
 <div class="wrap app-wrap">
   <div id="app"><p class="muted">Loading…</p></div>
 </div>
+{{/* Which players have a profile file in data/players. Their profile is
+     that file, so the page doesn't offer to edit it here. */}}
+{{ $slugs := slice }}{{ range $slug, $_ := site.Data.players }}{{ $slugs = $slugs | append $slug }}{{ end }}
+<script type="application/json" id="yaml-profiles">{{ $slugs | jsonify | safeJS }}</script>
 {{ end }}
 
 {{ define "scripts" }}
