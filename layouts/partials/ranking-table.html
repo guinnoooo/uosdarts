@@ -52,9 +52,9 @@
           <div class="stat"><span class="stat-label">Major Wins</span><span class="stat-value" data-stat="major_wins">{{ if isset $info "major_wins" }}{{ $info.major_wins }}{{ else }}&ndash;{{ end }}</span></div>
         </div>
         <div class="player-modal-stats-row">
-          <div class="stat"><span class="stat-label">180s Hit</span><span class="stat-value" data-stat="hit_180s">{{ if isset $info "hit_180s" }}{{ $info.hit_180s }}{{ else }}&ndash;{{ end }}</span></div>
-          <div class="stat"><span class="stat-label">100+ C/Os</span><span class="stat-value" data-stat="checkouts_100_plus">{{ if isset $info "checkouts_100_plus" }}{{ $info.checkouts_100_plus }}{{ else }}&ndash;{{ end }}</span></div>
-          <div class="stat"><span class="stat-label">Sheet Legs</span><span class="stat-value" data-stat="sheet_legs">{{ if isset $info "sheet_legs" }}{{ $info.sheet_legs }}{{ else }}&ndash;{{ end }}</span></div>
+          <div class="stat"><span class="stat-label">180s Hit</span><span class="stat-value" data-stat="hit_180s" data-base="{{ if isset $info "hit_180s" }}{{ $info.hit_180s }}{{ else }}0{{ end }}">{{ if isset $info "hit_180s" }}{{ $info.hit_180s }}{{ else }}&ndash;{{ end }}</span></div>
+          <div class="stat"><span class="stat-label">100+ C/Os</span><span class="stat-value" data-stat="checkouts_100_plus" data-base="{{ if isset $info "checkouts_100_plus" }}{{ $info.checkouts_100_plus }}{{ else }}0{{ end }}">{{ if isset $info "checkouts_100_plus" }}{{ $info.checkouts_100_plus }}{{ else }}&ndash;{{ end }}</span></div>
+          <div class="stat"><span class="stat-label">Sheet Legs</span><span class="stat-value" data-stat="sheet_legs" data-base="{{ if isset $info "sheet_legs" }}{{ $info.sheet_legs }}{{ else }}0{{ end }}">{{ if isset $info "sheet_legs" }}{{ $info.sheet_legs }}{{ else }}&ndash;{{ end }}</span></div>
         </div>
       </div>
       {{ if or (isset $info "national_champion") (isset $info "stage_winner") }}

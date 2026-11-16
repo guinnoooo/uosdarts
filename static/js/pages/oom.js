@@ -93,9 +93,15 @@ async function liveStats() {
       const el = box.querySelector(`[data-stat="${key}"]`);
       if (!el) continue;
       if (value === null || value === undefined) continue;
-      // A zero from the database is real for counts, but for "best run" it
-      // means nothing has been played yet, so leave the published value.
-      if (typeof value === 'string' || Number.isFinite(value)) el.textContent = value;
+      // 180s, 100+ checkouts and sheet legs only exist in the database from
+      // the day live scoring started. Everything before that is in the
+      // player's yaml file, published into data-base, so the two are added.
+      // PC and major results are already complete in the database.
+      if ('base' in el.dataset && Number.isFinite(value)) {
+        el.textContent = (Number(el.dataset.base) || 0) + value;
+      } else if (typeof value === 'string' || Number.isFinite(value)) {
+        el.textContent = value;
+      }
     }
   }
 }
