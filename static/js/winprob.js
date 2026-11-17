@@ -2,8 +2,8 @@
 // probability (during it), so the two always agree.
 //
 // Everything runs in the browser from data the page already has: each
-// player's career figures (match_preview), the order of merit, and the
-// match's own score. It's a few hundred arithmetic steps per update.
+// player's career figures and recent form (match_preview), the order of
+// merit, and the match's own score. It's a few hundred arithmetic steps.
 
 const logit = p => Math.log(p / (1 - p));
 const sigmoid = x => 1 / (1 + Math.exp(-x));
@@ -23,33 +23,68 @@ export function oomScores(rows, name1, name2) {
   return { p1: score(name1), p2: score(name2) };
 }
 
-const careerAvg = x => parseFloat(x?.avg) || 40;   // no record: treated as about average
+// Every number the model uses, in one place, so it can be retuned once there
+// are enough results to measure it against (see tools/model-eval.mjs).
+export const MODEL = {
+  version: 2,
+  baseline: 40,       // average assumed for someone with no record
+  scale: 14,          // average points that make about one step in leg odds
+  f9Weight: 0.3,      // how much first 9 counts on top of the average
+  dblWeight: 0.15,    // average points per percentage point of doubles above 25%
+  formWeight: 0.6,    // how far recent form can move a player from their career level
+  formFull: 150,      // weighted recent darts for recent form to count fully
+  h2hPrior: 4,        // meetings before head-to-head counts for half
+  h2hHalfLife: 42,    // days: a meeting's weight halves every six weeks
+  knownDarts: 300,    // career darts for a full record (less is pulled to 50/50)
+  oomWeight: 0.6,     // order of merit gap to leg odds, with little history
+  oomWithHistory: 0.4, // ...and the share of that left once both have a full record
+  legCap: 0.85,       // no one rated more than this to win a leg before it starts
+};
 
-// Chance player 1 wins a single leg, before it starts. Mostly career average,
-// nudged by first 9 and doubles, pulled towards the head-to-head leg record,
-// pulled towards 50/50 for players with little history, and nudged by the
-// order of merit (most when there's little history).
+const num = (v, fallback) => { const n = parseFloat(v); return Number.isFinite(n) ? n : fallback; };
+
+// One player's level: overall ability (career figures) moved towards recent
+// form, by more the more they've played lately. Recent form comes from
+// player_form, where a dart's weight halves every six weeks.
+export function ability(career, form) {
+  const cAvg = num(career?.avg, MODEL.baseline);
+  const cF9 = num(career?.first9, cAvg);
+  const cDbl = num(career?.dbl_pct, 25);
+  const fd = num(form?.wdarts, 0);
+  const pull = fd > 0 ? MODEL.formWeight * (fd / (fd + MODEL.formFull)) : 0;
+  const blend = (c, f) => c + pull * (num(f, c) - c);
+  const avg = blend(cAvg, form?.avg);
+  const f9 = blend(cF9, form?.first9);
+  const dbl = blend(cDbl, form?.dbl_pct);
+  return { avg, f9, dbl, strength: avg + (f9 - avg) * MODEL.f9Weight + (dbl - 25) * MODEL.dblWeight };
+}
+
+// Chance player 1 wins a single leg, before it starts. Three things go in:
+// overall ability and recent form (above), the head-to-head (recent meetings
+// counting more), and the order of merit, which matters most when there's
+// little history. Players with little history are pulled towards 50/50.
 export function legChance(pv) {
-  const strength = x => {
-    const avg = careerAvg(x);
-    const f9 = parseFloat(x?.first9) || avg;
-    const dbl = parseFloat(x?.dbl_pct) || 25;
-    return avg + (f9 - avg) * 0.3 + (dbl - 25) * 0.15;
-  };
-  let p = sigmoid((strength(pv.p1) - strength(pv.p2)) / 14);
+  const a1 = ability(pv.p1, pv.p1_form), a2 = ability(pv.p2, pv.p2_form);
+  let p = sigmoid((a1.strength - a2.strength) / MODEL.scale);
   const h2h = pv.h2h ?? [];
   if (h2h.length) {
-    const legs1 = h2h.reduce((a, x) => a + x.p1_legs, 0);
-    const legs2 = h2h.reduce((a, x) => a + x.p2_legs, 0);
+    const now = Date.now();
+    let legs1 = 0, legs2 = 0, meetings = 0;
+    for (const x of h2h) {
+      const days = (now - new Date(x.date).getTime()) / 86400000;
+      const w = Number.isFinite(days) ? 0.5 ** (Math.max(0, days) / MODEL.h2hHalfLife) : 1;
+      legs1 += w * x.p1_legs; legs2 += w * x.p2_legs; meetings += w;
+    }
     const share = (legs1 + 1) / (legs1 + legs2 + 2);
-    const w = h2h.length / (h2h.length + 4);
+    const w = meetings / (meetings + MODEL.h2hPrior);
     p = p * (1 - w) + share * w;
   }
-  // About 300 darts (a decent night or two) counts as a full record.
-  const known = Math.min(1, Math.min(pv.p1?.darts ?? 0, pv.p2?.darts ?? 0) / 300);
+  const known = Math.min(1, Math.min(num(pv.p1?.darts, 0), num(pv.p2?.darts, 0)) / MODEL.knownDarts);
   p = 0.5 + (p - 0.5) * (0.5 + 0.5 * known);
-  if (pv.oom) p = sigmoid(logit(p) + (pv.oom.p1 - pv.oom.p2) * 0.6 * (1 - 0.6 * known));
-  return clamp(p, 0.15, 0.85);
+  if (pv.oom) {
+    p = sigmoid(logit(p) + (pv.oom.p1 - pv.oom.p2) * MODEL.oomWeight * (1 - (1 - MODEL.oomWithHistory) * known));
+  }
+  return clamp(p, 1 - MODEL.legCap, MODEL.legCap);
 }
 
 // Chance of being first to `a` more legs before the other gets `b`, winning
@@ -125,13 +160,13 @@ export function liveChance(pv, m, form) {
   // Averages for this leg: career, moved towards tonight's form (60 darts of
   // career count about the same as 60 darts tonight).
   const avg = n => {
-    const c = careerAvg(n === 1 ? pv.p1 : pv.p2);
+    const c = n === 1 ? ability(pv.p1, pv.p1_form).avg : ability(pv.p2, pv.p2_form).avg;
     const f = form?.[n === 1 ? 'p1' : 'p2'];
     if (!f?.darts) return c;
     return (c * 60 + (f.scored / f.darts) * 3 * f.darts) / (60 + f.darts);
   };
   const a1 = avg(1), a2 = avg(2);
-  const c1 = careerAvg(pv.p1), c2 = careerAvg(pv.p2);
+  const c1 = ability(pv.p1, pv.p1_form).avg, c2 = ability(pv.p2, pv.p2_form).avg;
   const start = m.start_score ?? 501;
   // Line the live model up with the pre-match one: with career averages at
   // the start of a leg it gives exactly the pre-match leg chance. Tonight's
