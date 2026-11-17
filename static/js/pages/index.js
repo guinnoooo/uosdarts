@@ -93,7 +93,6 @@ async function loadInner() {
     section('Live tournaments', live.map(card), 'No tournaments live right now.') +
     section('Live friendlies', liveFr.map(({ t, m }) => friendlyCard(t, m)), 'No friendlies on at the moment.', 'friendlies') +
     (enabled ? `<section class="start-friendly"><h2>Start a friendly</h2>
-      <p class="muted small">A one-off 1v1 you can score and share. It doesn't count towards the order of merit or anyone's stats.</p>
       <a class="button-link" href="/friendly/">Start a friendly</a></section>` : '') +
     section('Upcoming tournaments', upcoming.map(card), 'No tournaments scheduled yet.') +
     section('Recent results', results, 'No results yet.');
