@@ -5,7 +5,7 @@
     </a>
     <nav class="site-nav">
       {{ $p := .RelPermalink }}
-      <a href="{{ "/" | relURL }}" class="nav-link{{ if .IsHome }} nav-link-active{{ end }}">Tournaments</a>
+      <a href="{{ "/" | relURL }}" class="nav-link{{ if .IsHome }} nav-link-active{{ end }}">Match Hub</a>
       <a href="{{ "/order-of-merit/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/order-of-merit/") }} nav-link-active{{ end }}"><span class="nav-full">Order of Merit</span><span class="nav-short">OoM</span></a>
       <a href="{{ "/pc-oom/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/pc-oom/") }} nav-link-active{{ end }}"><span class="nav-full">PC Order of Merit</span><span class="nav-short">PC OoM</span></a>
       <a href="{{ "/dartsity/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/dartsity/") }} nav-link-active{{ end }}">Dartsity</a>

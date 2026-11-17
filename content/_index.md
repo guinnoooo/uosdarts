@@ -1,3 +1,3 @@
 ---
-title: "Tournaments"
+title: "Match Hub"
 ---

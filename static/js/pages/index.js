@@ -31,62 +31,72 @@ function europaVisible(all) {
   };
 }
 
-// Friendlies live in their own section: anything being played, anything set
-// up in the last 12 hours, and results from the last day. Each friendly is a
-// one-match tournament, so the card links straight to the match.
-async function friendliesSection(all) {
-  const hours = t => (Date.now() - new Date(t.created_at).getTime()) / 3600000;
-  const shown = all.filter(t => t.status === 'live'
-    || (t.status === 'upcoming' && hours(t) < 12)
-    || (t.status === 'complete' && hours(t) < 24));
-  const { data: enabled } = await sb.rpc('friendlies_enabled');
-  if (!shown.length && !enabled) return '';
-  let matches = [];
-  if (shown.length) {
-    const r = await sb.from('matches').select('id,tournament_id,status,p1_name,p2_name,p1_legs,p2_legs')
-      .in('tournament_id', shown.map(t => t.id));
-    matches = r.data ?? [];
-  }
-  const order = { live: 0, upcoming: 1, complete: 2 };
-  const cards = shown.sort((a, b) => order[a.status] - order[b.status] || new Date(b.created_at) - new Date(a.created_at))
-    .map(t => {
-      const m = matches.find(x => x.tournament_id === t.id);
-      if (!m) return '';
-      const score = m.status === 'pending' ? 'Not started' : `${m.p1_legs}–${m.p2_legs}`;
-      return `<a class="t-card ${t.status}" href="/match/?id=${m.id}">
-        <div class="t-name">${esc(m.p1_name)} v ${esc(m.p2_name)}</div>
-        <div class="t-meta">${score} · first to ${t.knockout_legs_to_win} · ${t.start_score}</div>
-        ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}
-      </a>`;
-    }).join('');
-  return `<section id="friendlies"><h2>Friendlies</h2>
-    ${cards ? `<div class="t-grid">${cards}</div>` : '<p class="muted">No friendlies on at the moment.</p>'}
-    ${enabled ? '<p><a class="button-link" href="/friendly/">Start a friendly</a></p>' : ''}
-  </section>`;
+// A friendly is a one-match tournament, so its card links straight to the match.
+function friendlyCard(t, m) {
+  const score = m.status === 'pending' ? 'Not started' : `${m.p1_legs}–${m.p2_legs}`;
+  const winner = t.status === 'complete' ? (m.p1_legs > m.p2_legs ? m.p1_name : m.p2_name) : null;
+  return `<a class="t-card ${t.status}" href="/match/?id=${m.id}">
+    <div class="t-name">${esc(m.p1_name)} v ${esc(m.p2_name)}</div>
+    <div class="t-meta">Friendly · ${score} · first to ${t.knockout_legs_to_win} · ${t.start_score}</div>
+    ${winner ? `<div class="t-champ">🏆 ${esc(winner)}</div>` : ''}
+    ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}
+  </a>`;
 }
 
-function section(title, list, empty) {
-  return `<section><h2>${title}</h2>
-    ${list.length ? `<div class="t-grid">${list.map(card).join('')}</div>` : `<p class="muted">${empty}</p>`}
+function section(title, cards, empty, id = '') {
+  return `<section${id ? ` id="${id}"` : ''}><h2>${title}</h2>
+    ${cards.length ? `<div class="t-grid">${cards.join('')}</div>` : `<p class="muted">${empty}</p>`}
   </section>`;
 }
 
 async function loadInner() {
-  const { data, error } = await sb.from('tournaments').select('*, champion:players!tournaments_champion_id_fkey(id,name)')
-    .order('starts_at', { ascending: true, nullsFirst: false });
+  const [{ data, error }, enabledRes] = await Promise.all([
+    sb.from('tournaments').select('*, champion:players!tournaments_champion_id_fkey(id,name)')
+      .order('starts_at', { ascending: true, nullsFirst: false }),
+    sb.rpc('friendlies_enabled'),
+  ]);
   if (error) {
     app.innerHTML = `<p class="error">${esc(error.message)}</p>`;
     return;
   }
+  const enabled = !!enabledRes.data;
+
   const list = data.filter(t => !t.is_friendly).filter(europaVisible(data));
   const live = list.filter(t => t.status === 'live');
   const upcoming = list.filter(t => t.status === 'upcoming');
-  const done = list.filter(t => t.status === 'complete').reverse().slice(0, 12);
+  const done = list.filter(t => t.status === 'complete');
+
+  // Friendlies: anything being played or set up in the last 12 hours shows
+  // as live; anything finished in the last day goes in with the results.
+  const hours = t => (Date.now() - new Date(t.created_at).getTime()) / 3600000;
+  const fr = data.filter(t => t.is_friendly && (t.status === 'live'
+    || (t.status === 'upcoming' && hours(t) < 12)
+    || (t.status === 'complete' && hours(t) < 24)));
+  let fm = [];
+  if (fr.length) {
+    const r = await sb.from('matches').select('id,tournament_id,status,p1_name,p2_name,p1_legs,p2_legs')
+      .in('tournament_id', fr.map(t => t.id));
+    fm = r.data ?? [];
+  }
+  const withMatch = t => ({ t, m: fm.find(x => x.tournament_id === t.id) });
+  const liveFr = fr.filter(t => t.status !== 'complete').map(withMatch).filter(x => x.m)
+    .sort((a, b) => (a.t.status === 'live' ? 0 : 1) - (b.t.status === 'live' ? 0 : 1)
+      || new Date(b.t.created_at) - new Date(a.t.created_at));
+
+  // Results: finished tournaments and today's finished friendlies, newest first.
+  const results = done.map(t => ({ when: new Date(t.starts_at ?? t.created_at), html: card(t) }))
+    .concat(fr.filter(t => t.status === 'complete').map(withMatch).filter(x => x.m)
+      .map(({ t, m }) => ({ when: new Date(t.created_at), html: friendlyCard(t, m) })))
+    .sort((a, b) => b.when - a.when).slice(0, 12).map(x => x.html);
+
   app.innerHTML =
-    section('Live now', live, 'Nothing live right now.') +
-    section('Upcoming', upcoming, 'No tournaments scheduled yet.') +
-    section('Recent results', done, 'No finished tournaments yet.') +
-    await friendliesSection(data.filter(t => t.is_friendly));
+    section('Live tournaments', live.map(card), 'No tournaments live right now.') +
+    section('Live friendlies', liveFr.map(({ t, m }) => friendlyCard(t, m)), 'No friendlies on at the moment.', 'friendlies') +
+    (enabled ? `<section class="start-friendly"><h2>Start a friendly</h2>
+      <p class="muted small">A one-off 1v1 you can score and share. It doesn't count towards the order of merit or anyone's stats.</p>
+      <a class="button-link" href="/friendly/">Start a friendly</a></section>` : '') +
+    section('Upcoming tournaments', upcoming.map(card), 'No tournaments scheduled yet.') +
+    section('Recent results', results, 'No results yet.');
 }
 
 load();
