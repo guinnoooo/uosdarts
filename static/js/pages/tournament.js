@@ -1,6 +1,7 @@
 import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, roundName, hasPlayers, MATCH_SELECT } from '../db.js';
 import { standings } from '../fixtures.js';
-import { matchCard, setWatching } from '../ui.js';
+import { matchCard, setWatching, setChances } from '../ui.js';
+import { oomScores, liveChance } from '../winprob.js';
 
 const app = document.getElementById('app');
 const id = qs('id');
@@ -49,6 +50,42 @@ async function loadInner() {
   S.matches = m.data;
   S.players = new Map(e.data.map(x => [x.player_id, x.players]));
   render();
+  loadChances();
+}
+
+// ---------------------------------------------------------------- win chances
+
+// Career figures for each live match, fetched once per match (8 live matches
+// means 8 small requests). After that the chances are worked out in the
+// browser from each score update, with no extra requests.
+const previews = new Map();
+let oomRows = null;
+
+let fetching = false;
+async function loadChances() {
+  if (fetching) return;
+  fetching = true;
+  try { await fetchChances(); } finally { fetching = false; }
+}
+
+async function fetchChances() {
+  const live = S.matches.filter(m => m.status === 'live' && m.player1_id && m.player2_id && !previews.has(m.id));
+  if (!live.length) return;
+  if (!oomRows) oomRows = (await sb.rpc('oom_table')).data ?? [];
+  await Promise.all(live.map(async m => {
+    const { data } = await sb.rpc('match_preview', { p_match: m.id });
+    if (data) previews.set(m.id, { ...data, oom: oomScores(oomRows, m.p1?.name, m.p2?.name) });
+  }));
+  render();
+}
+
+function updateChances() {
+  const map = new Map();
+  for (const m of S.matches) {
+    const pv = previews.get(m.id);
+    if (m.status === 'live' && pv) map.set(m.id, liveChance(pv, m));
+  }
+  setChances(map);
 }
 
 // A realtime row carries the match's own columns but not the joined player
@@ -63,6 +100,7 @@ function applyMatchRow(row) {
   const i = S.matches.findIndex(m => m.id === row.id);
   if (i === -1) return false;
   S.matches[i] = withNames({ ...S.matches[i], ...row });
+  if (S.matches[i].status === 'live' && !previews.has(row.id)) loadChances();   // a match just started
   return true;
 }
 
@@ -202,6 +240,7 @@ function summaryTab() {
 
 function render() {
   const t = S.t;
+  updateChances();
   // The bracket scrolls sideways on a phone. Redrawing it for a score update
   // would jump back to the first round, so keep where the viewer had got to.
   const kb = app.querySelector('.ko-bracket');
