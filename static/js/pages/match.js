@@ -526,7 +526,8 @@ function actionZone(d) {
         </div></div>`;
     }
     return `<div class="panel center">
-      <p>${m.status === 'live' ? 'This match has lost its scorer.' : 'This match needs a scorer.'}</p>
+      <p>${m.status === 'live' ? 'This match has lost its scorer.'
+        : m.called_at && m.referee_name ? `${esc(m.referee_name)} to mark.` : 'This match needs a scorer.'}</p>
       <button data-act="claim" class="primary big">Score this match</button>
       ${m.tournament?.requires_password ? '<p class="muted small">A scoring password is needed.</p>' : ''}
       </div>`;
@@ -539,19 +540,26 @@ function render() {
   const m = S.match;
   const d = derive();
   const scoring = isScorer() && m.status === 'live';
-  app.innerHTML = `
+  // The page is drawn in two parts with the chat between them, so the chat
+  // (and anything half typed in it) survives every redraw.
+  if (!app.querySelector('#m-top')) {
+    app.innerHTML = '<div id="m-top"></div><div id="match-chat"></div><div id="m-bottom"></div>';
+    S.chatMounted = false;
+  }
+  app.querySelector('#m-top').innerHTML = `
     <div class="m-head">
       <div class="m-head-top">
         ${isFriendly() ? '<a class="back-link" href="/#friendlies"><span aria-hidden="true">‹</span> Back to friendlies</a>'
           : `<a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`}
         <button data-act="share" class="share-btn">Share</button>
       </div>
-      <span>${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}${m.referee_name ? ` · Ref ${esc(m.referee_name)}` : ''}</span>
+      <span>${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
       <span id="watchers" class="watchers">${watchersText()}</span>
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
     ${actionZone(d)}
-    ${m.status === 'pending' && !isScorer() ? previewBlock() : ''}
+    ${m.status === 'pending' && !isScorer() ? previewBlock() : ''}`;
+  app.querySelector('#m-bottom').innerHTML = `
     ${scoring || m.status === 'complete' ? '' : legTable(d.leg)}
     ${scoring ? '' : statsTable()}
     ${scoring ? '' : allLegs(m.status !== 'complete')}
@@ -649,6 +657,7 @@ async function startClaim() {
 }
 
 app.addEventListener('click', async e => {
+  if (e.target.closest('#match-chat')) return;   // the chat handles its own clicks
   const el = e.target.closest('button');
   if (!el) return;
   const { key, quick, act, first, codarts, codbl, missdbl, bull } = el.dataset;
@@ -792,11 +801,10 @@ async function load() {
     showLoadError(app, e);
     return;
   }
-  // The chat sits under the match in its own box, set up once.
-  if (S.match && !document.getElementById('match-chat')) {
-    const host = document.createElement('div');
-    host.id = 'match-chat';
-    app.after(host);
-    mountChat(host, id).catch(() => { host.remove(); });
+  // The chat sits between the match and the leg-by-leg, set up once.
+  const host = app.querySelector('#match-chat');
+  if (S.match && host && !S.chatMounted) {
+    S.chatMounted = true;
+    mountChat(host, id).catch(() => { host.innerHTML = ''; });
   }
 }
