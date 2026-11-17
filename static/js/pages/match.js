@@ -320,28 +320,36 @@ function bullModal() {
 
 // ---------------------------------------------------------------- odds
 
-// Pretend bookmaker odds, for fun. Each player's strength is mostly their
-// career average, nudged by first 9 and doubles. The gap between them gives
-// the chance of winning a single leg, which is pulled towards their
-// head-to-head record the more often they've met. The match price then comes
-// from that leg chance over a first-to-N match.
-const ODDS = ['1/10', '1/8', '1/6', '1/5', '2/9', '1/4', '2/7', '1/3', '4/11', '2/5', '4/9', '1/2', '8/15',
-  '4/7', '8/13', '4/6', '8/11', '4/5', '5/6', '10/11', 'Evens', '11/10', '6/5', '5/4', '11/8', '6/4', '13/8',
-  '7/4', '15/8', '2/1', '9/4', '5/2', '11/4', '3/1', '10/3', '7/2', '4/1', '9/2', '5/1', '11/2', '6/1',
-  '7/1', '8/1', '9/1', '10/1', '12/1', '14/1', '16/1', '20/1', '25/1', '33/1', '50/1'];
-const oddsValue = f => (f === 'Evens' ? 1 : f.split('/').reduce((a, b) => a / b));
+// GuinnessBet: pretend bookmaker odds. Each player's strength is mostly their
+// career average, nudged by first 9 and doubles. The gap gives the chance of
+// winning a leg, pulled towards their head-to-head leg record the more often
+// they've met, and that's worked out over the length of the match. Players
+// with little history are pulled towards 50/50, because a few legs say little.
+//
+// The prices are then made like a real book: a margin is built in and every
+// price is rounded shorter, never longer, so the two sides always add up to
+// more than 100% and there's no way to back both and be sure of a profit.
+const LADDER = ['1/100', '1/66', '1/50', '1/40', '1/33', '1/25', '1/20', '1/16', '1/14', '1/12', '1/10',
+  '1/9', '1/8', '1/7', '1/6', '1/5', '2/9', '1/4', '2/7', '1/3', '4/11', '2/5', '4/9', '1/2', '8/15', '4/7',
+  '8/13', '4/6', '8/11', '4/5', '5/6', '10/11', 'Evens', '11/10', '6/5', '5/4', '11/8', '6/4', '13/8', '7/4',
+  '15/8', '2/1', '9/4', '5/2', '11/4', '3/1', '10/3', '7/2', '4/1', '9/2', '5/1', '11/2', '6/1', '13/2',
+  '7/1', '15/2', '8/1', '9/1', '10/1', '11/1', '12/1', '14/1', '16/1', '18/1', '20/1', '25/1', '33/1'];
+const ladderValue = f => (f === 'Evens' ? 1 : f.split('/').reduce((a, b) => a / b));
+const implied = f => 1 / (ladderValue(f) + 1);
+const BOOK = 1.045;  // about 4.5% margin, so two even players are 10/11 each
 
-function fractional(p) {
-  const target = 1 / Math.min(0.99, p * 1.06) - 1;   // a small bookmaker's margin
-  return ODDS.reduce((best, f) => (Math.abs(Math.log(oddsValue(f)) - Math.log(Math.max(target, 0.01)))
-    < Math.abs(Math.log(oddsValue(best)) - Math.log(Math.max(target, 0.01))) ? f : best));
+// The longest price on the ladder whose implied chance is at least `prob`.
+function priceFor(prob) {
+  let best = LADDER[0];
+  for (const f of LADDER) if (implied(f) >= prob) best = f;
+  return best;
 }
 
 const choose = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return r; };
 
-function matchOdds(pv, legsToWin) {
+function matchChance(pv, legsToWin, setsToWin) {
   const strength = x => {
-    const avg = parseFloat(x?.avg) || 40;           // someone with no record is treated as about average
+    const avg = parseFloat(x?.avg) || 40;           // no record: treated as about average
     const f9 = parseFloat(x?.first9) || avg;
     const dbl = parseFloat(x?.dbl_pct) || 25;
     return avg + (f9 - avg) * 0.3 + (dbl - 25) * 0.15;
@@ -355,30 +363,47 @@ function matchOdds(pv, legsToWin) {
     const w = h2h.length / (h2h.length + 4);
     pLeg = pLeg * (1 - w) + share * w;
   }
-  pLeg = Math.min(0.97, Math.max(0.03, pLeg));
-  const n = legsToWin;
-  const scores = [];
-  for (let k = 0; k < n; k++) {
-    scores.push({ a: n, b: k, p: choose(n - 1 + k, k) * pLeg ** n * (1 - pLeg) ** k });
-    scores.push({ a: k, b: n, p: choose(n - 1 + k, k) * (1 - pLeg) ** n * pLeg ** k });
-  }
-  const p1 = scores.filter(x => x.a === n).reduce((a, x) => a + x.p, 0);
-  const likely = scores.reduce((a, x) => (x.p > a.p ? x : a));
-  return { p1, p2: 1 - p1, likely };
+  // How much history there is: about 300 darts (a decent night or two) counts as a full record.
+  const known = Math.min(1, Math.min(pv.p1?.darts ?? 0, pv.p2?.darts ?? 0) / 300);
+  pLeg = 0.5 + (pLeg - 0.5) * (0.5 + 0.5 * known);
+  pLeg = Math.min(0.85, Math.max(0.15, pLeg));
+  // First to N legs; for set play the same sum again over sets.
+  const firstTo = (p, n) => {
+    let t = 0;
+    for (let k = 0; k < n; k++) t += choose(n - 1 + k, k) * p ** n * (1 - p) ** k;
+    return t;
+  };
+  let p = firstTo(pLeg, legsToWin);
+  if (setsToWin) p = firstTo(p, setsToWin);
+  return Math.min(0.96, Math.max(0.04, p));
+}
+
+function bookPrices(p1) {
+  const fav = p1 >= 0.5 ? 1 : 2;
+  const pf = Math.max(p1, 1 - p1);
+  // Favourite first, rounded shorter.
+  // The margin is shared the way bookmakers do it: most of it on prices
+  // near evens, very little on a heavy favourite.
+  const withMargin = q => q + (BOOK - 1) * 2 * q * (1 - q);
+  const favPrice = priceFor(Math.min(0.99, withMargin(pf)));
+  // Then the outsider, rounded shorter, and short enough that the book
+  // stays over 100% even when the favourite had to be rounded a lot.
+  const dogPrice = priceFor(Math.max(withMargin(1 - pf), 1.03 - implied(favPrice)));
+  return fav === 1 ? [favPrice, dogPrice] : [dogPrice, favPrice];
 }
 
 function oddsBlock(pv) {
-  const o = matchOdds(pv, S.match.legs_to_win);
-  const sc = o.likely;
+  const [a, b] = bookPrices(matchChance(pv, S.match.legs_to_win, S.match.sets_to_win));
   return `<div class="odds">
-    <h3>Odds <span class="muted small">just for fun</span></h3>
+    <h3>GuinnessBet</h3>
     <div class="odds-row">
-      <div><span class="odds-name">${esc(nameOf(1))}</span><b>${fractional(o.p1)}</b></div>
-      <div><span class="odds-name">${esc(nameOf(2))}</span><b>${fractional(o.p2)}</b></div>
+      <div><span class="odds-name">${esc(nameOf(1))}</span><b>${a}</b></div>
+      <div><span class="odds-name">${esc(nameOf(2))}</span><b>${b}</b></div>
     </div>
-    <p class="muted small center">Most likely score: ${esc(nameOf(sc.a > sc.b ? 1 : 2))} ${Math.max(sc.a, sc.b)}–${Math.min(sc.a, sc.b)} (${fractional(sc.p)})</p>
   </div>`;
 }
+
+const winRate = (won, played) => (played ? `${Math.round((won / played) * 100)}%` : null);
 
 function previewBlock() {
   const pv = S.preview;
@@ -397,7 +422,7 @@ function previewBlock() {
       ${row('Average', a.avg, b.avg)}
       ${row('First 9 average', a.first9, b.first9)}
       ${row('Doubles', a.dbl_pct, b.dbl_pct)}
-      ${row('Matches won', `${pv.p1_won ?? 0} of ${pv.p1_played ?? 0}`, `${pv.p2_won ?? 0} of ${pv.p2_played ?? 0}`)}
+      ${row('Win rate', winRate(pv.p1_won, pv.p1_played), winRate(pv.p2_won, pv.p2_played))}
       ${row('Head to head', h2h.length ? w1 : 0, h2h.length ? h2h.length - w1 : 0)}
     </table>
     ${oddsBlock(pv)}
