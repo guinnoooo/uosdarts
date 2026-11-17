@@ -27,7 +27,9 @@
   --r: 6px;
   --r-lg: 8px;
 
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+  /* Numbers use Inter with tabular figures rather than a monospace font, so
+     zeros are plain (no slash or dot) but still line up in columns. */
+  --mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -234,53 +236,55 @@ td { padding: .42rem .5rem; border-bottom: 1px solid var(--line); }
   padding-bottom: .8rem; border-bottom: 1px solid var(--line);
 }
 .m-head a { font-size: .95rem; font-weight: 600; color: var(--accent-soft); }
+.m-head .back-link {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: .35rem;
+  padding: .3rem .7rem .3rem .5rem; margin-bottom: .35rem;
+  border: 1px solid var(--line-strong); border-radius: var(--r); font-size: .88rem;
+}
+.m-head .back-link span { font-size: 1.2rem; line-height: 1; }
 .m-head span { font-size: .76rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
 
-/* Scoreboard as a stacked strip, the way broadcast and scoring apps show it */
+/* Scoreboard: the two players side by side, so the score each has left can
+   be as big as the screen allows. Every row has a fixed height, so the
+   keypad underneath never moves. */
 .scoreboard {
-  display: grid; grid-template-columns: 1fr; gap: 1px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
   background: var(--line); border: 1px solid var(--line);
   border-radius: var(--r-lg); overflow: hidden;
 }
 .pp {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  grid-template-areas:
-    "name  legs rem"
-    "co    legs rem"
-    "stats legs rem";
-  align-items: center; gap: 0 1rem;
-  background: var(--surface); padding: .7rem .9rem;
-  border-left: 2px solid transparent;
+  display: flex; flex-direction: column; align-items: stretch; min-width: 0;
+  background: var(--surface); padding: .55rem .7rem .6rem;
+  border-top: 3px solid transparent;
 }
-.pp.on { background: var(--surface-2); border-left-color: var(--live); }
-.pp.won { border-left-color: var(--accent); }
+.pp.on { background: var(--surface-2); border-top-color: var(--live); }
+.pp.won { border-top-color: var(--accent); }
 
+.pp-top { display: flex; align-items: center; gap: .4rem; min-width: 0; height: 1.5rem; }
 .pp-name {
-  grid-area: name; font-size: 1rem; font-weight: 600; min-width: 0;
+  flex: 1; font-size: .95rem; font-weight: 600; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pp-co {
-  grid-area: co; font-family: var(--mono); font-size: .8rem; color: var(--accent-soft);
-  min-height: 1.2em; letter-spacing: .02em;
-}
-.pp-stats {
-  grid-area: stats; font-size: .74rem; color: var(--text-3); min-width: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.pp-co { min-width: 0; white-space: nowrap; overflow: hidden; }
 .pp-legs {
-  grid-area: legs; font-family: var(--mono); font-size: 1.5rem; font-weight: 600;
-  color: var(--accent); text-align: center; min-width: 1.6rem;
+  font-family: var(--mono); font-size: 1.15rem; font-weight: 700; color: var(--accent);
+  min-width: 1.6rem; text-align: center; border: 1px solid var(--accent-dim); border-radius: 4px;
+  line-height: 1.35;
 }
-.pp.won .pp-legs { color: var(--accent); }
 .pp-rem {
-  grid-area: rem; font-family: var(--mono); font-size: clamp(2.4rem, 11vw, 3.4rem);
-  font-weight: 600; line-height: 1; letter-spacing: -0.02em;
-  text-align: right; min-width: 3.2ch;
+  font-family: var(--mono); font-size: clamp(3.4rem, 19vw, 5.5rem);
+  font-weight: 700; line-height: 1.05; letter-spacing: -0.03em; text-align: center;
+  margin: .1rem 0 0;
 }
 .pp.on .pp-rem { color: var(--text); }
 .pp:not(.on) .pp-rem { color: var(--text-2); }
+.pp-co {
+  font-family: var(--mono); font-size: .8rem; color: var(--accent-soft); text-align: center;
+  height: 1.2rem; letter-spacing: .02em; min-width: 0; white-space: nowrap; overflow: hidden;
+}
+.pp-stats {
+  font-size: .72rem; color: var(--text-3); text-align: center; height: 1.1rem; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .dot {
   display: inline-block; width: 4px; height: 4px; border-radius: 50%;
   background: var(--text-3); margin-right: .45rem; vertical-align: middle;
@@ -316,37 +320,22 @@ td { padding: .42rem .5rem; border-bottom: 1px solid var(--line); }
   /* scoring happens on a phone, so don't let the keys sprawl on a laptop */
   max-width: 480px; width: 100%;
 }
-/* Every row here has a fixed height and long names are cut short, so the keys
-   below never shift when the player or the numbers change. */
+/* One fixed-height row: what was last entered, and what's being typed. */
 .pad-top {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: 1.3rem 2.9rem 1.2rem;
-  grid-template-areas: "who entry" "left entry" "last last";
-  align-items: center; column-gap: .8rem;
+  display: flex; align-items: center; gap: .8rem; height: 3rem;
   background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--r-lg); padding: .55rem .85rem;
-}
-.pad-who, .pad-last {
-  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.pad-who { grid-area: who; font-size: .85rem; color: var(--text-2); }
-.pad-name { color: var(--text); font-weight: 600; }
-.pad-left { grid-area: left; font-size: .85rem; color: var(--text-3); line-height: 1; white-space: nowrap; }
-.pad-left b {
-  font-family: var(--mono); font-size: 2.6rem; font-weight: 700; color: var(--text);
-  letter-spacing: -0.02em; margin-right: .2rem;
+  border-radius: var(--r-lg); padding: 0 .85rem;
 }
 .pad-last {
-  grid-area: last; font-size: .78rem; color: var(--text-3);
-  border-top: 1px solid var(--line); padding-top: .3rem; margin-top: .15rem;
+  flex: 1; min-width: 0; font-size: .8rem; color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pad-last b { color: var(--text-2); font-family: var(--mono); font-weight: 600; }
 .pad-entry {
-  grid-area: entry; align-self: center;
-  font-family: var(--mono); font-size: 2.6rem; font-weight: 600; line-height: 1;
+  font-family: var(--mono); font-size: 2rem; font-weight: 700; line-height: 1;
   min-width: 3ch; text-align: right; color: var(--accent);
 }
-.pad-entry .muted { color: var(--text-3); opacity: .45; font-family: inherit; font-weight: 600; }
+.pad-entry .muted { color: var(--text-3); opacity: .45; font-family: inherit; }
 
 .quick { display: grid; grid-template-columns: repeat(9, 1fr); gap: .3rem; }
 .quick button { padding: .5rem 0; font-size: .82rem; font-family: var(--mono); color: var(--text-2); }
@@ -548,10 +537,6 @@ details.players-box { margin-top: 1.4rem; }
 @media (max-width: 600px) {
   main { padding: .8rem .7rem 2.5rem; }
   .quick { grid-template-columns: repeat(5, 1fr); }
-  .pp { padding: .6rem .7rem; gap: 0 .7rem; }
-  .pp-name { font-size: .95rem; }
-  .pp-stats { font-size: .7rem; }
-  .pp-legs { font-size: 1.25rem; min-width: 1.3rem; }
 }
 
 @media (max-width: 365px) {
@@ -758,3 +743,39 @@ label.chk {
 .call-board { font-family: var(--mono); font-weight: 600; color: var(--accent); white-space: nowrap; min-width: 4.6rem; }
 .call-list li > span.call-name { flex: 1; }
 .call-list input.board { width: 4rem; }
+
+/* ---------------------------------------------------------------- tournament summary */
+
+.summary { margin-top: 1rem; }
+.sum-podium { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.sum-podium > div {
+  display: flex; flex-direction: column; gap: .15rem; padding: .8rem 1rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+}
+.sum-podium b { font-size: 1.1rem; }
+.sum-winner { border-color: var(--accent-dim) !important; }
+.sum-winner b { color: var(--accent-soft); }
+.sum-podium > div:only-child { grid-column: 1 / -1; }
+.sum-totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin: .8rem 0 1rem; }
+.sum-totals div {
+  display: flex; flex-direction: column; align-items: center; padding: .6rem .3rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+}
+.sum-totals b { font-size: 1.4rem; font-weight: 700; }
+.sum-totals span { font-size: .72rem; color: var(--text-3); text-align: center; }
+.sum-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .8rem; }
+.sum-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: .7rem .9rem;
+}
+.sum-card h3 { margin: 0 0 .4rem; }
+.sum-list { margin: 0; padding: 0 0 0 1.3rem; }
+.sum-list li { padding: .22rem 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.sum-list li:last-child { border-bottom: none; }
+.sum-list li::marker { color: var(--text-3); }
+.sum-list li { display: list-item; }
+.sum-list li > span { display: inline-block; }
+.sum-name { max-width: calc(100% - 4.5rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.sum-val { float: right; font-weight: 600; color: var(--accent-soft); }
+.dart-limit-row { align-items: end; }
+.dart-limit-row input { width: 6rem; }
+.dart-limit-row .muted { flex: 1 1 220px; }
