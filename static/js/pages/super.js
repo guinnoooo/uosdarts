@@ -39,6 +39,7 @@ async function loadInner() {
 
   S.players = check(await sb.from('players').select('*').order('name'));
   S.admins = check(await sb.rpc('super_list_admins'));
+  S.friendliesOn = (await sb.rpc('friendlies_enabled')).data ?? false;
   if (S.sel) {
     S.sel = S.players.find(p => p.id === S.sel.id) ?? null;
   }
@@ -165,6 +166,22 @@ function playerPanel() {
   </section>`;
 }
 
+// One password for starting friendlies, shared with whoever should be able
+// to. Clearing it switches friendlies off.
+function friendlyPanel() {
+  return `<section class="panel">
+    <h2>Friendly matches</h2>
+    <p class="muted small">Friendlies are ${S.friendliesOn ? '<b>on</b>' : '<b>off</b>'}.
+      Anyone with this password can start a friendly at <a href="/friendly/">/friendly/</a>.
+      Friendlies don't count towards the order of merit or anyone's stats.</p>
+    <div class="row">
+      <label>New password <input type="text" id="fr-pw" autocomplete="off" placeholder="At least 4 characters"></label>
+      <button data-act="set-friendly-pw" class="primary">Save</button>
+      ${S.friendliesOn ? '<button data-act="clear-friendly-pw">Switch friendlies off</button>' : ''}
+    </div>
+  </section>`;
+}
+
 function adminsPanel() {
   return `<section class="panel">
     <h2>Admin logins</h2>
@@ -197,7 +214,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${friendlyPanel()}${adminsPanel()}`;
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
@@ -303,6 +320,18 @@ app.addEventListener('click', async e => {
         check(await sb.rpc('super_delete_player', { p_player: S.sel.id }));
         S.sel = null;
       }, 'Player deleted');
+      break;
+    case 'set-friendly-pw': {
+      const pw = val('#fr-pw');
+      if (pw.length < 4) { toast('Use at least 4 characters'); break; }
+      await run(async () => check(await sb.rpc('super_set_friendly_password', { p_password: pw })),
+        'Friendly password saved');
+      break;
+    }
+    case 'clear-friendly-pw':
+      if (!confirm('Switch friendlies off? Nobody will be able to start one until a new password is set.')) break;
+      await run(async () => check(await sb.rpc('super_set_friendly_password', { p_password: '' })),
+        'Friendlies switched off');
       break;
     case 'set-admin': {
       const email = val('#a-email');

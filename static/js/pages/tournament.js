@@ -1,4 +1,4 @@
-import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, roundName, MATCH_SELECT } from '../db.js';
+import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, roundName, hasPlayers, MATCH_SELECT } from '../db.js';
 import { standings } from '../fixtures.js';
 import { matchCard, setWatching } from '../ui.js';
 
@@ -26,9 +26,9 @@ async function loadInner() {
   }
   S.t = t.data;
   // A finished tournament opens on its summary unless a tab was asked for.
-  if (S.t.status === 'complete' && !S.tabPicked && !location.hash.slice(1)) S.tab = 'summary';
+  if (S.t.status === 'complete' && !S.t.is_friendly && !S.tabPicked && !location.hash.slice(1)) S.tab = 'summary';
   S.summary = null;
-  if (S.t.status === 'complete') {
+  if (S.t.status === 'complete' && !S.t.is_friendly) {
     const sum = await sb.rpc('tournament_summary', { p_tournament: id });
     S.summary = sum.error ? { error: sum.error.message } : sum.data;
   }
@@ -71,7 +71,7 @@ function koRounds() {
 }
 
 function tabs() {
-  const list = S.t.status === 'complete' ? [['summary', 'Summary'], ['matches', 'Matches']] : [['matches', 'Matches']];
+  const list = S.t.status === 'complete' && !S.t.is_friendly ? [['summary', 'Summary'], ['matches', 'Matches']] : [['matches', 'Matches']];
   if (S.t.format !== 'knockout') list.push(['groups', 'Groups']);
   if (S.matches.some(m => m.stage === 'knockout')) list.push(['bracket', 'Bracket']);
   if (!list.some(([k]) => k === S.tab)) S.tab = 'matches';
@@ -82,12 +82,12 @@ function tabs() {
 function matchesTab() {
   const kr = koRounds();
   const live = S.matches.filter(m => m.status === 'live');
-  const ready = S.matches.filter(m => m.status === 'pending' && m.player1_id && m.player2_id);
+  const ready = S.matches.filter(m => m.status === 'pending' && hasPlayers(m));
   // Matches the admin has sent to a board, in board order.
   const called = ready.filter(m => m.called_at)
     .sort((a, b) => String(a.board ?? '').localeCompare(String(b.board ?? ''), undefined, { numeric: true }));
   const next = ready.filter(m => !m.called_at);
-  const done = S.matches.filter(m => m.status === 'complete' && m.player1_id && m.player2_id)
+  const done = S.matches.filter(m => m.status === 'complete' && hasPlayers(m))
     .sort((a, b) => new Date(b.finished_at) - new Date(a.finished_at));
   const block = (title, list, empty) => `<section><h2>${title}</h2>
     ${list.length ? `<div class="m-grid">${list.map(m => matchCard(m, kr)).join('')}</div>`

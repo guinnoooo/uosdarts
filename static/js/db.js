@@ -41,7 +41,18 @@ export function fmtDate(d) {
 
 export { roundName } from './fixtures.js';
 
+// Friendlies have typed names (p1_name / p2_name) instead of player profiles.
+export const hasPlayers = m => !!((m.player1_id || m.p1_name) && (m.player2_id || m.p2_name));
+
+// 1 or 2 for the winner, or null. Friendlies have no winner_id, so the legs decide.
+export function winnerSide(m) {
+  if (m.winner_id) return m.winner_id === m.player1_id ? 1 : 2;
+  if (m.status === 'complete' && m.p1_name) return m.p1_legs > m.p2_legs ? 1 : 2;
+  return null;
+}
+
 export function matchLabel(m, totalKoRounds) {
+  if (m.p1_name) return 'Friendly';
   if (m.stage === 'group') return `Group ${m.group_label} · Round ${m.round}`;
   return roundName(m.round, totalKoRounds);
 }
