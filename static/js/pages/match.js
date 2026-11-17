@@ -9,7 +9,7 @@ const id = qs('id');
 const S = {
   match: null, legs: [], visits: [], koRounds: 0, uid: null,
   entry: '', busy: false, pendingCheckout: null, pendingDoubles: null, pendingBull: false, askPw: false,
-  shotTimer: null,
+  shotTimer: null, preview: undefined, watchers: 0, watch: null, trackedAs: null,
 };
 
 // ---------------------------------------------------------------- data
@@ -35,7 +35,14 @@ async function loadInner() {
       .eq('stage', 'knockout').order('round', { ascending: false }).limit(1);
     S.koRounds = r.data?.[0]?.round ?? 1;
   }
+  // Before a match starts, spectators get both players' figures and their
+  // head-to-head. Fetched once; it doesn't change while the match waits.
+  if (S.match.status === 'pending' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
+    const pv = await sb.rpc('match_preview', { p_match: id });
+    S.preview = pv.error ? null : pv.data;
+  }
   render();
+  watch();
 }
 const reload = debounce(load, 120);
 
@@ -206,9 +213,7 @@ function statsTable() {
 function lastVisitLine() {
   const v = S.visits[S.visits.length - 1];
   if (!v) return 'No scores entered yet';
-  const what = v.is_bust ? 'bust' : v.remaining === 0 ? `${v.score} checkout` : String(v.score);
-  // Score first, so a long name can't push it out of view.
-  return `Last: <b>${what}</b>${v.remaining === 0 ? '' : ` · ${v.remaining} left`} · ${esc(nameOf(v.player))}`;
+  return `Last: <b>${v.is_bust ? 'Bust' : v.score}</b>`;
 }
 
 // True once both players have thrown the tournament's dart limit in this leg
@@ -292,6 +297,65 @@ function bullModal() {
   </div></div>`;
 }
 
+function previewBlock() {
+  const pv = S.preview;
+  if (!pv) return '';
+  const a = pv.p1 ?? {}, b = pv.p2 ?? {};
+  const row = (label, x, y) => `<tr><td>${x ?? '–'}</td><th>${label}</th><td>${y ?? '–'}</td></tr>`;
+  const h2h = pv.h2h ?? [];
+  const w1 = h2h.filter(x => x.p1_won).length;
+  const meetings = h2h.slice(0, 5).map(x => `<li>
+      <span class="muted small">${esc(x.tournament)} · ${new Date(x.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+      <b>${x.p1_legs}–${x.p2_legs}</b>
+      <span class="small">${esc(nameOf(x.p1_won ? 1 : 2))}</span></li>`).join('');
+  return `<section class="preview"><h2>Match preview</h2>
+    <table class="stats">
+      <thead><tr><th>${esc(nameOf(1))}</th><th></th><th>${esc(nameOf(2))}</th></tr></thead>
+      ${row('Average', a.avg, b.avg)}
+      ${row('First 9 average', a.first9, b.first9)}
+      ${row('Doubles', a.dbl_pct, b.dbl_pct)}
+      ${row('Matches won', `${pv.p1_won ?? 0} of ${pv.p1_played ?? 0}`, `${pv.p2_won ?? 0} of ${pv.p2_played ?? 0}`)}
+      ${row('Head to head', h2h.length ? w1 : 0, h2h.length ? h2h.length - w1 : 0)}
+    </table>
+    ${h2h.length ? `<h3>Previous meetings</h3><ul class="meetings">${meetings}</ul>`
+      : '<p class="muted small center">First meeting on the site.</p>'}
+    <p class="muted small">Averages are across every tournament scored on the site.</p>
+  </section>`;
+}
+
+// ---------------------------------------------------------------- spectators
+
+// Everyone watching any match in a tournament shares one presence channel and
+// says which match they're on. The count only includes people on this match,
+// and not whoever is scoring it.
+function watchersText() {
+  return S.watchers ? `${S.watchers} watching` : '';
+}
+
+function watch() {
+  if (S.watch || !S.match) return;
+  const ch = sb.channel(`watch-${S.match.tournament_id}`, { config: { presence: { key: crypto.randomUUID() } } });
+  S.watch = ch;
+  ch.on('presence', { event: 'sync' }, () => {
+    const state = ch.presenceState();
+    S.watchers = Object.values(state)
+      .filter(metas => metas.some(x => x.match === id && !x.scorer)).length;
+    const el = document.getElementById('watchers');
+    if (el) el.textContent = watchersText();
+  });
+  // Also fires after a reconnect (a phone waking up), when presence has to be sent again.
+  ch.subscribe(status => { if (status === 'SUBSCRIBED') { S.trackedAs = null; track(); } });
+}
+
+// Re-sent when this viewer starts or stops scoring, so they drop out of the count.
+function track() {
+  if (!S.watch || !S.match) return;
+  const as = isScorer() ? 'scorer' : 'viewer';
+  if (S.trackedAs === as) return;
+  S.trackedAs = as;
+  S.watch.track({ match: id, scorer: as === 'scorer' }).catch(() => { S.trackedAs = null; });
+}
+
 function actionZone(d) {
   const m = S.match;
   const ready = m.player1_id && m.player2_id;
@@ -339,15 +403,18 @@ function render() {
     <div class="m-head">
       <a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>
       <span>${esc(matchLabel(m, S.koRounds))} · First to ${m.legs_to_win} legs${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
+      <span id="watchers" class="watchers">${watchersText()}</span>
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
     ${actionZone(d)}
+    ${m.status === 'pending' && !isScorer() ? previewBlock() : ''}
     ${scoring || m.status === 'complete' ? '' : legTable(d.leg)}
     ${scoring ? '' : statsTable()}
     ${scoring ? '' : allLegs(m.status !== 'complete')}
     ${S.pendingCheckout ? checkoutModal() : S.pendingDoubles ? doublesModal() : S.pendingBull && scoring ? bullModal() : ''}`;
   // Stops a fast double tap on the keypad zooming the page on phones.
   document.documentElement.classList.toggle('scoring', scoring);
+  track();
   if (S.askPw) app.querySelector('#pw-input')?.focus();
 }
 

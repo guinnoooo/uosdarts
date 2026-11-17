@@ -79,6 +79,9 @@ function modalHtml(p) {
         <div class="player-modal-stats-row">
           ${stat('hit_180s', '180s Hit')}${stat('checkouts_100_plus', '100+ C/Os')}${stat('sheet_legs', 'Sheet Legs')}
         </div>
+        <div class="player-modal-stats-row">
+          ${stat('avg', 'Average')}${stat('first9', 'First 9 Avg')}${stat('dbl_pct', 'Doubles')}
+        </div>
       </div>
     </div>
   </dialog>`;
@@ -192,6 +195,9 @@ async function run() {
     const stats = await fetchStats(season);
     rebuildBracket(data, stats);
     liveStats(stats);
+    // Career averages across every tournament scored on the site.
+    const avgs = await sb.rpc('player_averages');
+    if (!avgs.error) liveStats(avgs.data);
   } catch (e) {
     // Leave the table built at deploy time in place and say so quietly.
     if (note) {
