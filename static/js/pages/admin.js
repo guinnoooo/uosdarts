@@ -436,6 +436,8 @@ function manageSection() {
 
     ${canDrawKo ? '<div class="row"><button data-act="draw-ko" class="primary">Group stage done: draw knockout</button></div>' : ''}
 
+    ${hasFixtures ? boardCallsBlock(koRounds) : ''}
+
     ${hasFixtures ? `<h3>Matches</h3>
       <table class="admin-matches"><thead><tr><th>Match</th><th>Players</th><th>Legs</th><th>Status</th><th>Board</th><th>Scorer</th><th>Result</th></tr></thead>
       <tbody>${S.matches.map(m => matchRow(m, koRounds)).join('')}</tbody></table>
@@ -469,6 +471,34 @@ function allPlayersBlock(inThis) {
       <p class="muted small">Everyone with a profile on the site. ${ids.size} of them ${ids.size === 1 ? 'is' : 'are'} in this tournament.</p>
     </div>
   </details>`;
+}
+
+// Ready matches that haven't started can be called to a board. Tick the ones
+// going on now, give each a board, and they move into "Board calls" on the
+// tournament page. Called or not, anyone can still start scoring them.
+function boardCallsBlock(koRounds) {
+  const ready = S.matches.filter(m => m.status === 'pending' && m.player1_id && m.player2_id);
+  if (!ready.length) return '';
+  const called = ready.filter(m => m.called_at)
+    .sort((a, b) => String(a.board ?? '').localeCompare(String(b.board ?? ''), undefined, { numeric: true }));
+  const waiting = ready.filter(m => !m.called_at);
+  const name = m => `${esc(m.p1?.name ?? 'TBC')} v ${esc(m.p2?.name ?? 'TBC')}`;
+  return `<section class="panel board-calls">
+    <h3>Board calls</h3>
+    ${called.length ? `<ul class="call-list">${called.map(m => `<li>
+        <span class="call-board">Board ${esc(m.board ?? '?')}</span>
+        <span class="call-name">${name(m)}</span>
+        <button data-uncall="${m.id}">Uncall</button></li>`).join('')}</ul>`
+      : '<p class="muted small">Nothing called yet.</p>'}
+    ${waiting.length ? `<ul class="call-list pick">${waiting.map(m => `<li>
+        <label><input type="checkbox" data-callpick="${m.id}">
+          <span class="call-name">${name(m)}</span>
+          <span class="muted small">${esc(matchLabel(m, koRounds))}</span></label>
+        <input class="board" data-callboard="${m.id}" value="${esc(m.board ?? '')}" size="3" placeholder="Board" inputmode="numeric">
+      </li>`).join('')}</ul>
+      <div class="row"><span class="muted small">Tick the matches going on now and give each a board.</span>
+        <button data-act="call-boards" class="primary">Call to boards</button></div>` : ''}
+  </section>`;
 }
 
 function matchRow(m, koRounds) {
@@ -818,6 +848,27 @@ app.addEventListener('click', async e => {
     S.sel = S.tournaments.find(x => x.id === el.dataset.manage);
     S.picked = null;   // rebuilt from whatever that tournament already has
     await refresh();
+    return;
+  }
+  if (el.dataset.uncall) {
+    await run(async () => check(await sb.from('matches')
+      .update({ called_at: null }).eq('id', el.dataset.uncall)), 'Call removed');
+    return;
+  }
+  if (el.dataset.act === 'call-boards') {
+    const picks = [...app.querySelectorAll('[data-callpick]:checked')].map(c => ({
+      id: c.dataset.callpick,
+      board: app.querySelector(`[data-callboard="${c.dataset.callpick}"]`)?.value.trim() ?? '',
+    }));
+    if (!picks.length) { toast('Tick at least one match'); return; }
+    const missing = picks.filter(p => !p.board).length;
+    if (missing) { toast(`Give ${missing === 1 ? 'that match' : 'each ticked match'} a board number`); return; }
+    const now = new Date().toISOString();
+    await run(async () => {
+      for (const p of picks) {
+        check(await sb.from('matches').update({ board: p.board, called_at: now }).eq('id', p.id));
+      }
+    }, picks.length === 1 ? 'Match called' : `${picks.length} matches called`);
     return;
   }
   if (el.dataset.release) {

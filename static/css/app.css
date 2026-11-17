@@ -738,3 +738,23 @@ label.chk {
   border: 1px solid var(--line); border-radius: 4px;
 }
 .profile-edit .muted { margin: 0; }
+
+/* ---------------------------------------------------------------- board calls */
+
+.badge.called { border-color: var(--accent); color: var(--accent); }
+.board-calls h3 { margin: 0 0 .5rem; }
+.call-list { list-style: none; margin: 0 0 .6rem; padding: 0; }
+.call-list li {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .35rem 0; border-bottom: 1px solid var(--line); font-size: .9rem;
+}
+.call-list label {
+  display: flex; flex-direction: row; align-items: center; gap: .5rem; flex: 1; min-width: 0;
+  cursor: pointer; text-transform: none; letter-spacing: 0; font-size: .9rem; color: var(--text); margin: 0;
+}
+.call-list label input[type=checkbox] { width: 1.15rem; height: 1.15rem; flex: none; margin: 0; }
+.call-list label .muted { margin-left: auto; white-space: nowrap; text-transform: uppercase; font-size: .7rem; letter-spacing: .04em; }
+.call-name { min-width: 0; }
+.call-board { font-family: var(--mono); font-weight: 600; color: var(--accent); white-space: nowrap; min-width: 4.6rem; }
+.call-list li > span.call-name { flex: 1; }
+.call-list input.board { width: 4rem; }
