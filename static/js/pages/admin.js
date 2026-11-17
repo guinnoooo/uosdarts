@@ -423,6 +423,13 @@ function manageSection() {
       <details class="adv-fold" style="display:block" ${S.advOpen.manage ? 'open' : ''}>
       <summary>Advanced settings</summary>
       <div id="adv-manage">
+        <div class="row dart-limit-row">
+          <label>Dart limit per leg
+            <input type="number" min="3" max="300" step="3" data-dartlimit value="${t.dart_limit ?? ''}" placeholder="None">
+          </label>
+          <span class="muted small">Once both players have thrown this many darts in a leg without a checkout, the scorer can settle it with a bull off. Leave blank for no limit.</span>
+        </div>
+        <hr>
         ${pointsPanel(t)}
         ${hasFixtures ? '' : `<hr>${advBody({
           format: t.format,
@@ -1085,6 +1092,12 @@ app.addEventListener('change', async e => {
       p_tournament: e.target.dataset.move,
       p_starts_at: new Date(v).toISOString(),
     })), 'Fixture moved');
+  } else if (e.target.matches('[data-dartlimit]')) {
+    const raw = e.target.value.trim();
+    const v = raw === '' ? null : Number(raw);
+    if (v !== null && (!Number.isInteger(v) || v < 3 || v > 300)) { toast('Dart limit must be a whole number from 3 to 300'); return; }
+    await run(async () => check(await sb.from('tournaments').update({ dart_limit: v }).eq('id', S.sel.id)),
+      v ? `Dart limit set to ${v}` : 'Dart limit removed');
   } else if (e.target.matches('[data-board]')) {
     await run(async () => check(await sb.from('matches')
       .update({ board: e.target.value.trim() || null }).eq('id', e.target.dataset.board)));

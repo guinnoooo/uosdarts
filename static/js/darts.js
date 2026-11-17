@@ -61,21 +61,29 @@ export function playerStats(visits, legs, p) {
 
   let bestLeg = null;
   for (const l of legs) {
-    if (l.winner !== p) continue;
+    if (l.winner !== p || l.bull_off) continue;
     const d = vs.filter(v => v.leg_id === l.id).reduce((a, v) => a + v.darts, 0);
     if (bestLeg === null || d < bestLeg) bestLeg = d;
   }
 
   // Every leg won ends on a double, so legs won is the number of doubles hit.
-  const dblHit = legs.filter(l => l.winner === p).length;
+  // A leg settled on a bull off had no double, so it doesn't count.
+  const dblHit = legs.filter(l => l.winner === p && !l.bull_off).length;
+
+  // First 9: the first three visits of each leg.
+  let f9darts = 0, f9scored = 0;
+  for (const l of legs) {
+    for (const v of vs.filter(x => x.leg_id === l.id).slice(0, 3)) { f9darts += v.darts; f9scored += v.score; }
+  }
   const dblAt = vs.reduce((a, v) => a + (v.darts_at_double ?? 0), 0);
 
   return {
     avg: darts ? (scored / darts) * 3 : null,
     darts,
-    // Cumulative: a 180 counts in all three bands, a 140 counts in the first two.
-    ton: vs.filter(v => v.score >= 100).length,
-    ton40: vs.filter(v => v.score >= 140).length,
+    first9: f9darts ? (f9scored / f9darts) * 3 : null,
+    // Separate bands: a 180 is only a 180, a 140 isn't also a 100+.
+    ton: vs.filter(v => v.score >= 100 && v.score < 140).length,
+    ton40: vs.filter(v => v.score >= 140 && v.score < 180).length,
     max: vs.filter(v => v.score === 180).length,
     hiCheckout: checkouts.length ? Math.max(...checkouts) : null,
     bestLeg,

@@ -8,7 +8,7 @@ const id = qs('id');
 
 const S = {
   match: null, legs: [], visits: [], koRounds: 0, uid: null,
-  entry: '', busy: false, pendingCheckout: null, pendingDoubles: null, askPw: false,
+  entry: '', busy: false, pendingCheckout: null, pendingDoubles: null, pendingBull: false, askPw: false,
   shotTimer: null,
 };
 
@@ -16,7 +16,7 @@ const S = {
 
 async function loadInner() {
   const [m, l, v] = await Promise.all([
-    sb.from('matches').select(`${MATCH_SELECT}, tournament:tournaments(id,name,requires_password)`).eq('id', id).single(),
+    sb.from('matches').select(`${MATCH_SELECT}, tournament:tournaments(*)`).eq('id', id).single(),
     sb.from('legs').select('*').eq('match_id', id).order('leg_no'),
     sb.from('visits').select('*').eq('match_id', id).order('id'),
   ]);
@@ -140,12 +140,15 @@ function playerPanel(n, d) {
   const rem = d.rem[n];
   const co = d.turn === n ? checkout(rem) : null;
   const legDarts = d.legVisits.filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
+  // Side by side, so the score each player has left can be as big as possible.
   return `<div class="pp${d.turn === n ? ' on' : ''}${m.winner_id && m.winner_id === (n === 1 ? m.player1_id : m.player2_id) ? ' won' : ''}">
-    <div class="pp-name">${d.leg?.starter === n && m.status === 'live' ? '<span class="dot" title="Threw first this leg"></span>' : ''}${esc(nameOf(n))}</div>
-    <div class="pp-legs">${n === 1 ? m.p1_legs : m.p2_legs}</div>
+    <div class="pp-top">
+      <span class="pp-name">${d.leg?.starter === n && m.status === 'live' ? '<span class="dot" title="Threw first this leg"></span>' : ''}${esc(nameOf(n))}</span>
+      <span class="pp-legs" title="Legs won">${n === 1 ? m.p1_legs : m.p2_legs}</span>
+    </div>
     <div class="pp-rem">${m.status === 'pending' ? m.start_score : rem}</div>
     <div class="pp-co">${co ? co.join(' ') : '&nbsp;'}</div>
-    <div class="pp-stats">Avg ${st.avg ? st.avg.toFixed(2) : '–'} · Darts ${legDarts}${st.dblAt ? ` · D ${st.dblPct.toFixed(0)}%` : ''}</div>
+    <div class="pp-stats">Avg ${st.avg ? st.avg.toFixed(1) : '–'} · ${legDarts} darts</div>
   </div>`;
 }
 
@@ -166,7 +169,9 @@ function legTable(leg) {
     rows.push(`<tr>${cell(byPlayer[1])}<td class="darts">${(i + 1) * 3}</td>${cell(byPlayer[2])}</tr>`);
   }
   const darts = legVisits.filter(v => v.player === leg.winner).reduce((t, v) => t + v.darts, 0);
-  const result = leg.winner ? ` <span class="leg-result">${esc(nameOf(leg.winner))} in ${darts} darts</span>` : '';
+  const result = !leg.winner ? ''
+    : leg.bull_off ? ` <span class="leg-result">${esc(nameOf(leg.winner))} on the bull off</span>`
+    : ` <span class="leg-result">${esc(nameOf(leg.winner))} in ${darts} darts</span>`;
   return `<section><h2>Leg ${leg.leg_no}${result}</h2>
     <table class="leg"><thead><tr><th colspan="2">${esc(nameOf(1))}</th><th></th><th colspan="2">${esc(nameOf(2))}</th></tr></thead>
     <tbody>${rows.join('') || '<tr><td colspan="5" class="muted">No darts thrown yet</td></tr>'}</tbody></table></section>`;
@@ -186,6 +191,7 @@ function statsTable() {
   const row = (label, x, y) => `<tr><td>${x ?? '–'}</td><th>${label}</th><td>${y ?? '–'}</td></tr>`;
   return `<section><h2>Match stats</h2><table class="stats">
     ${row('3-dart average', a.avg?.toFixed(2), b.avg?.toFixed(2))}
+    ${row('First 9 average', a.first9?.toFixed(2), b.first9?.toFixed(2))}
     ${row('100+', a.ton, b.ton)}
     ${row('140+', a.ton40, b.ton40)}
     ${row('180s', a.max, b.max)}
@@ -201,7 +207,17 @@ function lastVisitLine() {
   const v = S.visits[S.visits.length - 1];
   if (!v) return 'No scores entered yet';
   const what = v.is_bust ? 'bust' : v.remaining === 0 ? `${v.score} checkout` : String(v.score);
-  return `Last: ${esc(nameOf(v.player))} <b>${what}</b>${v.remaining === 0 ? '' : `, ${v.remaining} left`}`;
+  // Score first, so a long name can't push it out of view.
+  return `Last: <b>${what}</b>${v.remaining === 0 ? '' : ` · ${v.remaining} left`} · ${esc(nameOf(v.player))}`;
+}
+
+// True once both players have thrown the tournament's dart limit in this leg
+// without anyone checking out.
+function limitReached(d) {
+  const lim = S.match.tournament?.dart_limit;
+  if (!lim || !d.leg || d.leg.winner) return false;
+  const thrown = n => d.legVisits.filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
+  return Math.min(thrown(1), thrown(2)) >= lim;
 }
 
 function keypad(d) {
@@ -209,10 +225,8 @@ function keypad(d) {
   const canFinish = minDarts(rem) !== null;
   return `<div class="pad">
     <div class="pad-top">
-      <div class="pad-who"><span class="pad-name">${esc(nameOf(d.turn))}</span> to throw</div>
-      <div class="pad-left"><b>${rem}</b> left</div>
-      <div class="pad-entry">${S.entry || '<span class="muted">0</span>'}</div>
       <div class="pad-last">${lastVisitLine()}</div>
+      <div class="pad-entry">${S.entry || '<span class="muted">0</span>'}</div>
     </div>
     <div class="quick">${QUICK_SCORES.map(q => `<button data-quick="${q}">${q}</button>`).join('')}</div>
     <div class="keys">
@@ -224,6 +238,7 @@ function keypad(d) {
     <div class="pad-actions">
       <button data-act="noscore">No score</button>
       ${canFinish ? `<button data-act="checkout" class="good">Checkout ${rem}</button>` : ''}
+      ${limitReached(d) ? '<button data-act="bulloff" class="primary">Bull off</button>' : ''}
       <button data-act="undo">Undo</button>
     </div>
     <button data-act="release" class="link">Stop scoring this match</button>
@@ -262,6 +277,18 @@ function doublesModal() {
     <div class="modal-btns">${[0, 1, 2, 3]
       .map(n => `<button data-missdbl="${n}" class="primary">${n}</button>`).join('')}</div>
     <button data-act="cancel-dbl" class="link">Cancel</button>
+  </div></div>`;
+}
+
+function bullModal() {
+  return `<div class="modal"><div class="modal-box">
+    <h3>Bull off</h3>
+    <p class="modal-q">Both players have thrown ${S.match.tournament.dart_limit} darts. Who was closest to the bull?</p>
+    <div class="modal-btns">
+      <button data-bull="1" class="primary">${esc(nameOf(1))}</button>
+      <button data-bull="2" class="primary">${esc(nameOf(2))}</button>
+    </div>
+    <button data-act="cancel-bull" class="link">Cancel, keep playing</button>
   </div></div>`;
 }
 
@@ -310,15 +337,15 @@ function render() {
   const scoring = isScorer() && m.status === 'live';
   app.innerHTML = `
     <div class="m-head">
-      <a href="/tournament/?id=${m.tournament_id}">${esc(m.tournament?.name)}</a>
-      <span>${esc(matchLabel(m, S.koRounds))} · First to ${m.legs_to_win} legs${m.board ? ` · Board ${esc(m.board)}` : ''}</span>
+      <a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>
+      <span>${esc(matchLabel(m, S.koRounds))} · First to ${m.legs_to_win} legs${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
     ${actionZone(d)}
     ${scoring || m.status === 'complete' ? '' : legTable(d.leg)}
     ${scoring ? '' : statsTable()}
     ${scoring ? '' : allLegs(m.status !== 'complete')}
-    ${S.pendingCheckout ? checkoutModal() : S.pendingDoubles ? doublesModal() : ''}`;
+    ${S.pendingCheckout ? checkoutModal() : S.pendingDoubles ? doublesModal() : S.pendingBull && scoring ? bullModal() : ''}`;
   // Stops a fast double tap on the keypad zooming the page on phones.
   document.documentElement.classList.toggle('scoring', scoring);
   if (S.askPw) app.querySelector('#pw-input')?.focus();
@@ -413,7 +440,7 @@ async function startClaim() {
 app.addEventListener('click', async e => {
   const el = e.target.closest('button');
   if (!el) return;
-  const { key, quick, act, first, codarts, codbl, missdbl } = el.dataset;
+  const { key, quick, act, first, codarts, codbl, missdbl, bull } = el.dataset;
 
   if (key) {
     if (key === 'back') S.entry = S.entry.slice(0, -1);
@@ -461,6 +488,16 @@ app.addEventListener('click', async e => {
     if (confirm('Stop scoring? Someone else will be able to take over.')) {
       await rpc('release_match', { p_match: id });
     }
+  } else if (act === 'bulloff') {
+    S.pendingBull = true;
+    render();
+  } else if (act === 'cancel-bull') {
+    S.pendingBull = false;
+    render();
+  } else if (bull) {
+    S.pendingBull = false;
+    S.entry = '';
+    await rpc('bull_off', { p_match: id, p_winner: Number(bull) });
   } else if (act === 'cancel-dbl') {
     S.entry = String(S.pendingDoubles?.score ?? '');
     S.pendingDoubles = null;
@@ -483,7 +520,7 @@ document.addEventListener('keydown', async e => {
     }
     return;
   }
-  if (!S.match || !isScorer() || S.match.status !== 'live' || S.pendingCheckout || S.pendingDoubles) return;
+  if (!S.match || !isScorer() || S.match.status !== 'live' || S.pendingCheckout || S.pendingDoubles || S.pendingBull) return;
   if (/^\d$/.test(e.key) && S.entry.length < 3) {
     S.entry = (S.entry + e.key).replace(/^0+(?=\d)/, '');
     render();

@@ -25,6 +25,13 @@ async function loadInner() {
     return;
   }
   S.t = t.data;
+  // A finished tournament opens on its summary unless a tab was asked for.
+  if (S.t.status === 'complete' && !S.tabPicked && !location.hash.slice(1)) S.tab = 'summary';
+  S.summary = null;
+  if (S.t.status === 'complete') {
+    const sum = await sb.rpc('tournament_summary', { p_tournament: id });
+    S.summary = sum.error ? { error: sum.error.message } : sum.data;
+  }
   S.europa = kids.data?.[0] ?? null;
   S.parent = null;
   if (S.t.parent_id) {
@@ -64,7 +71,7 @@ function koRounds() {
 }
 
 function tabs() {
-  const list = [['matches', 'Matches']];
+  const list = S.t.status === 'complete' ? [['summary', 'Summary'], ['matches', 'Matches']] : [['matches', 'Matches']];
   if (S.t.format !== 'knockout') list.push(['groups', 'Groups']);
   if (S.matches.some(m => m.stage === 'knockout')) list.push(['bracket', 'Bracket']);
   if (!list.some(([k]) => k === S.tab)) S.tab = 'matches';
@@ -121,9 +128,73 @@ function bracketTab() {
   return `<div class="ko-bracket">${cols.join('')}</div>`;
 }
 
+// ---------------------------------------------------------------- summary
+
+const avg3 = (scored, darts) => (darts ? (scored / darts) * 3 : null);
+
+function leaderboard(title, rows, fmt, empty = 'Nothing yet.') {
+  return `<div class="sum-card"><h3>${title}</h3>
+    ${rows.length ? `<ol class="sum-list">${rows.map(r => `<li>
+      <span class="sum-name">${esc(r.player_name)}</span><span class="sum-val">${fmt(r)}</span></li>`).join('')}</ol>`
+      : `<p class="muted small">${empty}</p>`}
+  </div>`;
+}
+
+function runnerUp() {
+  const ko = S.matches.filter(m => m.stage === 'knockout');
+  if (!ko.length) return null;
+  const last = Math.max(...ko.map(m => m.round));
+  const final = ko.find(m => m.round === last && m.status === 'complete' && m.winner_id);
+  if (!final) return null;
+  return final.winner_id === final.player1_id ? final.p2 : final.p1;
+}
+
+function summaryTab() {
+  if (!S.summary) return '<p class="muted">Loading the summary…</p>';
+  if (S.summary.error) return `<p class="muted">The summary isn't available yet. ${esc(S.summary.error)}</p>`;
+  const rows = S.summary.map(r => ({
+    ...r, avg: avg3(r.scored, r.darts), f9: avg3(r.first9_scored, r.first9_darts),
+  }));
+  const top = (list, key, dir = -1, n = 5) => list.filter(r => r[key] != null && r[key] > 0)
+    .sort((a, b) => dir * (a[key] - b[key]) || a.player_name.localeCompare(b.player_name)).slice(0, n);
+  // Averages need a fair sample, otherwise one lucky visit tops the list.
+  const enough = rows.filter(r => r.darts >= 9);
+  const sum = k => rows.reduce((a, r) => a + (r[k] ?? 0), 0);
+  const ru = runnerUp();
+  const t = S.t;
+  const legs = S.matches.reduce((a, m) => a + (m.status === 'complete' ? m.p1_legs + m.p2_legs : 0), 0);
+
+  return `<section class="summary">
+    <div class="sum-podium">
+      <div class="sum-winner"><span class="muted small">Winner</span><b>${esc(t.champion?.name ?? 'Not set')}</b></div>
+      ${ru ? `<div class="sum-runner"><span class="muted small">Runner-up</span><b>${esc(ru.name)}</b></div>` : ''}
+    </div>
+    <div class="sum-totals">
+      <div><b>${S.matches.filter(m => m.status === 'complete' && m.player1_id && m.player2_id).length}</b><span>matches</span></div>
+      <div><b>${legs}</b><span>legs</span></div>
+      <div><b>${sum('s180')}</b><span>180s</span></div>
+      <div><b>${sum('ton_checkouts')}</b><span>100+ checkouts</span></div>
+    </div>
+    <div class="sum-grid">
+      ${leaderboard('Top averages', top(enough, 'avg'), r => r.avg.toFixed(2))}
+      ${leaderboard('First 9 averages', top(enough, 'f9'), r => r.f9.toFixed(2))}
+      ${leaderboard('Highest checkouts', top(rows, 'hi_checkout'), r => r.hi_checkout)}
+      ${leaderboard('Best legs', top(rows, 'best_leg', 1), r => `${r.best_leg} darts`)}
+      ${leaderboard('180s', top(rows, 's180'), r => r.s180)}
+      ${leaderboard('140+', top(rows, 's140'), r => r.s140)}
+      ${leaderboard('100+ checkouts', top(rows, 'ton_checkouts'), r => r.ton_checkouts)}
+      ${leaderboard('Most legs won', top(rows, 'legs_won'), r => r.legs_won)}
+    </div>
+  </section>`;
+}
+
 function render() {
   const t = S.t;
-  const body = S.tab === 'groups' ? groupsTab() : S.tab === 'bracket' ? bracketTab() : matchesTab();
+  // The bracket scrolls sideways on a phone. Redrawing it for a score update
+  // would jump back to the first round, so keep where the viewer had got to.
+  const kb = app.querySelector('.ko-bracket');
+  const keepX = kb ? kb.scrollLeft : null;
+  const body = S.tab === 'summary' ? summaryTab() : S.tab === 'groups' ? groupsTab() : S.tab === 'bracket' ? bracketTab() : matchesTab();
   app.innerHTML = `
     ${t.champion ? `<div class="champ-banner">🏆 <b>${esc(t.champion.name)}</b> wins ${esc(t.name)}</div>` : ''}
     <div class="t-head">
@@ -135,12 +206,17 @@ function render() {
     </div>
     ${tabs()}
     <div class="tab-body">${body}</div>`;
+  if (keepX) {
+    const nb = app.querySelector('.ko-bracket');
+    if (nb) nb.scrollLeft = keepX;
+  }
 }
 
 app.addEventListener('click', e => {
   const b = e.target.closest('[data-tab]');
   if (!b) return;
   S.tab = b.dataset.tab;
+  S.tabPicked = true;
   history.replaceState(null, '', `#${S.tab}`);
   render();
 });
