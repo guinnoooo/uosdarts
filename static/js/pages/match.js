@@ -593,7 +593,7 @@ function actionZone(d) {
       ${m.tournament?.requires_password ? '<p class="muted small">A scoring password is needed.</p>' : ''}
       </div>`;
   }
-  if (m.scorer_id) return '<p class="muted center">Being scored live. Updates appear automatically.</p>';
+  if (m.scorer_id) return '<p class="muted center">Being scored live.</p>';
   return '<p class="muted center">Waiting for both players to be decided.</p>';
 }
 
