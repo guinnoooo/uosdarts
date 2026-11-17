@@ -551,10 +551,12 @@ function render() {
       <div class="m-head-top">
         ${isFriendly() ? '<a class="back-link" href="/#friendlies"><span aria-hidden="true">‹</span> Back to friendlies</a>'
           : `<a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`}
-        <button data-act="share" class="share-btn">Share</button>
+        <div class="m-head-right">
+          <span id="watchers" class="watchers">${watchersText()}</span>
+          <button data-act="share" class="share-btn">Share</button>
+        </div>
       </div>
-      <span>${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
-      <span id="watchers" class="watchers">${watchersText()}</span>
+      <span class="m-info">${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
     ${actionZone(d)}

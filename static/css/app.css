@@ -785,8 +785,13 @@ label.chk {
 
 /* ---------------------------------------------------------------- spectators and preview */
 
-.m-head .watchers { color: var(--live); text-transform: none; letter-spacing: 0; font-size: .8rem; }
-.m-head .watchers:empty { display: none; }
+/* The watcher count sits in the top row beside Share, so it appearing or
+   changing never pushes the scoreboard and keypad down. */
+.m-head-right { display: flex; align-items: center; gap: .6rem; flex: none; }
+.m-head .watchers { color: var(--live); text-transform: none; letter-spacing: 0; font-size: .8rem; white-space: nowrap; }
+/* While scoring the info line is held to one line, so a board number or
+   anything else added mid-match can't make it wrap and shift the keypad. */
+html.scoring .m-info { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mc-watch { color: var(--live); }
 .preview { margin-top: 1rem; }
 .preview .stats thead th { color: var(--text); font-weight: 600; font-size: .85rem; border-bottom: 1px solid var(--line); }
