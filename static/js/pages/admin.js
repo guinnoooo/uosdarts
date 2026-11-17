@@ -244,7 +244,7 @@ function newTournamentSection() {
 }
 
 function tournamentsSection() {
-  const alive = S.tournaments.filter(t => !t.deleted_at);
+  const alive = S.tournaments.filter(t => !t.deleted_at && !t.is_friendly);
   const pcs = alive.filter(t => t.is_pc);
   const byId = new Map(alive.map(t => [t.id, t]));
   // Europas sit under their PC. One only joins the general lists once its PC
@@ -278,6 +278,8 @@ function tournamentsSection() {
 
     ${deletedSection()}
 
+    ${friendliesSection()}
+
     <section class="panel">
       <h2>Other tournaments</h2>
       ${upcoming.length ? upcoming.map(row).join('') : '<p class="muted">Nothing else scheduled.</p>'}
@@ -286,6 +288,22 @@ function tournamentsSection() {
         <div class="archive-body">${done.map(row).join('')}</div>
       </details>` : ''}
     </section>`;
+}
+
+// Friendlies from the last week, so a junk or abandoned one can be removed.
+function friendliesSection() {
+  const week = Date.now() - 7 * 86400000;
+  const list = S.tournaments.filter(t => t.is_friendly && !t.deleted_at && new Date(t.created_at) > week);
+  if (!list.length) return '';
+  return `<details class="archive-box friendlies-box">
+    <summary>Friendlies this week <span class="count">${list.length}</span></summary>
+    <div class="archive-body">${list.map(t => `<div class="t-row">
+      <span class="t-row-main"><b>${esc(t.name.replace(/^Friendly: /, ''))}</b>
+        <span class="muted small">${fmtDate(t.created_at)} · ${t.status}</span></span>
+      <a href="/tournament/?id=${t.id}" class="muted small">View</a>
+      <button data-remove="${t.id}" data-name="${esc(t.name)}">Delete</button>
+    </div>`).join('')}</div>
+  </details>`;
 }
 
 // Deleting marks a tournament rather than removing it, so there is a day to
@@ -898,7 +916,8 @@ app.addEventListener('click', async e => {
     return;
   }
   if (el.dataset.remove) {
-    if (!confirm(`Remove ${el.dataset.name}? Fixtures after it move up a number. `
+    const pc = !el.dataset.name.startsWith('Friendly: ');
+    if (!confirm(`Remove ${el.dataset.name}?${pc ? ' Fixtures after it move up a number.' : ''} `
       + 'You can restore it from Recently deleted for 24 hours.')) return;
     await run(async () => {
       check(await sb.rpc('admin_delete_tournament', { p_tournament: el.dataset.remove }));

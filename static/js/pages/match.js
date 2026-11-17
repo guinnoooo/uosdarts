@@ -1,5 +1,5 @@
 import {
-  sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, MATCH_SELECT,
+  sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, MATCH_SELECT,
 } from '../db.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
@@ -136,7 +136,8 @@ function derive() {
   return { leg, legVisits, rem, turn };
 }
 
-const nameOf = n => (n === 1 ? S.match.p1?.name : S.match.p2?.name) ?? 'TBC';
+const nameOf = n => (n === 1 ? S.match.p1?.name ?? S.match.p1_name : S.match.p2?.name ?? S.match.p2_name) ?? 'TBC';
+const isFriendly = () => !!S.match.tournament?.is_friendly;
 const isScorer = () => !!S.match.scorer_id && S.match.scorer_id === S.uid;
 
 // ---------------------------------------------------------------- rendering
@@ -148,7 +149,7 @@ function playerPanel(n, d) {
   const co = d.turn === n ? checkout(rem) : null;
   const legDarts = d.legVisits.filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
   // Side by side, so the score each player has left can be as big as possible.
-  return `<div class="pp${d.turn === n ? ' on' : ''}${m.winner_id && m.winner_id === (n === 1 ? m.player1_id : m.player2_id) ? ' won' : ''}">
+  return `<div class="pp${d.turn === n ? ' on' : ''}${winnerSide(m) === n ? ' won' : ''}">
     <div class="pp-top">
       <span class="pp-name">${d.leg?.starter === n && m.status === 'live' ? '<span class="dot" title="Threw first this leg"></span>' : ''}${esc(nameOf(n))}</span>
       <span class="pp-legs" title="Legs won">${n === 1 ? m.p1_legs : m.p2_legs}</span>
@@ -247,6 +248,7 @@ function keypad(d) {
       <button data-act="undo">Undo</button>
     </div>
     <button data-act="release" class="link">Stop scoring this match</button>
+    ${isFriendly() ? '<button data-act="delete-friendly" class="link danger-link">Delete this friendly</button>' : ''}
   </div>`;
 }
 
@@ -297,6 +299,68 @@ function bullModal() {
   </div></div>`;
 }
 
+// ---------------------------------------------------------------- odds
+
+// Pretend bookmaker odds, for fun. Each player's strength is mostly their
+// career average, nudged by first 9 and doubles. The gap between them gives
+// the chance of winning a single leg, which is pulled towards their
+// head-to-head record the more often they've met. The match price then comes
+// from that leg chance over a first-to-N match.
+const ODDS = ['1/10', '1/8', '1/6', '1/5', '2/9', '1/4', '2/7', '1/3', '4/11', '2/5', '4/9', '1/2', '8/15',
+  '4/7', '8/13', '4/6', '8/11', '4/5', '5/6', '10/11', 'Evens', '11/10', '6/5', '5/4', '11/8', '6/4', '13/8',
+  '7/4', '15/8', '2/1', '9/4', '5/2', '11/4', '3/1', '10/3', '7/2', '4/1', '9/2', '5/1', '11/2', '6/1',
+  '7/1', '8/1', '9/1', '10/1', '12/1', '14/1', '16/1', '20/1', '25/1', '33/1', '50/1'];
+const oddsValue = f => (f === 'Evens' ? 1 : f.split('/').reduce((a, b) => a / b));
+
+function fractional(p) {
+  const target = 1 / Math.min(0.99, p * 1.06) - 1;   // a small bookmaker's margin
+  return ODDS.reduce((best, f) => (Math.abs(Math.log(oddsValue(f)) - Math.log(Math.max(target, 0.01)))
+    < Math.abs(Math.log(oddsValue(best)) - Math.log(Math.max(target, 0.01))) ? f : best));
+}
+
+const choose = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return r; };
+
+function matchOdds(pv, legsToWin) {
+  const strength = x => {
+    const avg = parseFloat(x?.avg) || 40;           // someone with no record is treated as about average
+    const f9 = parseFloat(x?.first9) || avg;
+    const dbl = parseFloat(x?.dbl_pct) || 25;
+    return avg + (f9 - avg) * 0.3 + (dbl - 25) * 0.15;
+  };
+  let pLeg = 1 / (1 + Math.exp(-(strength(pv.p1) - strength(pv.p2)) / 14));
+  const h2h = pv.h2h ?? [];
+  if (h2h.length) {
+    const legs1 = h2h.reduce((a, x) => a + x.p1_legs, 0);
+    const legs2 = h2h.reduce((a, x) => a + x.p2_legs, 0);
+    const share = (legs1 + 1) / (legs1 + legs2 + 2);
+    const w = h2h.length / (h2h.length + 4);
+    pLeg = pLeg * (1 - w) + share * w;
+  }
+  pLeg = Math.min(0.97, Math.max(0.03, pLeg));
+  const n = legsToWin;
+  const scores = [];
+  for (let k = 0; k < n; k++) {
+    scores.push({ a: n, b: k, p: choose(n - 1 + k, k) * pLeg ** n * (1 - pLeg) ** k });
+    scores.push({ a: k, b: n, p: choose(n - 1 + k, k) * (1 - pLeg) ** n * pLeg ** k });
+  }
+  const p1 = scores.filter(x => x.a === n).reduce((a, x) => a + x.p, 0);
+  const likely = scores.reduce((a, x) => (x.p > a.p ? x : a));
+  return { p1, p2: 1 - p1, likely };
+}
+
+function oddsBlock(pv) {
+  const o = matchOdds(pv, S.match.legs_to_win);
+  const sc = o.likely;
+  return `<div class="odds">
+    <h3>Odds <span class="muted small">just for fun</span></h3>
+    <div class="odds-row">
+      <div><span class="odds-name">${esc(nameOf(1))}</span><b>${fractional(o.p1)}</b></div>
+      <div><span class="odds-name">${esc(nameOf(2))}</span><b>${fractional(o.p2)}</b></div>
+    </div>
+    <p class="muted small center">Most likely score: ${esc(nameOf(sc.a > sc.b ? 1 : 2))} ${Math.max(sc.a, sc.b)}–${Math.min(sc.a, sc.b)} (${fractional(sc.p)})</p>
+  </div>`;
+}
+
 function previewBlock() {
   const pv = S.preview;
   if (!pv) return '';
@@ -317,6 +381,7 @@ function previewBlock() {
       ${row('Matches won', `${pv.p1_won ?? 0} of ${pv.p1_played ?? 0}`, `${pv.p2_won ?? 0} of ${pv.p2_played ?? 0}`)}
       ${row('Head to head', h2h.length ? w1 : 0, h2h.length ? h2h.length - w1 : 0)}
     </table>
+    ${oddsBlock(pv)}
     ${h2h.length ? `<h3>Previous meetings</h3><ul class="meetings">${meetings}</ul>`
       : '<p class="muted small center">First meeting on the site.</p>'}
     <p class="muted small">Averages are across every tournament scored on the site.</p>
@@ -358,10 +423,10 @@ function track() {
 
 function actionZone(d) {
   const m = S.match;
-  const ready = m.player1_id && m.player2_id;
+  const ready = hasPlayers(m);
 
   if (m.status === 'complete') {
-    const w = m.winner_id === m.player1_id ? 1 : 2;
+    const w = winnerSide(m) ?? (m.p1_legs > m.p2_legs ? 1 : 2);
     return `<div class="banner">${esc(nameOf(w))} wins ${Math.max(m.p1_legs, m.p2_legs)}–${Math.min(m.p1_legs, m.p2_legs)}</div>
       ${isScorer() ? '<div class="center"><button data-act="undo">Undo last visit</button></div>' : ''}`;
   }
@@ -371,14 +436,15 @@ function actionZone(d) {
         <button data-first="1" class="primary">${esc(nameOf(1))}</button>
         <button data-first="2" class="primary">${esc(nameOf(2))}</button>
       </div>
-      <button data-act="release" class="link">Cancel, I'm not scoring</button></div>`;
+      <button data-act="release" class="link">Cancel, I'm not scoring</button>
+      ${isFriendly() ? '<button data-act="delete-friendly" class="link danger-link">Delete this friendly</button>' : ''}</div>`;
   }
   if (isScorer() && m.status === 'live') return keypad(d);
   if (!m.scorer_id && ready) {
     if (S.askPw) {
       return `<div class="panel center pw-panel">
         <h3>Scoring password</h3>
-        <p class="muted">Ask whoever is running the tournament.</p>
+        <p class="muted">${isFriendly() ? 'Friendlies use the friendly password.' : 'Ask whoever is running the tournament.'}</p>
         <input id="pw-input" type="password" autocomplete="off" placeholder="Password" autofocus>
         <div class="modal-btns">
           <button data-act="pw-submit" class="primary">Start scoring</button>
@@ -401,7 +467,11 @@ function render() {
   const scoring = isScorer() && m.status === 'live';
   app.innerHTML = `
     <div class="m-head">
-      <a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>
+      <div class="m-head-top">
+        ${isFriendly() ? '<a class="back-link" href="/#friendlies"><span aria-hidden="true">‹</span> Back to friendlies</a>'
+          : `<a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`}
+        <button data-act="share" class="share-btn">Share</button>
+      </div>
       <span>${esc(matchLabel(m, S.koRounds))} · First to ${m.legs_to_win} legs${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
       <span id="watchers" class="watchers">${watchersText()}</span>
     </div>
@@ -473,7 +543,7 @@ async function submit(score) {
 }
 
 // The password is remembered per tournament so a scorer types it once a night.
-function pwKey() { return `uosdarts:pw:${S.match.tournament_id}`; }
+function pwKey() { return isFriendly() ? 'uosdarts:friendlypw' : `uosdarts:pw:${S.match.tournament_id}`; }
 function savedPw() { try { return localStorage.getItem(pwKey()) ?? ''; } catch { return ''; } }
 function rememberPw(v) { try { localStorage.setItem(pwKey(), v); } catch { /* private mode */ } }
 function forgetPw() { try { localStorage.removeItem(pwKey()); } catch { /* private mode */ } }
@@ -551,6 +621,21 @@ app.addEventListener('click', async e => {
   } else if (act === 'pw-cancel') {
     S.askPw = false;
     render();
+  } else if (act === 'share') {
+    // Phones get the share sheet (WhatsApp and so on); elsewhere copy the link.
+    const url = location.href.split('#')[0];
+    const title = `${nameOf(1)} v ${nameOf(2)}`;
+    try {
+      if (navigator.share) await navigator.share({ title, text: `Watch ${title} live`, url });
+      else { await navigator.clipboard.writeText(url); toast('Link copied', false); }
+    } catch { /* share sheet closed */ }
+  } else if (act === 'delete-friendly') {
+    if (!confirm('Delete this friendly? Its scores go with it.')) return;
+    try {
+      const { error } = await sb.rpc('delete_friendly', { p_match: id });
+      if (error) throw error;
+      location.href = '/#friendlies';
+    } catch (e) { toast(e.message); }
   } else if (act === 'release') {
     if (confirm('Stop scoring? Someone else will be able to take over.')) {
       await rpc('release_match', { p_match: id });
