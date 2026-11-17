@@ -763,7 +763,10 @@ label.chk {
 }
 .sum-totals b { font-size: 1.4rem; font-weight: 700; }
 .sum-totals span { font-size: .72rem; color: var(--text-3); text-align: center; }
-.sum-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .8rem; }
+.sum-grid { display: grid; grid-template-columns: 1fr; gap: .8rem; }
+/* Three across on a wider screen, so the six lists sit in two rows of three. */
+@media (min-width: 760px) { .sum-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.sum-sub { display: block; color: var(--text-3); font-size: .76rem; overflow: hidden; text-overflow: ellipsis; }
 .sum-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: .7rem .9rem;
 }
@@ -774,7 +777,7 @@ label.chk {
 .sum-list li::marker { color: var(--text-3); }
 .sum-list li { display: list-item; }
 .sum-list li > span { display: inline-block; }
-.sum-name { max-width: calc(100% - 4.5rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.sum-name { max-width: calc(100% - 4.5rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
 .sum-val { float: right; font-weight: 600; color: var(--accent-soft); }
 .dart-limit-row { align-items: end; }
 .dart-limit-row input { width: 6rem; }
