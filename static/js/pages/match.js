@@ -1,6 +1,7 @@
 import {
   sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, formatText, MATCH_SELECT,
 } from '../db.js';
+import { mountChat } from '../chat.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -545,7 +546,7 @@ function render() {
           : `<a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`}
         <button data-act="share" class="share-btn">Share</button>
       </div>
-      <span>${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
+      <span>${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}${m.referee_name ? ` · Ref ${esc(m.referee_name)}` : ''}</span>
       <span id="watchers" class="watchers">${watchersText()}</span>
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
@@ -738,6 +739,8 @@ app.addEventListener('click', async e => {
 
 // Physical keyboard support for scorers on a laptop
 document.addEventListener('keydown', async e => {
+  // Typing in the chat isn't scoring.
+  if (e.target.closest?.('#match-chat')) return;
   if (S.askPw) {
     if (e.key === 'Enter') {
       const v = app.querySelector('#pw-input')?.value.trim() ?? '';
@@ -787,5 +790,13 @@ async function load() {
     await loadInner();
   } catch (e) {
     showLoadError(app, e);
+    return;
+  }
+  // The chat sits under the match in its own box, set up once.
+  if (S.match && !document.getElementById('match-chat')) {
+    const host = document.createElement('div');
+    host.id = 'match-chat';
+    app.after(host);
+    mountChat(host, id).catch(() => { host.remove(); });
   }
 }

@@ -34,7 +34,7 @@ export function matchCard(m, totalKoRounds) {
     </div>`;
   };
   return `<a class="match-card ${m.status}" href="/match/?id=${m.id}">
-    <div class="mc-meta"><span>${esc(matchLabel(m, totalKoRounds))}${m.board ? ` · Board ${esc(m.board)}` : ''}${watching.get(m.id) ? ` · <span class="mc-watch">${watching.get(m.id)} watching</span>` : ''}</span>${statusBadge(m)}</div>
+    <div class="mc-meta"><span>${esc(matchLabel(m, totalKoRounds))}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.referee_name && m.status !== 'complete' ? ` · Ref ${esc(m.referee_name)}` : ''}${watching.get(m.id) ? ` · <span class="mc-watch">${watching.get(m.id)} watching</span>` : ''}</span>${statusBadge(m)}</div>
     ${row(1)}${row(2)}
     ${m.status === 'pending' && hasPlayers(m) && !m.scorer_id
       ? '<div class="mc-cta">Needs a scorer</div>' : ''}
