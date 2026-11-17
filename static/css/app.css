@@ -820,3 +820,11 @@ button.link.danger-link { color: var(--live); display: block; margin: .3rem auto
 }
 .odds-row b { font-size: 1.4rem; color: var(--accent-soft); }
 .odds-name { font-size: .82rem; color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* set play: sets won sits before the legs in the current set */
+.pp-sets {
+  font-family: var(--mono); font-size: 1.15rem; font-weight: 700; color: #111; background: var(--accent);
+  min-width: 1.6rem; text-align: center; border-radius: 4px; line-height: 1.35; border: 1px solid var(--accent);
+}
+.mc-legs small { font-size: .72rem; font-weight: 500; color: var(--text-3); margin-left: .3rem; }
+.friendly-format { margin-top: -.2rem; }

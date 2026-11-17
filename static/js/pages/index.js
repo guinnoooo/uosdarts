@@ -1,4 +1,4 @@
-import { sb, showLoadError, esc, fmtDate, debounce } from '../db.js';
+import { sb, showLoadError, esc, fmtDate, debounce, scoreText, winnerSide } from '../db.js';
 
 const app = document.getElementById('app');
 
@@ -33,11 +33,12 @@ function europaVisible(all) {
 
 // A friendly is a one-match tournament, so its card links straight to the match.
 function friendlyCard(t, m) {
-  const score = m.status === 'pending' ? 'Not started' : `${m.p1_legs}–${m.p2_legs}`;
-  const winner = t.status === 'complete' ? (m.p1_legs > m.p2_legs ? m.p1_name : m.p2_name) : null;
+  const score = m.status === 'pending' ? 'Not started' : scoreText(m);
+  const winner = t.status === 'complete' ? (winnerSide({ ...m, status: 'complete' }) === 1 ? m.p1_name : m.p2_name) : null;
+  const length = m.sets_to_win ? `first to ${m.sets_to_win} sets` : `first to ${t.knockout_legs_to_win}`;
   return `<a class="t-card ${t.status}" href="/match/?id=${m.id}">
     <div class="t-name">${esc(m.p1_name)} v ${esc(m.p2_name)}</div>
-    <div class="t-meta">Friendly · ${score} · first to ${t.knockout_legs_to_win} · ${t.start_score}</div>
+    <div class="t-meta">Friendly · ${score} · ${length} · ${t.start_score}</div>
     ${winner ? `<div class="t-champ">🏆 ${esc(winner)}</div>` : ''}
     ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}
   </a>`;
@@ -74,7 +75,7 @@ async function loadInner() {
     || (t.status === 'complete' && hours(t) < 24)));
   let fm = [];
   if (fr.length) {
-    const r = await sb.from('matches').select('id,tournament_id,status,p1_name,p2_name,p1_legs,p2_legs')
+    const r = await sb.from('matches').select('*')
       .in('tournament_id', fr.map(t => t.id));
     fm = r.data ?? [];
   }

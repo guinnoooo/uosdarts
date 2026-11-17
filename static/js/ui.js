@@ -28,7 +28,9 @@ export function matchCard(m, totalKoRounds) {
     return `<div class="mc-row${won ? ' win' : ''}${throwing ? ' throwing' : ''}">
       <span class="mc-name">${esc(playerName(m, n))}</span>
       ${live ? `<span class="mc-rem">${n === 1 ? m.p1_rem : m.p2_rem}</span>` : ''}
-      <span class="mc-legs">${m.status === 'pending' ? '' : (n === 1 ? m.p1_legs : m.p2_legs)}</span>
+      <span class="mc-legs">${m.status === 'pending' ? '' : m.sets_to_win
+        ? `${n === 1 ? m.p1_sets : m.p2_sets}<small>${n === 1 ? m.p1_legs : m.p2_legs}</small>`
+        : (n === 1 ? m.p1_legs : m.p2_legs)}</span>
     </div>`;
   };
   return `<a class="match-card ${m.status}" href="/match/?id=${m.id}">
