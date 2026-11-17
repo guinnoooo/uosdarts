@@ -106,7 +106,7 @@ function pointsPanel(t) {
       Major (counts towards Major Best and Major Wins on player profiles)
     </label>
     ${t?.is_pc ? `<p class="muted small">Weekly PC ${t.pc_number ?? ''}: also counts towards the PC order of merit.</p>` : ''}
-    <table class="points-plan">
+    <table class="points-plan" ${isNew || t.counts_for_oom ? '' : 'hidden'}>
       <thead><tr><th>Reached</th><th>Points</th></tr></thead>
       <tbody>${REACH_LABELS.map(([k, label]) => `<tr>
         <td>${label}</td>
@@ -1149,6 +1149,13 @@ function syncFormatFields(form) {
 }
 
 app.addEventListener('change', async e => {
+  // The points for each finishing spot only matter while the tournament
+  // counts towards the order of merit.
+  if (e.target.matches('[data-oom-counts]')) {
+    const table = e.target.closest('.oom-box')?.querySelector('.points-plan');
+    if (table) table.hidden = !e.target.checked;
+    return;
+  }
   if (e.target.matches('[name=format]')) {
     syncFormatFields(e.target.closest('form'));
   } else if (e.target.matches('#adv-manage [data-legs]')) {
