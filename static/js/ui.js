@@ -20,15 +20,6 @@ export function statusBadge(m) {
 let watching = new Map();
 export function setWatching(map) { watching = map; }
 
-// Live win chance for player 1 of each match (0 to 1), set by the page.
-let chances = new Map();
-export function setChances(map) { chances = map; }
-
-function winStrip(p) {
-  const a = Math.round(p * 100);
-  return `<div class="mc-wp" title="Live win probability"><span>${a}%</span><div class="wp-bar"><i style="width:${a}%"></i></div><span>${100 - a}%</span></div>`;
-}
-
 export function matchCard(m, totalKoRounds) {
   const live = m.status === 'live';
   const row = n => {
@@ -45,7 +36,6 @@ export function matchCard(m, totalKoRounds) {
   return `<a class="match-card ${m.status}" href="/match/?id=${m.id}">
     <div class="mc-meta"><span>${esc(matchLabel(m, totalKoRounds))}${m.board ? ` · Board ${esc(m.board)}` : ''}${watching.get(m.id) ? ` · <span class="mc-watch">${watching.get(m.id)} watching</span>` : ''}</span>${statusBadge(m)}</div>
     ${row(1)}${row(2)}
-    ${m.status === 'live' && chances.has(m.id) ? winStrip(chances.get(m.id)) : ''}
     ${m.status === 'pending' && hasPlayers(m) && !m.scorer_id
       ? `<div class="mc-cta">${m.called_at && m.referee_name ? `${esc(m.referee_name)} to mark` : 'Needs a scorer'}</div>` : ''}
   </a>`;

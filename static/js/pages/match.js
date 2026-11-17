@@ -39,8 +39,8 @@ async function loadInner() {
   }
   // Before a match starts, spectators get both players' figures and their
   // head-to-head. Fetched once; it doesn't change while the match waits.
-  // Live matches use it too, for the win probability bar.
-  if (S.match.status !== 'complete' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
+  // Live matches use it for the win probability bar, finished ones for the chart.
+  if (S.match.player1_id && S.match.player2_id && S.preview === undefined) {
     const pv = await sb.rpc('match_preview', { p_match: id });
     S.preview = pv.error ? null : pv.data;
     // Order of merit standing, a small extra factor in the GuinnessBet prices.
@@ -350,6 +350,73 @@ function winBar() {
   <p class="wp-label">Win probability</p>`;
 }
 
+// The whole match replayed visit by visit: the win probability after each
+// one, from the same model as the live bar. Returns player 1's chance at the
+// start, after every visit, and 1 or 0 at the end, plus where each leg began.
+function probTimeline() {
+  const m = S.match, pv = S.preview;
+  const st = { ...m, status: 'live', p1_legs: 0, p2_legs: 0, p1_sets: 0, p2_sets: 0 };
+  const form = { p1: { darts: 0, scored: 0 }, p2: { darts: 0, scored: 0 } };
+  const pts = [], legStarts = [];
+  const legs = [...S.legs].sort((a, b) => a.leg_no - b.leg_no);
+  for (const leg of legs) {
+    st.p1_rem = st.p2_rem = m.start_score;
+    st.turn = leg.starter;
+    legStarts.push(pts.length);
+    pts.push(liveChance(pv, st, form));
+    for (const v of S.visits.filter(x => x.leg_id === leg.id)) {
+      const f = v.player === 1 ? form.p1 : form.p2;
+      f.darts += v.darts; f.scored += v.score;
+      if (v.remaining === 0) break;            // leg over: the next point is the next leg
+      if (v.player === 1) st.p1_rem = v.remaining; else st.p2_rem = v.remaining;
+      st.turn = 3 - v.player;
+      pts.push(liveChance(pv, st, form));
+    }
+    if (!leg.winner) continue;
+    if (leg.winner === 1) st.p1_legs++; else st.p2_legs++;
+    if (st.sets_to_win && Math.max(st.p1_legs, st.p2_legs) >= st.legs_to_win) {
+      if (st.p1_legs > st.p2_legs) st.p1_sets++; else st.p2_sets++;
+      st.p1_legs = 0; st.p2_legs = 0;
+    }
+  }
+  pts.push(winnerSide(m) === 1 ? 1 : 0);
+  return { pts, legStarts };
+}
+
+// Shown under the stats once a match is over. The winner's 100% is the top
+// edge and the other player's 100% the bottom, left to right from first dart
+// to last, with a faint line where each leg began.
+function winChart() {
+  if (!S.preview || !S.visits.length) return '';
+  const { pts, legStarts } = probTimeline();
+  const w = winnerSide(S.match) ?? 1;
+  const ys = pts.map(p => (w === 1 ? p : 1 - p));
+  const W = 600, H = 180, n = ys.length - 1;
+  const x = i => (n ? (i / n) * W : 0);
+  const y = p => (1 - p) * H;
+  const line = ys.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p).toFixed(1)}`).join(' ');
+  const area = `${line} L${W},${H / 2} L0,${H / 2} Z`;
+  const legs = legStarts.map((i, k) => ({ at: x(i), k: k + 1 }));
+  return `<section class="win-chart">
+    <h2>Win probability</h2>
+    <div class="wc-frame">
+      <span class="wc-name top">${esc(nameOf(w))}</span>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+           aria-label="Win probability through the match, ending with ${esc(nameOf(w))} winning">
+        <line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="wc-mid" vector-effect="non-scaling-stroke"/>
+        ${legs.slice(1).map(l => `<line x1="${l.at}" x2="${l.at}" y1="0" y2="${H}" class="wc-leg" vector-effect="non-scaling-stroke"/>`).join('')}
+        <path d="${area}" class="wc-area"/>
+        <path d="${line}" class="wc-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <span class="wc-name bottom">${esc(nameOf(3 - w))}</span>
+    </div>
+    <div class="wc-legs">${legs.map((l, i) => {
+      const next = legs[i + 1]?.at ?? W;
+      return `<span style="left:${(l.at / W) * 100}%;width:${((next - l.at) / W) * 100}%">${legs.length > 12 ? l.k : `Leg ${l.k}`}</span>`;
+    }).join('')}</div>
+  </section>`;
+}
+
 // ---------------------------------------------------------------- odds
 
 // GuinnessBet: pretend bookmaker odds. The chance of each player winning
@@ -534,6 +601,7 @@ function render() {
   app.querySelector('#m-bottom').innerHTML = `
     ${scoring || m.status === 'complete' ? '' : legTable(d.leg)}
     ${scoring ? '' : statsTable()}
+    ${m.status === 'complete' ? winChart() : ''}
     ${scoring ? '' : allLegs(m.status !== 'complete')}
     ${S.pendingCheckout ? checkoutModal() : S.pendingDoubles ? doublesModal() : S.pendingBull && scoring ? bullModal() : ''}`;
   // Stops a fast double tap on the keypad zooming the page on phones.
