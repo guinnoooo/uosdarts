@@ -125,6 +125,8 @@ export function liveChance(pv, m, form) {
   const neutral = (liveLeg(start, start, 1, c1, c2) + liveLeg(start, start, 2, c1, c2)) / 2;
   const shift = logit(pLeg) - logit(clamp(neutral, 0.02, 0.98));
   const raw = liveLeg(m.p1_rem ?? start, m.p2_rem ?? start, m.turn ?? 1, a1, a2);
-  const cur = clamp(sigmoid(logit(clamp(raw, 0.01, 0.99)) + shift), 0.01, 0.99);
-  return clamp(fromLeg(cur, pLeg, m), 0.01, 0.99);
+  // Only a hair off 0 and 1, so the maths never divides by zero. A match
+  // that's all but over can show 99.9%; only the finish itself is 100%.
+  const cur = clamp(sigmoid(logit(clamp(raw, 0.0001, 0.9999)) + shift), 0.0001, 0.9999);
+  return clamp(fromLeg(cur, pLeg, m), 0.0005, 0.9995);
 }
