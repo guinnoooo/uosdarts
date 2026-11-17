@@ -470,6 +470,8 @@ function manageSection() {
 
     ${canDrawKo ? '<div class="row"><button data-act="draw-ko" class="primary">Group stage done: draw knockout</button></div>' : ''}
 
+    ${boardsPanel(t)}
+
     ${hasFixtures ? boardCallsBlock(koRounds) : ''}
 
     ${hasFixtures ? `<h3>Matches</h3>
@@ -510,6 +512,46 @@ function allPlayersBlock(inThis) {
 // Ready matches that haven't started can be called to a board. Tick the ones
 // going on now, give each a board, and they move into "Board calls" on the
 // tournament page. Called or not, anyone can still start scoring them.
+// Who's refereeing a called match. Filled in automatically when automatic
+// board calls are on; the admin can swap them here either way.
+function refSelect(m) {
+  const opts = S.entrants
+    .filter(e => e.player_id !== m.player1_id && e.player_id !== m.player2_id)
+    .sort((a, b) => a.players.name.localeCompare(b.players.name))
+    .map(e => `<option value="${e.player_id}" ${m.referee_id === e.player_id ? 'selected' : ''}>${esc(e.players.name)}</option>`)
+    .join('');
+  return `<label class="ref-pick">Ref <select data-referee="${m.id}"><option value="" ${m.referee_id ? '' : 'selected'}>None</option>${opts}</select></label>`;
+}
+
+// How many boards there are, best first. With automatic calls on, the
+// database calls the earliest ready match to the best free board whenever
+// one frees up, and gives each called match a referee. Both can be changed
+// while the tournament is running.
+function boardsPanel(t) {
+  if (!('boards' in t)) return '';   // migration-024 not run yet
+  const boards = t.boards ?? [];
+  return `<section class="panel boards-panel">
+    <h3>Boards</h3>
+    <div class="row">
+      <label>Boards available
+        <input type="number" min="0" max="40" data-boardcount value="${boards.length}" inputmode="numeric">
+      </label>
+      <label class="check-row"><input type="checkbox" data-autoboards ${t.auto_boards ? 'checked' : ''}>
+        Call matches and referees automatically</label>
+    </div>
+    ${boards.length ? `<p class="muted small">Ranked best to worst. Matches go to the best free board first.</p>
+      <ol class="board-rank">${boards.map((b, i) => `<li>
+        <span>Board ${esc(b)}</span>
+        <button data-boardmove="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+        <button data-boardmove="${i}" data-dir="1" ${i === boards.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+      </li>`).join('')}</ol>` : ''}
+  </section>`;
+}
+
+async function saveBoards(patch, msg) {
+  await run(async () => check(await sb.from('tournaments').update(patch).eq('id', S.sel.id)), msg);
+}
+
 function boardCallsBlock(koRounds) {
   const ready = S.matches.filter(m => m.status === 'pending' && m.player1_id && m.player2_id);
   if (!ready.length) return '';
@@ -522,6 +564,7 @@ function boardCallsBlock(koRounds) {
     ${called.length ? `<ul class="call-list">${called.map(m => `<li>
         <span class="call-board">Board ${esc(m.board ?? '?')}</span>
         <span class="call-name">${name(m)}</span>
+        ${refSelect(m)}
         <button data-uncall="${m.id}">Uncall</button></li>`).join('')}</ul>`
       : '<p class="muted small">Nothing called yet.</p>'}
     ${waiting.length ? `<ul class="call-list pick">${waiting.map(m => `<li>
@@ -884,6 +927,14 @@ app.addEventListener('click', async e => {
     await refresh();
     return;
   }
+  if (el.dataset.boardmove) {
+    const b = [...(S.sel.boards ?? [])];
+    const i = Number(el.dataset.boardmove), j = i + Number(el.dataset.dir);
+    if (j < 0 || j >= b.length) return;
+    [b[i], b[j]] = [b[j], b[i]];
+    await saveBoards({ boards: b }, 'Board order saved');
+    return;
+  }
   if (el.dataset.uncall) {
     await run(async () => check(await sb.from('matches')
       .update({ called_at: null }).eq('id', el.dataset.uncall)), 'Call removed');
@@ -1111,6 +1162,20 @@ app.addEventListener('change', async e => {
       p_tournament: e.target.dataset.move,
       p_starts_at: new Date(v).toISOString(),
     })), 'Fixture moved');
+  } else if (e.target.matches('[data-boardcount]')) {
+    const n = Number(e.target.value);
+    if (!Number.isInteger(n) || n < 0 || n > 40) { toast('Boards must be a whole number from 0 to 40'); return; }
+    let b = [...(S.sel.boards ?? [])];
+    // More boards: add the next unused numbers. Fewer: drop the worst ranked.
+    for (let k = 1; b.length < n; k++) if (!b.includes(String(k))) b.push(String(k));
+    b = b.slice(0, n);
+    await saveBoards({ boards: b }, `${n} board${n === 1 ? '' : 's'}`);
+  } else if (e.target.matches('[data-autoboards]')) {
+    await saveBoards({ auto_boards: e.target.checked },
+      e.target.checked ? 'Automatic board calls on' : 'Automatic board calls off');
+  } else if (e.target.matches('[data-referee]')) {
+    await run(async () => check(await sb.rpc('admin_set_referee',
+      { p_match: e.target.dataset.referee, p_player: e.target.value || null })), 'Referee changed');
   } else if (e.target.matches('[data-dartlimit]')) {
     const raw = e.target.value.trim();
     const v = raw === '' ? null : Number(raw);
