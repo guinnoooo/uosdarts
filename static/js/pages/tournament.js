@@ -29,12 +29,15 @@ async function loadInner() {
   if (S.t.status === 'complete' && !S.t.is_friendly && !S.tabPicked && !location.hash.slice(1)) S.tab = 'summary';
   S.summary = null;
   if (S.t.status === 'complete' && !S.t.is_friendly) {
-    const [sum, ma] = await Promise.all([
+    const [sum, ma, bl] = await Promise.all([
       sb.rpc('tournament_summary', { p_tournament: id }),
       sb.rpc('tournament_match_averages', { p_tournament: id }),
+      sb.rpc('tournament_best_legs', { p_tournament: id, p_limit: 5 }),
     ]);
     S.summary = sum.error ? { error: sum.error.message } : sum.data;
     S.matchAvgs = ma.error ? [] : ma.data;
+    // Each leg on its own, so one player can fill several places.
+    S.bestLegs = bl.error ? null : bl.data;
   }
   S.europa = kids.data?.[0] ?? null;
   S.parent = null;
@@ -189,7 +192,8 @@ function summaryTab() {
       ${leaderboard('Top averages', top(enough, 'avg'), r => r.avg.toFixed(2))}
       ${leaderboard('Best match averages', matchAvgs, r => r.avg.toFixed(2), 'Nothing yet.', r => `v ${esc(r.opponent)}`)}
       ${leaderboard('Highest checkouts', top(rows, 'hi_checkout'), r => r.hi_checkout)}
-      ${leaderboard('Best legs', top(rows, 'best_leg', 1), r => `${r.best_leg} darts`)}
+      ${leaderboard('Best legs', S.bestLegs ?? top(rows, 'best_leg', 1).map(r => ({ ...r, darts: r.best_leg })),
+        r => `${r.darts} darts`)}
       ${leaderboard('180s', top(rows, 's180'), r => r.s180)}
       ${leaderboard('140+', top(rows, 's140'), r => r.s140)}
     </div>
