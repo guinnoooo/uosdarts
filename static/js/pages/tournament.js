@@ -1,6 +1,6 @@
 import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, roundName, MATCH_SELECT } from '../db.js';
 import { standings } from '../fixtures.js';
-import { matchCard } from '../ui.js';
+import { matchCard, setWatching } from '../ui.js';
 
 const app = document.getElementById('app');
 const id = qs('id');
@@ -222,6 +222,19 @@ app.addEventListener('click', e => {
 });
 
 const reload = debounce(load, 250);
+
+// Spectator counts. Match pages announce which match they're watching on this
+// channel; this page only listens, so it isn't counted itself.
+const watchCh = sb.channel(`watch-${id}`);
+watchCh.on('presence', { event: 'sync' }, () => {
+  const counts = new Map();
+  for (const metas of Object.values(watchCh.presenceState())) {
+    const meta = metas.find(x => x.match && !x.scorer);
+    if (meta) counts.set(meta.match, (counts.get(meta.match) ?? 0) + 1);
+  }
+  setWatching(counts);
+  if (S.t) scheduleRender();
+}).subscribe();
 
 load();
 

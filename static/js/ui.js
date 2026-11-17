@@ -14,6 +14,10 @@ export function statusBadge(m) {
   return '<span class="badge">Waiting</span>';
 }
 
+// How many people are watching each match, kept up to date by the page.
+let watching = new Map();
+export function setWatching(map) { watching = map; }
+
 export function matchCard(m, totalKoRounds) {
   const live = m.status === 'live';
   const row = n => {
@@ -26,7 +30,7 @@ export function matchCard(m, totalKoRounds) {
     </div>`;
   };
   return `<a class="match-card ${m.status}" href="/match/?id=${m.id}">
-    <div class="mc-meta"><span>${esc(matchLabel(m, totalKoRounds))}${m.board ? ` · Board ${esc(m.board)}` : ''}</span>${statusBadge(m)}</div>
+    <div class="mc-meta"><span>${esc(matchLabel(m, totalKoRounds))}${m.board ? ` · Board ${esc(m.board)}` : ''}${watching.get(m.id) ? ` · <span class="mc-watch">${watching.get(m.id)} watching</span>` : ''}</span>${statusBadge(m)}</div>
     ${row(1)}${row(2)}
     ${m.status === 'pending' && m.player1_id && m.player2_id && !m.scorer_id
       ? '<div class="mc-cta">Needs a scorer</div>' : ''}
