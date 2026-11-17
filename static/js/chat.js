@@ -33,7 +33,7 @@ export async function mountChat(host, matchId) {
           <span class="chat-time">${time(m.created_at)}</span>
           ${C.admin ? `<button class="link chat-del" data-chatdel="${m.id}" aria-label="Delete message">✕</button>` : ''}
         </div>`).join('')
-      : '<p class="muted small">No messages yet. Start the chat.</p>';
+      : '<p class="muted small">No messages yet.</p>';
     // Tall enough for the latest five messages; anything older scrolls.
     const rows = [...list.querySelectorAll('.chat-msg')];
     list.style.maxHeight = rows.length > 5
