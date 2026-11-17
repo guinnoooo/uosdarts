@@ -1106,6 +1106,92 @@ app.addEventListener('change', async e => {
 
 init();
 
+// ---------------------------------------------------------------- live updates
+
+// The public pages update themselves as matches are scored; this does the same
+// here. A score change for the tournament being managed is merged straight
+// into what's on screen. Anything bigger (a new round filled in, a tournament
+// added or moved, a Europa gaining players) reloads the data.
+//
+// The panel is redrawn from scratch, which would throw away anything half
+// typed. So while you're typing in a box, or have changed a box or tick
+// without saving it, the update waits and is applied once you're done.
+const live = { fetch: false, timer: null };
+
+function editingNow() {
+  const a = document.activeElement;
+  if (a && app.contains(a) && a.matches('input, select, textarea') && a.id !== 'all-players-filter') return true;
+  if (S.newPlayer) return true;
+  return [...app.querySelectorAll('input, select, textarea')].some(el => {
+    if (el.id === 'all-players-filter') return false;
+    if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+    if (el.tagName === 'SELECT') {
+      const def = [...el.options].findIndex(o => o.defaultSelected);
+      return el.selectedIndex !== (def === -1 ? 0 : def);
+    }
+    return el.value !== el.defaultValue;
+  });
+}
+
+function liveSoon(delay = 400) {
+  clearTimeout(live.timer);
+  live.timer = setTimeout(applyLive, delay);
+}
+
+async function applyLive() {
+  if (!S.role) return;                                  // not signed in yet
+  if (editingNow()) { liveSoon(1500); return; }
+  try {
+    if (live.fetch) {
+      live.fetch = false;
+      await refresh();
+    } else {
+      render();
+    }
+  } catch {
+    live.fetch = true;
+    liveSoon(5000);
+  }
+}
+
+function onMatchChange({ eventType, new: row, old }) {
+  if (!S.sel) return;
+  if (eventType === 'UPDATE') {
+    // A result in a PC can add players to the Europa being managed.
+    if (S.sel.parent_id && row.tournament_id === S.sel.parent_id && row.winner_id !== undefined) {
+      live.fetch = true;
+      return liveSoon();
+    }
+    if (row.tournament_id !== S.sel.id) return;
+    const i = S.matches.findIndex(m => m.id === row.id);
+    const prev = S.matches[i];
+    // New players in a match (the next round filling in) need their names fetched.
+    if (!prev || prev.player1_id !== row.player1_id || prev.player2_id !== row.player2_id) {
+      live.fetch = true;
+    } else {
+      S.matches[i] = { ...prev, ...row, p1: prev.p1, p2: prev.p2 };
+    }
+    return liveSoon();
+  }
+  if ((row && row.tournament_id === S.sel.id) || S.matches.some(m => m.id === old?.id)) {
+    live.fetch = true;
+    liveSoon();
+  }
+}
+
+sb.channel('admin-live')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, onMatchChange)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments' }, () => { live.fetch = true; liveSoon(); })
+  .subscribe(status => {
+    // After a dropped connection, catch up on anything missed.
+    if (status === 'SUBSCRIBED' && S.role) { live.fetch = true; liveSoon(); }
+  });
+
+// Phones and sleeping laptops miss messages; catch up when the page is back.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.role) { live.fetch = true; liveSoon(); }
+});
+
 async function init() {
   try {
     await initInner();
