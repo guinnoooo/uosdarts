@@ -39,8 +39,8 @@ async function loadInner() {
   }
   // Before a match starts, spectators get both players' figures and their
   // head-to-head. Fetched once; it doesn't change while the match waits.
-  // Live matches use it for the win probability bar, finished ones for the chart.
-  if (S.match.player1_id && S.match.player2_id && S.preview === undefined) {
+  // Upcoming matches use it for the preview, finished ones for the win probability chart.
+  if (S.match.status !== 'live' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
     const pv = await sb.rpc('match_preview', { p_match: id });
     S.preview = pv.error ? null : pv.data;
     // Order of merit standing, a small extra factor in the GuinnessBet prices.
@@ -328,31 +328,8 @@ function bullModal() {
 
 // ---------------------------------------------------------------- win probability
 
-// Live chance of each player winning, for spectators. It moves after every
-// visit, using the same model as GuinnessBet so the two agree before a ball
-// is thrown. Hidden from the scorer, and not shown for friendlies (they have
-// no player records to go on).
-function winBar() {
-  if (!S.preview) return '';
-  const form = { p1: { darts: 0, scored: 0 }, p2: { darts: 0, scored: 0 } };
-  for (const v of S.visits) {
-    const f = v.player === 1 ? form.p1 : form.p2;
-    f.darts += v.darts; f.scored += v.score;
-  }
-  const chance = liveChance(S.preview, S.match, form);
-  const [p, q] = pctPair(chance);
-  // Sits right under the scoreboard, so the left number is the left player.
-  return `<div class="winprob" title="Live win probability"
-      aria-label="Win probability: ${esc(nameOf(1))} ${p}%, ${esc(nameOf(2))} ${q}%">
-    <span class="wp-side"><b>${p}%</b></span>
-    <div class="wp-bar"><i style="width:${p}%"></i></div>
-    <span class="wp-side right"><b>${q}%</b></span>
-  </div>
-  <p class="wp-label">Win probability</p>`;
-}
-
 // The whole match replayed visit by visit: the win probability after each
-// one, from the same model as the live bar. Returns player 1's chance at the
+// one, from the same model as GuinnessBet. Returns player 1's chance at the
 // start, after every visit, and 1 or 0 at the end, plus where each leg began.
 function probTimeline() {
   const m = S.match, pv = S.preview;
@@ -643,7 +620,6 @@ function render() {
       <span class="m-info">${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
-    ${m.status === 'live' && !isScorer() ? winBar() : ''}
     ${actionZone(d)}
     ${m.status === 'pending' && !isScorer() ? previewBlock() : ''}`;
   app.querySelector('#m-bottom').innerHTML = `
