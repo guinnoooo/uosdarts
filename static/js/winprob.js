@@ -81,6 +81,20 @@ export function matchChance(pv, m) {
   return clamp(fromLeg(pLeg, pLeg, { ...m, p1_legs: 0, p2_legs: 0, p1_sets: 0, p2_sets: 0 }), 0.04, 0.96);
 }
 
+// A chance as shown on screen, to one decimal place. Until the match is over
+// it never reads 100.0% or 0.0%: anything that would round to those shows
+// as 99.9% or 0.1%.
+export function pct(p, final = false) {
+  const v = Math.round(p * 1000) / 10;
+  return (final ? v : clamp(v, 0.1, 99.9)).toFixed(1);
+}
+
+// Both sides, worked from the same rounded number so they always add up to 100.0.
+export function pctPair(p, final = false) {
+  const a = pct(p, final);
+  return [a, (100 - Number(a)).toFixed(1)];
+}
+
 // ---------------------------------------------------------------- during a leg
 
 // Visits a player is likely to need from `rem`: scoring down to a finish at
@@ -128,5 +142,5 @@ export function liveChance(pv, m, form) {
   // Only a hair off 0 and 1, so the maths never divides by zero. A match
   // that's all but over can show 99.9%; only the finish itself is 100%.
   const cur = clamp(sigmoid(logit(clamp(raw, 0.0001, 0.9999)) + shift), 0.0001, 0.9999);
-  return clamp(fromLeg(cur, pLeg, m), 0.0005, 0.9995);
+  return clamp(fromLeg(cur, pLeg, m), 0.001, 0.999);
 }
