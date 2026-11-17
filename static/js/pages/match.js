@@ -2,6 +2,7 @@ import {
   sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, formatText, MATCH_SELECT,
 } from '../db.js';
 import { mountChat } from '../chat.js';
+import { oomScores, matchChance, liveChance } from '../winprob.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -38,13 +39,14 @@ async function loadInner() {
   }
   // Before a match starts, spectators get both players' figures and their
   // head-to-head. Fetched once; it doesn't change while the match waits.
-  if (S.match.status === 'pending' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
+  // Live matches use it too, for the win probability bar.
+  if (S.match.status !== 'complete' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
     const pv = await sb.rpc('match_preview', { p_match: id });
     S.preview = pv.error ? null : pv.data;
     // Order of merit standing, a small extra factor in the GuinnessBet prices.
     if (S.preview) {
       const oom = await sb.rpc('oom_table');
-      if (!oom.error) S.preview.oom = oomScores(oom.data ?? []);
+      if (!oom.error) S.preview.oom = oomScores(oom.data ?? [], nameOf(1), nameOf(2));
     }
   }
   render();
@@ -324,13 +326,35 @@ function bullModal() {
   </div></div>`;
 }
 
+// ---------------------------------------------------------------- win probability
+
+// Live chance of each player winning, for spectators. It moves after every
+// visit, using the same model as GuinnessBet so the two agree before a ball
+// is thrown. Hidden from the scorer, and not shown for friendlies (they have
+// no player records to go on).
+function winBar() {
+  if (!S.preview) return '';
+  const form = { p1: { darts: 0, scored: 0 }, p2: { darts: 0, scored: 0 } };
+  for (const v of S.visits) {
+    const f = v.player === 1 ? form.p1 : form.p2;
+    f.darts += v.darts; f.scored += v.score;
+  }
+  const p = Math.round(liveChance(S.preview, S.match, form) * 100);
+  // Sits right under the scoreboard, so the left number is the left player.
+  return `<div class="winprob" title="Live win probability"
+      aria-label="Win probability: ${esc(nameOf(1))} ${p}%, ${esc(nameOf(2))} ${100 - p}%">
+    <span class="wp-side"><b>${p}%</b></span>
+    <div class="wp-bar"><i style="width:${p}%"></i></div>
+    <span class="wp-side right"><b>${100 - p}%</b></span>
+  </div>
+  <p class="wp-label">Win probability</p>`;
+}
+
 // ---------------------------------------------------------------- odds
 
-// GuinnessBet: pretend bookmaker odds. Each player's strength is mostly their
-// career average, nudged by first 9 and doubles. The gap gives the chance of
-// winning a leg, pulled towards their head-to-head leg record the more often
-// they've met, and that's worked out over the length of the match. Players
-// with little history are pulled towards 50/50, because a few legs say little.
+// GuinnessBet: pretend bookmaker odds. The chance of each player winning
+// comes from winprob.js (career average, first 9, doubles, head-to-head,
+// order of merit), the same model as the live win probability.
 //
 // The prices are then made like a real book: a margin is built in and every
 // price is rounded shorter, never longer, so the two sides always add up to
@@ -351,61 +375,6 @@ function priceFor(prob) {
   return best;
 }
 
-const choose = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return r; };
-
-// 0 to 1 for where each player sits in the order of merit: 1 for top,
-// down to 0.4 for the lowest with points. No points at all scores 0.3, which
-// covers both newcomers and people who haven't picked up points yet.
-function oomScores(rows) {
-  const pointed = rows.filter(r => Number(r.total_points) > 0);
-  const n = pointed.length;
-  const score = name => {
-    const r = pointed.find(x => x.player_name === name);
-    if (!r) return 0.3;
-    return 0.4 + 0.6 * (n > 1 ? 1 - (r.rank - 1) / (n - 1) : 1);
-  };
-  return { p1: score(nameOf(1)), p2: score(nameOf(2)) };
-}
-
-function matchChance(pv, legsToWin, setsToWin) {
-  const strength = x => {
-    const avg = parseFloat(x?.avg) || 40;           // no record: treated as about average
-    const f9 = parseFloat(x?.first9) || avg;
-    const dbl = parseFloat(x?.dbl_pct) || 25;
-    return avg + (f9 - avg) * 0.3 + (dbl - 25) * 0.15;
-  };
-  let pLeg = 1 / (1 + Math.exp(-(strength(pv.p1) - strength(pv.p2)) / 14));
-  const h2h = pv.h2h ?? [];
-  if (h2h.length) {
-    const legs1 = h2h.reduce((a, x) => a + x.p1_legs, 0);
-    const legs2 = h2h.reduce((a, x) => a + x.p2_legs, 0);
-    const share = (legs1 + 1) / (legs1 + legs2 + 2);
-    const w = h2h.length / (h2h.length + 4);
-    pLeg = pLeg * (1 - w) + share * w;
-  }
-  // How much history there is: about 300 darts (a decent night or two) counts as a full record.
-  const known = Math.min(1, Math.min(pv.p1?.darts ?? 0, pv.p2?.darts ?? 0) / 300);
-  pLeg = 0.5 + (pLeg - 0.5) * (0.5 + 0.5 * known);
-  // Order of merit: a small nudge. It counts most when there's little
-  // scoring history to go on (newcomers, or two players with near enough the
-  // same record), and drops to under half that once both have a full record.
-  // Top of the OoM against no points at all moves a leg from 50% to about 60%.
-  if (pv.oom) {
-    const logit = Math.log(pLeg / (1 - pLeg)) + (pv.oom.p1 - pv.oom.p2) * 0.6 * (1 - 0.6 * known);
-    pLeg = 1 / (1 + Math.exp(-logit));
-  }
-  pLeg = Math.min(0.85, Math.max(0.15, pLeg));
-  // First to N legs; for set play the same sum again over sets.
-  const firstTo = (p, n) => {
-    let t = 0;
-    for (let k = 0; k < n; k++) t += choose(n - 1 + k, k) * p ** n * (1 - p) ** k;
-    return t;
-  };
-  let p = firstTo(pLeg, legsToWin);
-  if (setsToWin) p = firstTo(p, setsToWin);
-  return Math.min(0.96, Math.max(0.04, p));
-}
-
 function bookPrices(p1) {
   const fav = p1 >= 0.5 ? 1 : 2;
   const pf = Math.max(p1, 1 - p1);
@@ -421,7 +390,7 @@ function bookPrices(p1) {
 }
 
 function oddsBlock(pv) {
-  const [a, b] = bookPrices(matchChance(pv, S.match.legs_to_win, S.match.sets_to_win));
+  const [a, b] = bookPrices(matchChance(pv, S.match));
   return `<div class="odds">
     <h3>GuinnessBet</h3>
     <div class="odds-row">
@@ -559,6 +528,7 @@ function render() {
       <span class="m-info">${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
+    ${m.status === 'live' && !isScorer() ? winBar() : ''}
     ${actionZone(d)}
     ${m.status === 'pending' && !isScorer() ? previewBlock() : ''}`;
   app.querySelector('#m-bottom').innerHTML = `
