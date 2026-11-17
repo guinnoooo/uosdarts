@@ -2,7 +2,7 @@ import {
   sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, formatText, MATCH_SELECT,
 } from '../db.js';
 import { mountChat } from '../chat.js';
-import { oomScores, matchChance, liveChance } from '../winprob.js';
+import { oomScores, matchChance, liveChance, pctPair } from '../winprob.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -339,13 +339,14 @@ function winBar() {
     const f = v.player === 1 ? form.p1 : form.p2;
     f.darts += v.darts; f.scored += v.score;
   }
-  const p = Math.round(liveChance(S.preview, S.match, form) * 100);
+  const chance = liveChance(S.preview, S.match, form);
+  const [p, q] = pctPair(chance);
   // Sits right under the scoreboard, so the left number is the left player.
   return `<div class="winprob" title="Live win probability"
-      aria-label="Win probability: ${esc(nameOf(1))} ${p}%, ${esc(nameOf(2))} ${100 - p}%">
+      aria-label="Win probability: ${esc(nameOf(1))} ${p}%, ${esc(nameOf(2))} ${q}%">
     <span class="wp-side"><b>${p}%</b></span>
     <div class="wp-bar"><i style="width:${p}%"></i></div>
-    <span class="wp-side right"><b>${100 - p}%</b></span>
+    <span class="wp-side right"><b>${q}%</b></span>
   </div>
   <p class="wp-label">Win probability</p>`;
 }
@@ -435,8 +436,10 @@ function chartAt(frame, clientX) {
   const tip = frame.querySelector('.wc-tip');
   guide.style.left = dot.style.left = `${xPct}%`;
   dot.style.top = `${(1 - p) * 100}%`;
-  tip.innerHTML = `<b>${esc(frame.dataset.top)} ${(p * 100).toFixed(1)}%</b>
-    <span>${esc(frame.dataset.bottom)} ${((1 - p) * 100).toFixed(1)}%</span>
+  // Only the final point (the match won) can read 100.0% / 0.0%.
+  const [top, bottom] = pctPair(p, i === n);
+  tip.innerHTML = `<b>${esc(frame.dataset.top)} ${top}%</b>
+    <span>${esc(frame.dataset.bottom)} ${bottom}%</span>
     <small>${i === n ? 'Final' : `Leg ${leg}`}</small>`;
   // Keep the label inside the chart: right of the line, or left near the end.
   tip.style.left = xPct > 55 ? '' : `calc(${xPct}% + 10px)`;
