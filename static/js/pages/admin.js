@@ -246,9 +246,15 @@ function newTournamentSection() {
 function tournamentsSection() {
   const alive = S.tournaments.filter(t => !t.deleted_at);
   const pcs = alive.filter(t => t.is_pc);
-  const other = alive.filter(t => !t.is_pc);
-  const live = other.filter(t => t.status === 'live').concat(pcs.filter(t => t.status === 'live'));
-  const upcoming = other.filter(t => t.status === 'upcoming');
+  const byId = new Map(alive.map(t => [t.id, t]));
+  // Europas sit under their PC. One only joins the general lists once its PC
+  // has started, so the twelve weeks of empty ones stay out of the way.
+  const europas = alive.filter(t => t.parent_id);
+  const tonight = europas.filter(t => t.status === 'upcoming'
+    && ['live', 'complete'].includes(byId.get(t.parent_id)?.status));
+  const other = alive.filter(t => !t.is_pc && !t.parent_id);
+  const live = other.concat(europas).filter(t => t.status === 'live').concat(pcs.filter(t => t.status === 'live'));
+  const upcoming = tonight.concat(other.filter(t => t.status === 'upcoming'));
   const done = alive.filter(t => t.status === 'complete');
 
   const row = t => {
@@ -312,6 +318,8 @@ function deletedSection() {
 
 // The weekly Monday fixtures. Numbers follow date order and are maintained
 // by the database, so moving or cancelling one reshuffles the rest.
+const europaOf = pc => S.tournaments.find(t => t.parent_id === pc.id && !t.deleted_at) ?? null;
+
 function pcSection(pcs) {
   const future = pcs.filter(t => t.status !== 'complete' && t.status !== 'cancelled')
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
@@ -329,6 +337,7 @@ function pcSection(pcs) {
       </span>
       <input type="datetime-local" data-move="${t.id}" value="${value}" title="Move this fixture">
       <button data-remove="${t.id}" data-name="${esc(t.name)}">Remove</button>
+      ${europaOf(t) ? `<button data-manage="${europaOf(t).id}" title="The Europa that goes with this PC">${S.sel?.id === europaOf(t).id ? 'Managing Europa' : 'Europa'}</button>` : ''}
       <button data-manage="${t.id}">${S.sel?.id === t.id ? 'Managing' : 'Manage'}</button>
     </div>`;
   };

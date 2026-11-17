@@ -17,6 +17,20 @@ function card(t) {
   </a>`;
 }
 
+// Every PC has a Europa waiting behind it. An unstarted one only shows up on
+// the night (its PC is live, or finished within the last day), otherwise the
+// upcoming list would be full of empty Europas.
+function europaVisible(all) {
+  const byId = new Map(all.map(t => [t.id, t]));
+  return t => {
+    if (!t.parent_id || t.status !== 'upcoming') return true;
+    const pc = byId.get(t.parent_id);
+    if (!pc) return false;
+    if (pc.status === 'live') return true;
+    return pc.status === 'complete' && Date.now() - new Date(pc.starts_at).getTime() < 36 * 3600 * 1000;
+  };
+}
+
 function section(title, list, empty) {
   return `<section><h2>${title}</h2>
     ${list.length ? `<div class="t-grid">${list.map(card).join('')}</div>` : `<p class="muted">${empty}</p>`}
@@ -30,8 +44,9 @@ async function loadInner() {
     app.innerHTML = `<p class="error">${esc(error.message)}</p>`;
     return;
   }
-  const live = data.filter(t => t.status === 'live');
-  const upcoming = data.filter(t => t.status === 'upcoming');
+  const list = data.filter(europaVisible(data));
+  const live = list.filter(t => t.status === 'live');
+  const upcoming = list.filter(t => t.status === 'upcoming');
   const done = data.filter(t => t.status === 'complete').reverse().slice(0, 12);
   app.innerHTML =
     section('Live now', live, 'Nothing live right now.') +
