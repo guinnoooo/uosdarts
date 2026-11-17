@@ -12,11 +12,12 @@ let S = {
 let subscribed = false;
 
 async function loadInner() {
-  const [t, e, m] = await Promise.all([
+  const [t, e, m, kids] = await Promise.all([
     sb.from('tournaments').select('*, champion:players!tournaments_champion_id_fkey(id,name)').eq('id', id).single(),
     sb.from('tournament_players').select('*, players(id,name)').eq('tournament_id', id),
     sb.from('matches').select(MATCH_SELECT).eq('tournament_id', id)
       .order('stage').order('round').order('slot'),
+    sb.from('tournaments').select('id,name,status').eq('parent_id', id),
   ]);
   const err = t.error || e.error || m.error;
   if (err) {
@@ -24,6 +25,12 @@ async function loadInner() {
     return;
   }
   S.t = t.data;
+  S.europa = kids.data?.[0] ?? null;
+  S.parent = null;
+  if (S.t.parent_id) {
+    const p = await sb.from('tournaments').select('id,name').eq('id', S.t.parent_id).maybeSingle();
+    S.parent = p.data ?? null;
+  }
   S.entrants = e.data;
   S.matches = m.data;
   S.players = new Map(e.data.map(x => [x.player_id, x.players]));
@@ -123,6 +130,8 @@ function render() {
       <h1>${esc(t.name)}</h1>
       <p class="muted">${fmtDate(t.starts_at)} · ${S.entrants.length} players · ${t.start_score}
         ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}</p>
+      ${S.parent ? `<p class="muted small">For players knocked out of <a href="/tournament/?id=${S.parent.id}">${esc(S.parent.name)}</a> before the last 16.</p>` : ''}
+      ${S.europa && S.t.status !== 'upcoming' ? `<p class="muted small">Out before the last 16? You're in <a href="/tournament/?id=${S.europa.id}">${esc(S.europa.name)}</a>.</p>` : ''}
     </div>
     ${tabs()}
     <div class="tab-body">${body}</div>`;
