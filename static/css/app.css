@@ -833,7 +833,7 @@ button.link.danger-link { color: var(--live); display: block; margin: .3rem auto
 
 .chat { margin-top: 1.4rem; }
 .chat-list {
-  max-height: 340px; overflow-y: auto; padding: .4rem .6rem;
+  overflow-y: auto; padding: .4rem .6rem;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
 }
 .chat-msg { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .45rem; padding: .3rem 0; border-bottom: 1px solid var(--line); }

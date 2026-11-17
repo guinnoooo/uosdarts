@@ -34,6 +34,10 @@ export async function mountChat(host, matchId) {
           ${C.admin ? `<button class="link chat-del" data-chatdel="${m.id}" aria-label="Delete message">✕</button>` : ''}
         </div>`).join('')
       : '<p class="muted small">No messages yet. Start the chat.</p>';
+    // Tall enough for the latest five messages; anything older scrolls.
+    const rows = [...list.querySelectorAll('.chat-msg')];
+    list.style.maxHeight = rows.length > 5
+      ? `${rows.slice(-5).reduce((h, r) => h + r.offsetHeight, 0) + 12}px` : '';
     if (stick) list.scrollTop = list.scrollHeight;
   }
 
