@@ -1,5 +1,5 @@
 import {
-  sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, MATCH_SELECT,
+  sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, formatText, MATCH_SELECT,
 } from '../db.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
@@ -49,16 +49,20 @@ const reload = debounce(load, 120);
 // Pulls only the visits recorded since the last one we hold, instead of the
 // whole match every time a dart is thrown. Returns false when a plain top-up
 // can't be trusted, in which case the caller does a full reload.
+// Goes up by at least one every time a leg is won, including the leg that
+// wins a set (where the legs go back to 0). Going down means an undo.
+const progress = r => ((r.p1_sets ?? 0) + (r.p2_sets ?? 0)) * 1000 + r.p1_legs + r.p2_legs;
+
 async function topUp(row) {
   const prev = S.match;
   if (!prev || row.id !== prev.id) return false;
   // Scores going backwards means an undo or an admin edit: refetch properly.
-  if (row.p1_legs + row.p2_legs < prev.p1_legs + prev.p2_legs) return false;
+  if (progress(row) < progress(prev)) return false;
   if (row.status !== prev.status) return false;
 
   // A leg has been won, so the legs table has changed underneath us: the old
   // leg gained a winner and a new one was inserted.
-  const legWon = (row.p1_legs + row.p2_legs) > (prev.p1_legs + prev.p2_legs);
+  const legWon = progress(row) > progress(prev);
 
   const lastId = S.visits.length ? S.visits[S.visits.length - 1].id : 0;
   const { data, error } = await sb.from('visits').select('*')
@@ -91,9 +95,12 @@ let queue = Promise.resolve();
 async function onMatchRow(row) {
   if (S.busy) return;                       // our own write, load() follows it
   const prev = S.match;
-  const legWon = prev && (row.p1_legs + row.p2_legs) > (prev.p1_legs + prev.p2_legs);
-  const winner = legWon ? (row.p1_legs > prev.p1_legs ? 1 : 2) : null;
-  const legNo = row.p1_legs + row.p2_legs;
+  const legWon = prev && progress(row) > progress(prev);
+  const winner = !legWon ? null
+    : (row.p1_sets ?? 0) !== (prev.p1_sets ?? 0) ? 1
+    : (row.p2_sets ?? 0) !== (prev.p2_sets ?? 0) ? 2
+    : row.p1_legs > prev.p1_legs ? 1 : 2;
+  const legNo = S.legs.filter(l => l.winner).length + 1;
 
   if (!await topUp(row)) await load();
 
@@ -152,12 +159,24 @@ function playerPanel(n, d) {
   return `<div class="pp${d.turn === n ? ' on' : ''}${winnerSide(m) === n ? ' won' : ''}">
     <div class="pp-top">
       <span class="pp-name">${d.leg?.starter === n && m.status === 'live' ? '<span class="dot" title="Threw first this leg"></span>' : ''}${esc(nameOf(n))}</span>
-      <span class="pp-legs" title="Legs won">${n === 1 ? m.p1_legs : m.p2_legs}</span>
+      ${m.sets_to_win ? `<span class="pp-sets" title="Sets won">${n === 1 ? m.p1_sets : m.p2_sets}</span>` : ''}
+      <span class="pp-legs" title="${m.sets_to_win ? 'Legs won in this set' : 'Legs won'}">${n === 1 ? m.p1_legs : m.p2_legs}</span>
     </div>
     <div class="pp-rem">${m.status === 'pending' ? m.start_score : rem}</div>
     <div class="pp-co">${co ? co.join(' ') : '&nbsp;'}</div>
     <div class="pp-stats">Avg ${st.avg ? st.avg.toFixed(1) : '–'} · ${legDarts} darts</div>
   </div>`;
+}
+
+// Which set a leg belongs to, worked out from the legs before it.
+function setOf(leg) {
+  let set = 1, a = 0, b = 0;
+  for (const l of S.legs) {
+    if (l.id === leg.id) return set;
+    if (l.winner === 1) a++; else if (l.winner === 2) b++;
+    if (Math.max(a, b) >= S.match.legs_to_win) { set++; a = 0; b = 0; }
+  }
+  return set;
 }
 
 function legTable(leg) {
@@ -180,7 +199,7 @@ function legTable(leg) {
   const result = !leg.winner ? ''
     : leg.bull_off ? ` <span class="leg-result">${esc(nameOf(leg.winner))} on the bull off</span>`
     : ` <span class="leg-result">${esc(nameOf(leg.winner))} in ${darts} darts</span>`;
-  return `<section><h2>Leg ${leg.leg_no}${result}</h2>
+  return `<section><h2>Leg ${leg.leg_no}${S.match.sets_to_win ? ` · Set ${setOf(leg)}` : ''}${result}</h2>
     <table class="leg"><thead><tr><th colspan="2">${esc(nameOf(1))}</th><th></th><th colspan="2">${esc(nameOf(2))}</th></tr></thead>
     <tbody>${rows.join('') || '<tr><td colspan="5" class="muted">No darts thrown yet</td></tr>'}</tbody></table></section>`;
 }
@@ -427,7 +446,9 @@ function actionZone(d) {
 
   if (m.status === 'complete') {
     const w = winnerSide(m) ?? (m.p1_legs > m.p2_legs ? 1 : 2);
-    return `<div class="banner">${esc(nameOf(w))} wins ${Math.max(m.p1_legs, m.p2_legs)}–${Math.min(m.p1_legs, m.p2_legs)}</div>
+    const [hi, lo] = m.sets_to_win ? [Math.max(m.p1_sets, m.p2_sets), Math.min(m.p1_sets, m.p2_sets)]
+      : [Math.max(m.p1_legs, m.p2_legs), Math.min(m.p1_legs, m.p2_legs)];
+    return `<div class="banner">${esc(nameOf(w))} wins ${hi}–${lo}${m.sets_to_win ? ' in sets' : ''}</div>
       ${isScorer() ? '<div class="center"><button data-act="undo">Undo last visit</button></div>' : ''}`;
   }
   if (isScorer() && m.status === 'pending') {
@@ -472,7 +493,7 @@ function render() {
           : `<a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`}
         <button data-act="share" class="share-btn">Share</button>
       </div>
-      <span>${esc(matchLabel(m, S.koRounds))} · First to ${m.legs_to_win} legs${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
+      <span>${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
       <span id="watchers" class="watchers">${watchersText()}</span>
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>

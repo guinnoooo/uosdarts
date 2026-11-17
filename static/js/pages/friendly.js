@@ -3,6 +3,7 @@ import { sb, esc, toast, ensureSignedIn, showLoadError } from '../db.js';
 // Start a friendly: two names, a length and a start score. Friendlies don't
 // count for anything; they're there so a match can be scored and watched.
 const app = document.getElementById('app');
+const range = n => Array.from({ length: n }, (_, i) => i + 1);
 const PW_KEY = 'uosdarts:friendlypw';
 const savedPw = () => { try { return localStorage.getItem(PW_KEY) ?? ''; } catch { return ''; } };
 const rememberPw = v => { try { localStorage.setItem(PW_KEY, v); } catch { /* private mode */ } };
@@ -22,13 +23,19 @@ async function init() {
   const names = (players.data ?? []).map(p => `<option value="${esc(p.name)}">`).join('');
   app.innerHTML = `<form class="panel narrow friendly-form" data-form="friendly">
     <h1>Start a friendly</h1>
-    <p class="muted small">A one-off match you can score and share. It doesn't count towards the order of merit or anyone's stats.</p>
     <label>Player 1 <input name="p1" list="player-names" maxlength="40" autocomplete="off" required></label>
     <label>Player 2 <input name="p2" list="player-names" maxlength="40" autocomplete="off" required></label>
     <datalist id="player-names">${names}</datalist>
+    <div class="seg friendly-format" role="radiogroup" aria-label="Format">
+      <label><input type="radio" name="format" value="legs" checked> Legs</label>
+      <label><input type="radio" name="format" value="sets"> Sets</label>
+    </div>
     <div class="row friendly-opts">
-      <label>First to
-        <select name="legs">${[1, 2, 3, 4, 5, 6, 7].map(n => `<option value="${n}" ${n === 3 ? 'selected' : ''}>${n} leg${n > 1 ? 's' : ''}</option>`).join('')}</select>
+      <label class="sets-only" hidden>First to
+        <select name="sets">${range(10).map(n => `<option value="${n}" ${n === 2 ? 'selected' : ''}>${n} set${n > 1 ? 's' : ''}</option>`).join('')}</select>
+      </label>
+      <label><span class="legs-label">First to</span>
+        <select name="legs">${range(10).map(n => `<option value="${n}" ${n === 3 ? 'selected' : ''}>${n} leg${n > 1 ? 's' : ''}</option>`).join('')}</select>
       </label>
       <label>Start score
         <select name="start">${[501, 301, 701, 170, 101].map(n => `<option ${n === 501 ? 'selected' : ''}>${n}</option>`).join('')}</select>
@@ -53,6 +60,7 @@ app.addEventListener('submit', async e => {
       p_p2: String(f.get('p2')),
       p_legs: Number(f.get('legs')),
       p_start: Number(f.get('start')),
+      p_sets: f.get('format') === 'sets' ? Number(f.get('sets')) : null,
     });
     if (error) throw error;
     rememberPw(String(f.get('pw')).trim());
@@ -61,6 +69,14 @@ app.addEventListener('submit', async e => {
     toast(err.message);
     btn.disabled = false;
   }
+});
+
+// Sets: pick the number of sets, and the legs box becomes legs per set.
+app.addEventListener('change', e => {
+  if (e.target.name !== 'format') return;
+  const sets = e.target.value === 'sets';
+  app.querySelector('.sets-only').hidden = !sets;
+  app.querySelector('.legs-label').textContent = sets ? 'Legs a set' : 'First to';
 });
 
 init().catch(e => showLoadError(app, e));

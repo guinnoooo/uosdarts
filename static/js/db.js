@@ -47,9 +47,21 @@ export const hasPlayers = m => !!((m.player1_id || m.p1_name) && (m.player2_id |
 // 1 or 2 for the winner, or null. Friendlies have no winner_id, so the legs decide.
 export function winnerSide(m) {
   if (m.winner_id) return m.winner_id === m.player1_id ? 1 : 2;
-  if (m.status === 'complete' && m.p1_name) return m.p1_legs > m.p2_legs ? 1 : 2;
+  if (m.status === 'complete' && m.p1_name) {
+    return (m.sets_to_win ? m.p1_sets > m.p2_sets : m.p1_legs > m.p2_legs) ? 1 : 2;
+  }
   return null;
 }
+
+// "First to 3 legs" or "First to 3 sets (2 legs a set)".
+export function formatText(m) {
+  return m.sets_to_win
+    ? `First to ${m.sets_to_win} set${m.sets_to_win > 1 ? 's' : ''} (${m.legs_to_win} leg${m.legs_to_win > 1 ? 's' : ''} a set)`
+    : `First to ${m.legs_to_win} leg${m.legs_to_win > 1 ? 's' : ''}`;
+}
+
+// The score as people say it: legs, or sets for set play.
+export const scoreText = m => (m.sets_to_win ? `${m.p1_sets}–${m.p2_sets} in sets` : `${m.p1_legs}–${m.p2_legs}`);
 
 export function matchLabel(m, totalKoRounds) {
   if (m.p1_name) return 'Friendly';
