@@ -16,7 +16,7 @@ async function init() {
   if (!enabled) {
     app.innerHTML = `<section class="panel narrow"><h1>Friendlies</h1>
       <p class="muted">Friendlies are switched off at the moment.</p>
-      <a href="/">Back to tournaments</a></section>`;
+      <a href="/">Back to the match hub</a></section>`;
     return;
   }
   const names = (players.data ?? []).map(p => `<option value="${esc(p.name)}">`).join('');
