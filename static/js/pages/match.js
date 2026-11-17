@@ -399,8 +399,10 @@ function winChart() {
   const legs = legStarts.map((i, k) => ({ at: x(i), k: k + 1 }));
   return `<section class="win-chart">
     <h2>Win probability</h2>
-    <div class="wc-frame">
+    <div class="wc-frame" data-ys="${esc(JSON.stringify(ys.map(p => Math.round(p * 10000) / 10000)))}"
+         data-legs="${esc(JSON.stringify(legStarts))}" data-top="${esc(nameOf(w))}" data-bottom="${esc(nameOf(3 - w))}">
       <span class="wc-name top">${esc(nameOf(w))}</span>
+      <div class="wc-guide" hidden></div><div class="wc-dot" hidden></div><div class="wc-tip" hidden></div>
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
            aria-label="Win probability through the match, ending with ${esc(nameOf(w))} winning">
         <line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="wc-mid" vector-effect="non-scaling-stroke"/>
@@ -416,6 +418,49 @@ function winChart() {
     }).join('')}</div>
   </section>`;
 }
+
+// Hover with a mouse, or tap (and slide) on a phone, to read the split at
+// any point in the chart.
+function chartAt(frame, clientX) {
+  const ys = JSON.parse(frame.dataset.ys);
+  const legs = JSON.parse(frame.dataset.legs);
+  const r = frame.getBoundingClientRect();
+  const n = ys.length - 1;
+  const i = Math.max(0, Math.min(n, Math.round(((clientX - r.left) / r.width) * n)));
+  const p = ys[i];
+  const xPct = n ? (i / n) * 100 : 0;
+  const leg = legs.filter(s => s <= i).length;
+  const guide = frame.querySelector('.wc-guide');
+  const dot = frame.querySelector('.wc-dot');
+  const tip = frame.querySelector('.wc-tip');
+  guide.style.left = dot.style.left = `${xPct}%`;
+  dot.style.top = `${(1 - p) * 100}%`;
+  tip.innerHTML = `<b>${esc(frame.dataset.top)} ${(p * 100).toFixed(1)}%</b>
+    <span>${esc(frame.dataset.bottom)} ${((1 - p) * 100).toFixed(1)}%</span>
+    <small>${i === n ? 'Final' : `Leg ${leg}`}</small>`;
+  // Keep the label inside the chart: right of the line, or left near the end.
+  tip.style.left = xPct > 55 ? '' : `calc(${xPct}% + 10px)`;
+  tip.style.right = xPct > 55 ? `calc(${100 - xPct}% + 10px)` : '';
+  guide.hidden = dot.hidden = tip.hidden = false;
+}
+
+function chartOff(frame) {
+  frame.querySelectorAll('.wc-guide, .wc-dot, .wc-tip').forEach(el => { el.hidden = true; });
+}
+
+app.addEventListener('pointermove', e => {
+  const frame = e.target.closest?.('.wc-frame');
+  if (frame && (e.pointerType === 'mouse' || e.buttons)) chartAt(frame, e.clientX);
+});
+app.addEventListener('pointerdown', e => {
+  const frame = e.target.closest?.('.wc-frame');
+  if (frame) chartAt(frame, e.clientX);
+  else app.querySelectorAll('.wc-frame').forEach(chartOff);   // tap elsewhere to clear
+});
+app.addEventListener('pointerout', e => {
+  const frame = e.target.closest?.('.wc-frame');
+  if (frame && e.pointerType === 'mouse' && !frame.contains(e.relatedTarget)) chartOff(frame);
+});
 
 // ---------------------------------------------------------------- odds
 
