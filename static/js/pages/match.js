@@ -40,6 +40,11 @@ async function loadInner() {
   if (S.match.status === 'pending' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
     const pv = await sb.rpc('match_preview', { p_match: id });
     S.preview = pv.error ? null : pv.data;
+    // Order of merit standing, a small extra factor in the GuinnessBet prices.
+    if (S.preview) {
+      const oom = await sb.rpc('oom_table');
+      if (!oom.error) S.preview.oom = oomScores(oom.data ?? []);
+    }
   }
   render();
   watch();
@@ -347,6 +352,20 @@ function priceFor(prob) {
 
 const choose = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return r; };
 
+// 0 to 1 for where each player sits in the order of merit: 1 for top,
+// down to 0.4 for the lowest with points. No points at all scores 0.3, which
+// covers both newcomers and people who haven't picked up points yet.
+function oomScores(rows) {
+  const pointed = rows.filter(r => Number(r.total_points) > 0);
+  const n = pointed.length;
+  const score = name => {
+    const r = pointed.find(x => x.player_name === name);
+    if (!r) return 0.3;
+    return 0.4 + 0.6 * (n > 1 ? 1 - (r.rank - 1) / (n - 1) : 1);
+  };
+  return { p1: score(nameOf(1)), p2: score(nameOf(2)) };
+}
+
 function matchChance(pv, legsToWin, setsToWin) {
   const strength = x => {
     const avg = parseFloat(x?.avg) || 40;           // no record: treated as about average
@@ -366,6 +385,14 @@ function matchChance(pv, legsToWin, setsToWin) {
   // How much history there is: about 300 darts (a decent night or two) counts as a full record.
   const known = Math.min(1, Math.min(pv.p1?.darts ?? 0, pv.p2?.darts ?? 0) / 300);
   pLeg = 0.5 + (pLeg - 0.5) * (0.5 + 0.5 * known);
+  // Order of merit: a small nudge. It counts most when there's little
+  // scoring history to go on (newcomers, or two players with near enough the
+  // same record), and drops to under half that once both have a full record.
+  // Top of the OoM against no points at all moves a leg from 50% to about 60%.
+  if (pv.oom) {
+    const logit = Math.log(pLeg / (1 - pLeg)) + (pv.oom.p1 - pv.oom.p2) * 0.6 * (1 - 0.6 * known);
+    pLeg = 1 / (1 + Math.exp(-logit));
+  }
   pLeg = Math.min(0.85, Math.max(0.15, pLeg));
   // First to N legs; for set play the same sum again over sets.
   const firstTo = (p, n) => {
