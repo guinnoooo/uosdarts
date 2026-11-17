@@ -257,14 +257,18 @@ td { padding: .42rem .5rem; border-bottom: 1px solid var(--line); }
 .pp.won { border-left-color: var(--accent); }
 
 .pp-name {
-  grid-area: name; font-size: 1rem; font-weight: 600;
+  grid-area: name; font-size: 1rem; font-weight: 600; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pp-co {
   grid-area: co; font-family: var(--mono); font-size: .8rem; color: var(--accent-soft);
   min-height: 1.2em; letter-spacing: .02em;
 }
-.pp-stats { grid-area: stats; font-size: .74rem; color: var(--text-3); }
+.pp-stats {
+  grid-area: stats; font-size: .74rem; color: var(--text-3); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pp-co { min-width: 0; white-space: nowrap; overflow: hidden; }
 .pp-legs {
   grid-area: legs; font-family: var(--mono); font-size: 1.5rem; font-weight: 600;
   color: var(--accent); text-align: center; min-width: 1.6rem;
@@ -312,18 +316,37 @@ td { padding: .42rem .5rem; border-bottom: 1px solid var(--line); }
   /* scoring happens on a phone, so don't let the keys sprawl on a laptop */
   max-width: 480px; width: 100%;
 }
+/* Every row here has a fixed height and long names are cut short, so the keys
+   below never shift when the player or the numbers change. */
 .pad-top {
-  display: flex; justify-content: space-between; align-items: center;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 1.3rem 2.9rem 1.2rem;
+  grid-template-areas: "who entry" "left entry" "last last";
+  align-items: center; column-gap: .8rem;
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r-lg); padding: .55rem .85rem;
 }
-.pad-turn { font-size: .85rem; color: var(--text-2); }
-.pad-turn b { color: var(--text); font-family: var(--mono); }
-.pad-entry {
-  font-family: var(--mono); font-size: 1.7rem; font-weight: 600;
-  min-width: 3.5ch; text-align: right; color: var(--accent);
+.pad-who, .pad-last {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pad-entry .muted { font-size: .85rem; font-weight: 400; color: var(--text-3); font-family: inherit; }
+.pad-who { grid-area: who; font-size: .85rem; color: var(--text-2); }
+.pad-name { color: var(--text); font-weight: 600; }
+.pad-left { grid-area: left; font-size: .85rem; color: var(--text-3); line-height: 1; white-space: nowrap; }
+.pad-left b {
+  font-family: var(--mono); font-size: 2.6rem; font-weight: 700; color: var(--text);
+  letter-spacing: -0.02em; margin-right: .2rem;
+}
+.pad-last {
+  grid-area: last; font-size: .78rem; color: var(--text-3);
+  border-top: 1px solid var(--line); padding-top: .3rem; margin-top: .15rem;
+}
+.pad-last b { color: var(--text-2); font-family: var(--mono); font-weight: 600; }
+.pad-entry {
+  grid-area: entry; align-self: center;
+  font-family: var(--mono); font-size: 2.6rem; font-weight: 600; line-height: 1;
+  min-width: 3ch; text-align: right; color: var(--accent);
+}
+.pad-entry .muted { color: var(--text-3); opacity: .45; font-family: inherit; font-weight: 600; }
 
 .quick { display: grid; grid-template-columns: repeat(9, 1fr); gap: .3rem; }
 .quick button { padding: .5rem 0; font-size: .82rem; font-family: var(--mono); color: var(--text-2); }
@@ -332,6 +355,16 @@ td { padding: .42rem .5rem; border-bottom: 1px solid var(--line); }
 .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; }
 .keys button { padding: .95rem 0; font-size: 1.35rem; font-weight: 500; font-family: var(--mono); }
 .keys button.primary { font-family: inherit; font-size: 1rem; font-weight: 600; }
+.keys button.back-btn { display: grid; place-items: center; padding: 0; color: var(--text-2); }
+
+/* No double-tap zoom while scoring. Effective touch-action is the overlap of
+   an element and its ancestors, so setting it on the root covers the page. */
+html.scoring, html.scoring body, .pad, .pad button, .modal, .modal button { touch-action: manipulation; }
+
+.leg-result {
+  font-family: inherit; font-size: .78rem; font-weight: 400; text-transform: none;
+  letter-spacing: 0; color: var(--text-3); margin-left: .4rem;
+}
 
 .pad-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: .35rem; }
 .pad-actions button { padding: .7rem 0; font-size: .85rem; }

@@ -149,11 +149,12 @@ function playerPanel(n, d) {
   </div>`;
 }
 
-function legTable(d) {
-  if (!d.leg) return '';
-  const starter = d.leg.starter;
-  const a = d.legVisits.filter(v => v.player === starter);
-  const b = d.legVisits.filter(v => v.player !== starter);
+function legTable(leg) {
+  if (!leg) return '';
+  const legVisits = S.visits.filter(v => v.leg_id === leg.id);
+  const starter = leg.starter;
+  const a = legVisits.filter(v => v.player === starter);
+  const b = legVisits.filter(v => v.player !== starter);
   // Chronological order: the first visit of the leg is the top row and each new
   // one is appended underneath, the way a paper scoresheet reads.
   const rows = [];
@@ -164,9 +165,18 @@ function legTable(d) {
       : '<td></td><td></td>');
     rows.push(`<tr>${cell(byPlayer[1])}<td class="darts">${(i + 1) * 3}</td>${cell(byPlayer[2])}</tr>`);
   }
-  return `<section><h2>Leg ${d.leg.leg_no}</h2>
+  const darts = legVisits.filter(v => v.player === leg.winner).reduce((t, v) => t + v.darts, 0);
+  const result = leg.winner ? ` <span class="leg-result">${esc(nameOf(leg.winner))} in ${darts} darts</span>` : '';
+  return `<section><h2>Leg ${leg.leg_no}${result}</h2>
     <table class="leg"><thead><tr><th colspan="2">${esc(nameOf(1))}</th><th></th><th colspan="2">${esc(nameOf(2))}</th></tr></thead>
     <tbody>${rows.join('') || '<tr><td colspan="5" class="muted">No darts thrown yet</td></tr>'}</tbody></table></section>`;
+}
+
+// Every leg in the match, first leg at the top. On a live match the current
+// leg is already shown above the stats, so it's left out here.
+function allLegs(skipCurrent) {
+  const legs = skipCurrent ? S.legs.slice(0, -1) : S.legs;
+  return legs.filter(l => S.visits.some(v => v.leg_id === l.id)).map(legTable).join('');
 }
 
 function statsTable() {
@@ -186,18 +196,28 @@ function statsTable() {
   </table></section>`;
 }
 
+// The last visit entered in the match, so the scorer can check what went in.
+function lastVisitLine() {
+  const v = S.visits[S.visits.length - 1];
+  if (!v) return 'No scores entered yet';
+  const what = v.is_bust ? 'bust' : v.remaining === 0 ? `${v.score} checkout` : String(v.score);
+  return `Last: ${esc(nameOf(v.player))} <b>${what}</b>${v.remaining === 0 ? '' : `, ${v.remaining} left`}`;
+}
+
 function keypad(d) {
   const rem = d.rem[d.turn];
   const canFinish = minDarts(rem) !== null;
   return `<div class="pad">
     <div class="pad-top">
-      <div class="pad-turn">${esc(nameOf(d.turn))} to throw · <b>${rem}</b> left</div>
-      <div class="pad-entry">${S.entry || '<span class="muted">Enter score</span>'}</div>
+      <div class="pad-who"><span class="pad-name">${esc(nameOf(d.turn))}</span> to throw</div>
+      <div class="pad-left"><b>${rem}</b> left</div>
+      <div class="pad-entry">${S.entry || '<span class="muted">0</span>'}</div>
+      <div class="pad-last">${lastVisitLine()}</div>
     </div>
     <div class="quick">${QUICK_SCORES.map(q => `<button data-quick="${q}">${q}</button>`).join('')}</div>
     <div class="keys">
       ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(k => `<button data-key="${k}">${k}</button>`).join('')}
-      <button data-key="back" class="muted-btn">⌫</button>
+      <button data-key="back" class="back-btn" aria-label="Delete last digit"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button data-key="0">0</button>
       <button data-act="enter" class="primary">Enter</button>
     </div>
@@ -241,6 +261,7 @@ function doublesModal() {
     <p class="modal-q">How many darts at double?</p>
     <div class="modal-btns">${[0, 1, 2, 3]
       .map(n => `<button data-missdbl="${n}" class="primary">${n}</button>`).join('')}</div>
+    <button data-act="cancel-dbl" class="link">Cancel</button>
   </div></div>`;
 }
 
@@ -294,9 +315,12 @@ function render() {
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
     ${actionZone(d)}
-    ${scoring ? '' : legTable(d)}
+    ${scoring || m.status === 'complete' ? '' : legTable(d.leg)}
     ${scoring ? '' : statsTable()}
+    ${scoring ? '' : allLegs(m.status !== 'complete')}
     ${S.pendingCheckout ? checkoutModal() : S.pendingDoubles ? doublesModal() : ''}`;
+  // Stops a fast double tap on the keypad zooming the page on phones.
+  document.documentElement.classList.toggle('scoring', scoring);
   if (S.askPw) app.querySelector('#pw-input')?.focus();
 }
 
@@ -338,12 +362,15 @@ async function submit(score) {
     return;
   }
 
-  if (rem - score < 2 && !confirm(`${score} from ${rem} is a bust. Record it as a bust?`)) return;
+  const bust = rem - score < 2;
+  if (bust && !confirm(`${score} from ${rem} is a bust. Record it as a bust?`)) return;
   S.entry = '';
 
-  // If they were on a finish and didn't take it, ask how many darts they used
-  // at the double so the percentage counts the misses.
-  if (minDarts(rem) !== null) {
+  // Ask about darts at a double only when the visit ends on 50 or less (or busts
+  // from there). Higher than that they were almost certainly setting up, and
+  // the question just slows the scorer down.
+  const after = bust ? rem : rem - score;
+  if (minDarts(rem) !== null && after <= 50) {
     S.pendingDoubles = { score, wasOn: rem };
     render();
     return;
@@ -410,7 +437,7 @@ app.addEventListener('click', async e => {
     S.entry = '';
     await rpc('record_visit', { p_match: id, p_score: score, p_darts: 3, p_doubles: Number(missdbl) });
   } else if (act === 'enter') {
-    if (S.entry !== '') await submit(Number(S.entry));
+    await submit(Number(S.entry || 0));
   } else if (act === 'noscore') {
     await submit(0);
   } else if (act === 'checkout') {
@@ -434,6 +461,10 @@ app.addEventListener('click', async e => {
     if (confirm('Stop scoring? Someone else will be able to take over.')) {
       await rpc('release_match', { p_match: id });
     }
+  } else if (act === 'cancel-dbl') {
+    S.entry = String(S.pendingDoubles?.score ?? '');
+    S.pendingDoubles = null;
+    render();
   } else if (act === 'cancel-co') {
     S.pendingCheckout = null;
     render();
@@ -459,8 +490,9 @@ document.addEventListener('keydown', async e => {
   } else if (e.key === 'Backspace') {
     S.entry = S.entry.slice(0, -1);
     render();
-  } else if (e.key === 'Enter' && S.entry !== '') {
-    await submit(Number(S.entry));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    await submit(Number(S.entry || 0));
   }
 });
 
