@@ -9,6 +9,7 @@ function playerName(m, n) {
 export function statusBadge(m) {
   if (m.status === 'live') return '<span class="badge live">Live</span>';
   if (m.status === 'complete') return '<span class="badge done">Result</span>';
+  if (m.called_at && m.player1_id && m.player2_id) return '<span class="badge called">Called</span>';
   if (m.player1_id && m.player2_id) return '<span class="badge ready">Ready</span>';
   return '<span class="badge">Waiting</span>';
 }

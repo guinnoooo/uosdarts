@@ -68,7 +68,11 @@ function tabs() {
 function matchesTab() {
   const kr = koRounds();
   const live = S.matches.filter(m => m.status === 'live');
-  const next = S.matches.filter(m => m.status === 'pending' && m.player1_id && m.player2_id);
+  const ready = S.matches.filter(m => m.status === 'pending' && m.player1_id && m.player2_id);
+  // Matches the admin has sent to a board, in board order.
+  const called = ready.filter(m => m.called_at)
+    .sort((a, b) => String(a.board ?? '').localeCompare(String(b.board ?? ''), undefined, { numeric: true }));
+  const next = ready.filter(m => !m.called_at);
   const done = S.matches.filter(m => m.status === 'complete' && m.player1_id && m.player2_id)
     .sort((a, b) => new Date(b.finished_at) - new Date(a.finished_at));
   const block = (title, list, empty) => `<section><h2>${title}</h2>
@@ -76,6 +80,7 @@ function matchesTab() {
       : `<p class="muted">${empty}</p>`}</section>`;
   if (!S.matches.length) return '<p class="muted">Fixtures haven\'t been drawn yet.</p>';
   return block('Live now', live, 'No matches in progress.') +
+    (called.length ? block('Board calls', called, '') : '') +
     block('Up next', next, 'No matches waiting to start.') +
     block('Results', done, 'No results yet.');
 }
