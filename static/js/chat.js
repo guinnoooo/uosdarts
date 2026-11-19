@@ -7,7 +7,41 @@ const NAME_KEY = 'uosdarts:chatname';
 const savedName = () => { try { return localStorage.getItem(NAME_KEY) ?? ''; } catch { return ''; } };
 const saveName = n => { try { localStorage.setItem(NAME_KEY, n); } catch { /* private mode */ } };
 
+// Chat is behind a password. Once entered, it stays unlocked for this
+// browser until the super admin changes it.
 export async function mountChat(host, matchId) {
+  const { data: { session } } = await sb.auth.getSession();
+  const ok = session ? (await sb.rpc('chat_ok')).data === true : false;
+  if (ok) { openChat(host, matchId); return; }
+
+  host.innerHTML = `<section class="chat">
+    <h2>Chat</h2>
+    <form class="chat-lock" autocomplete="off">
+      <p class="muted small">Enter the chat password to see and join the chat.</p>
+      <div class="chat-send">
+        <input name="pw" type="password" placeholder="Chat password" required>
+        <button class="primary">Unlock</button>
+      </div>
+    </form>
+  </section>`;
+  const form = host.querySelector('.chat-lock');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = form.querySelector('button');
+    btn.disabled = true;
+    try {
+      await ensureSignedIn();
+      const { error } = await sb.rpc('chat_unlock', { p_password: form.elements.pw.value });
+      if (error) throw error;
+      openChat(host, matchId);
+    } catch (err) {
+      toast(err.message);
+      btn.disabled = false;
+    }
+  });
+}
+
+async function openChat(host, matchId) {
   const C = { msgs: [], admin: false };
   host.innerHTML = `<section class="chat">
     <h2>Chat</h2>

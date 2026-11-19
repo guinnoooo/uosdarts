@@ -184,6 +184,19 @@ function friendlyPanel() {
   </section>`;
 }
 
+// The password people enter to see and use match chat. Changing it locks
+// chat for everyone until they enter the new one.
+function chatPanel() {
+  return `<section class="panel">
+    <h2>Chat password</h2>
+    <p class="muted small">Needed to see or post in match chat. Changing it means everyone has to enter the new one.</p>
+    <div class="row">
+      <label>New password <input type="text" id="chat-pw" autocomplete="off" placeholder="At least 4 characters"></label>
+      <button data-act="set-chat-pw" class="primary">Save</button>
+    </div>
+  </section>`;
+}
+
 // Finished friendlies to check. One that was played properly can count
 // towards each player's averages, first 9, doubles % and the odds model
 // (never 180s, 100+ checkouts, sheet legs, win rates or the order of merit).
@@ -277,7 +290,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${friendlyPanel()}${hubPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
@@ -400,6 +413,14 @@ app.addEventListener('click', async e => {
         S.sel = null;
       }, 'Player deleted');
       break;
+    case 'set-chat-pw': {
+      const pw = val('#chat-pw');
+      if (pw.length < 4) { toast('Use at least 4 characters'); break; }
+      if (!confirm('Change the chat password? Everyone will need to enter the new one.')) break;
+      await run(async () => check(await sb.rpc('super_set_chat_password', { p_password: pw })),
+        'Chat password saved');
+      break;
+    }
     case 'set-friendly-pw': {
       const pw = val('#fr-pw');
       if (pw.length < 4) { toast('Use at least 4 characters'); break; }
