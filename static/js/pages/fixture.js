@@ -1,7 +1,7 @@
 import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, toast, currentUserId, ensureSignedIn, HUBS, MATCH_SELECT } from '../db.js';
 import { matchCard, setWatching } from '../ui.js';
 import { venuePicker, bindVenue, readVenue } from '../events.js';
-import { teamPreview, matchChance, pctPair } from '../winprob.js';
+import { teamPreview, matchChance, legChance, chanceFromScore, pctPair } from '../winprob.js';
 
 // A UDUK or Franny team match: the two teams, the score in games won, and
 // every game in order. Each game opens on the match page, where its players
@@ -52,26 +52,43 @@ function score() {
 // ---------------------------------------------------------------- win chart
 
 // Once a team match is over: how each team's chance of winning it moved,
-// game by game. Each game's chance comes from its players, the same way as
-// the match odds, with anyone not on the site counted as an average player.
-// The team match chance is then every way the games still to come could go.
+// leg by leg. Each game's chance comes from its players, the same way as the
+// match odds, with anyone not on the site counted as an average player. The
+// team match chance is then every way the games still to come could go,
+// with the game being played worked out from its legs so far. Every game
+// gets the same width on the chart, with its legs spread across it.
 const isHomeWin = g => (g.sets_to_win ? g.p1_sets > g.p2_sets : g.p1_legs > g.p2_legs);
 
 async function loadChart() {
   if (S.t.status !== 'complete' || S.chance) return;
-  const [fp, oom] = await Promise.all([sb.rpc('fixture_preview', { p_tournament: id }), sb.rpc('oom_table')]);
-  if (fp.error) return;
+  const ids = S.games.map(g => g.id);
+  const [fp, oom, legs] = await Promise.all([
+    sb.rpc('fixture_preview', { p_tournament: id }),
+    sb.rpc('oom_table'),
+    sb.from('legs').select('match_id, leg_no, winner').in('match_id', ids).order('leg_no'),
+  ]);
+  if (fp.error || legs.error) return;
+  S.legChance = new Map();
   S.chance = new Map(S.games.map(g => {
     const pv = teamPreview(fp.data?.[g.id], oom.data ?? [], true);
+    S.legChance.set(g.id, pv ? legChance(pv) : 0.5);
     return [g.id, pv ? matchChance(pv, g) : 0.5];
   }));
+  S.legs = new Map();
+  for (const l of legs.data ?? []) {
+    if (!l.winner) continue;
+    if (!S.legs.has(l.match_id)) S.legs.set(l.match_id, []);
+    S.legs.get(l.match_id).push(l.winner);
+  }
 }
 
-function homeChance(regular, done, decider) {
+// Chance the home team wins the match. `fixed` holds games already decided
+// (true for a home win); `partial` is the game in progress and its chance.
+function homeChance(regular, fixed, partial, decider) {
   let h = 0, a = 0, dist = [1];
   for (const g of regular) {
-    if (done.has(g.id)) { if (isHomeWin(g)) h++; else a++; continue; }
-    const p = S.chance.get(g.id) ?? 0.5;
+    if (fixed.has(g.id)) { if (fixed.get(g.id)) h++; else a++; continue; }
+    const p = partial?.id === g.id ? partial.p : S.chance.get(g.id) ?? 0.5;
     const next = new Array(dist.length + 1).fill(0);
     dist.forEach((q, k) => { next[k + 1] += q * p; next[k] += q * (1 - p); });
     dist = next;
@@ -83,46 +100,63 @@ function homeChance(regular, done, decider) {
   }, 0);
 }
 
+// Points along the chart: x in games (game i runs from i to i + 1), p the
+// home team's chance, and a label for the reading.
 function chartPoints() {
   const regular = S.games.filter(g => g.game_type !== 'decider');
   const dec = S.games.find(g => g.game_type === 'decider');
-  const decChance = dec ? (dec.status === 'complete' ? (isHomeWin(dec) ? 1 : 0) : S.chance.get(dec.id) ?? 0.5) : 0.5;
   const order = regular.filter(g => g.status === 'complete')
     .sort((a, b) => new Date(a.finished_at ?? 0) - new Date(b.finished_at ?? 0) || a.slot - b.slot);
-  const done = new Set();
+  if (dec?.status === 'complete') order.push(dec);
+  const fixed = new Map();
   let h = 0, a = 0;
-  const pts = [{ p: homeChance(regular, done, dec ? (S.chance.get(dec.id) ?? 0.5) : 0.5), label: 'Before the first game' }];
-  for (const g of order) {
-    done.add(g.id);
+  const decPre = dec ? S.chance.get(dec.id) ?? 0.5 : 0.5;
+  const pts = [{ x: 0, p: homeChance(regular, fixed, null, decPre), label: 'Before the first game' }];
+  order.forEach((g, gi) => {
+    const isDec = g === dec;
+    const legs = S.legs.get(g.id) ?? [];
+    const L = g.legs_to_win ?? 1;
+    const pLeg = S.legChance.get(g.id) ?? 0.5;
+    let x1 = 0, x2 = 0;
+    const steps = legs.length || 1;
+    legs.forEach((w, k) => {
+      if (w === 1) x1++; else x2++;
+      const over = x1 >= L || x2 >= L || k === legs.length - 1;
+      const gameP = over ? (isHomeWin(g) ? 1 : 0) : chanceFromScore(pLeg, { legs_to_win: L, p1_legs: x1, p2_legs: x2 });
+      const p = isDec ? gameP : homeChance(regular, fixed, { id: g.id, p: gameP }, decPre);
+      pts.push({ x: gi + (k + 1) / steps, p, label: `${g.game_label ?? 'Game'} leg ${k + 1} (${x1}–${x2}) · Overall ${h + (over && isHomeWin(g) ? 1 : 0)}–${a + (over && !isHomeWin(g) ? 1 : 0)}` });
+    });
+    fixed.set(g.id, isHomeWin(g));
     if (isHomeWin(g)) h++; else a++;
-    const last = done.size === regular.length && !dec;
-    pts.push({ p: homeChance(regular, done, dec ? (S.chance.get(dec.id) ?? 0.5) : 0.5), label: `After ${g.game_label ?? 'game'} · ${h}–${a}`, last });
-  }
-  if (dec?.status === 'complete') pts.push({ p: decChance, label: `After the decider · ${h + (decChance ? 1 : 0)}–${a + (decChance ? 0 : 1)}`, last: true });
-  return pts;
+    if (!legs.length) {
+      pts.push({ x: gi + 1, p: isDec ? (isHomeWin(g) ? 1 : 0) : homeChance(regular, fixed, null, decPre), label: `After ${g.game_label ?? 'game'} · Overall ${h}–${a}` });
+    }
+  });
+  return { pts, games: order.length };
 }
 
 function winChart() {
   if (S.t.status !== 'complete' || !S.chance) return '';
-  const pts = chartPoints();
-  if (pts.length < 2) return '';
+  const { pts, games } = chartPoints();
+  if (pts.length < 2 || !games) return '';
   const { home, away } = score();
   const homeTop = home >= away;
   const top = homeTop ? S.t.home_team : S.t.away_team, bottom = homeTop ? S.t.away_team : S.t.home_team;
   const ys = pts.map(x => (homeTop ? x.p : 1 - x.p));
-  const W = 600, H = 180, n = ys.length - 1;
-  const xAt = i => (i / n) * W;
-  const line = ys.map((p, i) => `${i ? 'L' : 'M'}${xAt(i).toFixed(1)},${((1 - p) * H).toFixed(1)}`).join(' ');
+  const W = 600, H = 180;
+  const xAt = x => (x / games) * W;
+  const line = pts.map((pt, i) => `${i ? 'L' : 'M'}${xAt(pt.x).toFixed(1)},${((1 - ys[i]) * H).toFixed(1)}`).join(' ');
   return `<section class="win-chart">
     <h2>Win probability</h2>
     <div class="wc-frame fx-wc" data-ys="${esc(JSON.stringify(ys.map(p => Math.round(p * 10000) / 10000)))}"
+         data-xs="${esc(JSON.stringify(pts.map(pt => Math.round((pt.x / games) * 10000) / 10000)))}"
          data-labels="${esc(JSON.stringify(pts.map(x => x.label)))}" data-top="${esc(top)}" data-bottom="${esc(bottom)}">
       <span class="wc-name top">${esc(top)}</span>
       <div class="wc-guide" hidden></div><div class="wc-dot" hidden></div><div class="wc-tip" hidden></div>
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
-           aria-label="Win probability game by game, ending with ${esc(top)} winning">
+           aria-label="Win probability leg by leg, ending with ${esc(top)} winning">
         <line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="wc-mid" vector-effect="non-scaling-stroke"/>
-        ${ys.slice(1, -1).map((_, i) => `<line x1="${xAt(i + 1)}" x2="${xAt(i + 1)}" y1="0" y2="${H}" class="wc-leg" vector-effect="non-scaling-stroke"/>`).join('')}
+        ${Array.from({ length: games - 1 }, (_, i) => `<line x1="${xAt(i + 1)}" x2="${xAt(i + 1)}" y1="0" y2="${H}" class="wc-leg" vector-effect="non-scaling-stroke"/>`).join('')}
         <path d="${line} L${W},${H / 2} L0,${H / 2} Z" class="wc-area"/>
         <path d="${line}" class="wc-line" vector-effect="non-scaling-stroke"/>
       </svg>
@@ -133,11 +167,14 @@ function winChart() {
 
 // Hover with a mouse, or tap (and slide) on a phone, to read it after any game.
 function chartAt(frame, clientX) {
-  const ys = JSON.parse(frame.dataset.ys), labels = JSON.parse(frame.dataset.labels);
+  const ys = JSON.parse(frame.dataset.ys), xs = JSON.parse(frame.dataset.xs), labels = JSON.parse(frame.dataset.labels);
   const r = frame.getBoundingClientRect();
   const n = ys.length - 1;
-  const i = Math.max(0, Math.min(n, Math.round(((clientX - r.left) / r.width) * n)));
-  const xPct = (i / n) * 100;
+  const at = (clientX - r.left) / r.width;
+  // The reading nearest the pointer.
+  let i = 0;
+  xs.forEach((x, k) => { if (Math.abs(x - at) < Math.abs(xs[i] - at)) i = k; });
+  const xPct = xs[i] * 100;
   const [g, d, tip] = ['.wc-guide', '.wc-dot', '.wc-tip'].map(s => frame.querySelector(s));
   g.style.left = d.style.left = `${xPct}%`;
   d.style.top = `${(1 - ys[i]) * 100}%`;

@@ -197,6 +197,12 @@ export function matchChance(pv, m) {
   return clamp(fromLeg(pLeg, pLeg, { ...m, p1_legs: 0, p2_legs: 0, p1_sets: 0, p2_sets: 0 }), 0.04, 0.96);
 }
 
+// Chance player 1 wins from a given number of legs (and sets) each, between
+// legs, when they win each leg with chance pLeg. Used by the team match chart.
+export function chanceFromScore(pLeg, m) {
+  return fromLeg(pLeg, pLeg, m);
+}
+
 // A chance as shown on screen, to one decimal place. Until the match is over
 // it never reads 100.0% or 0.0%: anything that would round to those shows
 // as 99.9% or 0.1%.
