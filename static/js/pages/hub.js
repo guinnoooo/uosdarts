@@ -56,7 +56,6 @@ function startForm(enabled) {
     <label>Scoring password for this match
       <input name="spw" type="text" autocomplete="off" minlength="4" maxlength="40" required placeholder="At least 4 characters">
     </label>
-    <p class="muted small">Share this with the other team so they can score too.</p>
     <button class="primary big" data-submit>${S.form.later ? 'Schedule match' : 'Start match'}</button>
   </form>`;
 }

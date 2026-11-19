@@ -2,10 +2,15 @@ import { sb, showLoadError, debounce } from '../db.js';
 import { kindOf, anyCard, cardData, europaVisible } from '../events.js';
 
 // Everything coming up: tournaments and booked UDUK and Franny matches,
-// soonest first, under a heading for each day.
+// soonest first, grouped by month and then by day.
 const app = document.getElementById('app');
 
-const dayKey = d => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+const thisYear = new Date().getFullYear();
+const monthKey = d => {
+  const x = new Date(d);
+  return x.toLocaleDateString('en-GB', x.getFullYear() === thisYear ? { month: 'long' } : { month: 'long', year: 'numeric' });
+};
+const dayKey = d => new Date(d).toDateString();
 
 async function loadInner() {
   const { data, error } = await sb.from('tournaments')
@@ -16,19 +21,30 @@ async function loadInner() {
   const list = data.filter(t => t.status === 'upcoming' && kindOf(t) !== 'friendly').filter(europaVisible(data));
   const extra = await cardData(list.filter(t => t.kind));
 
-  const days = [];
+  // months: [{ name, days: [{ date, items }] }], with undated events last.
+  const months = [];
+  const undated = [];
   for (const t of list) {
-    const key = t.starts_at ? dayKey(t.starts_at) : 'Date to be confirmed';
-    if (days.at(-1)?.key === key) days.at(-1).items.push(t);
-    else days.push({ key, items: [t] });
+    if (!t.starts_at) { undated.push(t); continue; }
+    const m = monthKey(t.starts_at);
+    if (months.at(-1)?.name !== m) months.push({ name: m, days: [] });
+    const days = months.at(-1).days;
+    if (days.at(-1)?.key === dayKey(t.starts_at)) days.at(-1).items.push(t);
+    else days.push({ key: dayKey(t.starts_at), date: new Date(t.starts_at), items: [t] });
   }
+
+  const dayRow = d => `<div class="cal-row">
+      <div class="cal-date"><span>${d.date.toLocaleDateString('en-GB', { weekday: 'short' })}</span><b>${d.date.getDate()}</b></div>
+      <div class="t-grid cal-items">${d.items.map(t => anyCard(t, extra)).join('')}</div>
+    </div>`;
 
   app.innerHTML = `
     <a class="back-link plain" href="/">‹ Match Hub</a>
     <div class="page-head"><h1>Calendar</h1></div>
-    ${days.length ? days.map(d => `<section class="cal-day"><h2>${d.key}</h2>
-        <div class="t-grid">${d.items.map(t => anyCard(t, extra)).join('')}</div>
-      </section>`).join('') : '<p class="muted">Nothing scheduled yet.</p>'}`;
+    ${months.map(m => `<section class="cal-month"><h2>${m.name}</h2>${m.days.map(dayRow).join('')}</section>`).join('')}
+    ${undated.length ? `<section class="cal-month"><h2>Date to be confirmed</h2>
+        <div class="t-grid">${undated.map(t => anyCard(t, extra)).join('')}</div></section>` : ''}
+    ${list.length ? '' : '<p class="muted">Nothing scheduled yet.</p>'}`;
 }
 
 async function load() {

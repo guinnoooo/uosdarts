@@ -961,3 +961,12 @@ a.back-link.plain { display: inline-block; margin-bottom: .6rem; font-size: .9re
 .odds-note { margin-top: .5rem; font-size: .8rem; }
 .fx-actions { display: flex; gap: 1.2rem; flex-wrap: wrap; }
 .fx-edit { margin-top: 1rem; }
+
+/* Calendar: a month heading, then a row per day with the date down the side */
+.cal-month { margin-bottom: 1.6rem; }
+.cal-row { display: grid; grid-template-columns: 3.2rem 1fr; gap: .8rem; padding: .7rem 0; border-top: 1px solid var(--line, #2a2a2a); }
+.cal-row:first-of-type { border-top: 0; }
+.cal-date { display: flex; flex-direction: column; align-items: center; line-height: 1.1; padding-top: .3rem; }
+.cal-date span { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted, #999); }
+.cal-date b { font-size: 1.5rem; }
+.cal-items { margin: 0; }
