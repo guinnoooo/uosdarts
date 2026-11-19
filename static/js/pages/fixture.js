@@ -1,6 +1,7 @@
 import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, toast, currentUserId, ensureSignedIn, HUBS, MATCH_SELECT } from '../db.js';
 import { matchCard, setWatching } from '../ui.js';
 import { venuePicker, bindVenue, readVenue } from '../events.js';
+import { teamPreview, matchChance, pctPair } from '../winprob.js';
 
 // A UDUK or Franny team match: the two teams, the score in games won, and
 // every game in order. Each game opens on the match page, where its players
@@ -47,6 +48,118 @@ function score() {
   }
   return { home, away };
 }
+
+// ---------------------------------------------------------------- win chart
+
+// Once a team match is over: how each team's chance of winning it moved,
+// game by game. Each game's chance comes from its players, the same way as
+// the match odds, with anyone not on the site counted as an average player.
+// The team match chance is then every way the games still to come could go.
+const isHomeWin = g => (g.sets_to_win ? g.p1_sets > g.p2_sets : g.p1_legs > g.p2_legs);
+
+async function loadChart() {
+  if (S.t.status !== 'complete' || S.chance) return;
+  const [fp, oom] = await Promise.all([sb.rpc('fixture_preview', { p_tournament: id }), sb.rpc('oom_table')]);
+  if (fp.error) return;
+  S.chance = new Map(S.games.map(g => {
+    const pv = teamPreview(fp.data?.[g.id], oom.data ?? [], true);
+    return [g.id, pv ? matchChance(pv, g) : 0.5];
+  }));
+}
+
+function homeChance(regular, done, decider) {
+  let h = 0, a = 0, dist = [1];
+  for (const g of regular) {
+    if (done.has(g.id)) { if (isHomeWin(g)) h++; else a++; continue; }
+    const p = S.chance.get(g.id) ?? 0.5;
+    const next = new Array(dist.length + 1).fill(0);
+    dist.forEach((q, k) => { next[k + 1] += q * p; next[k] += q * (1 - p); });
+    dist = next;
+  }
+  const rem = dist.length - 1;
+  return dist.reduce((t, q, k) => {
+    const H = h + k, A = a + rem - k;
+    return t + (H > A ? q : H === A ? q * decider : 0);
+  }, 0);
+}
+
+function chartPoints() {
+  const regular = S.games.filter(g => g.game_type !== 'decider');
+  const dec = S.games.find(g => g.game_type === 'decider');
+  const decChance = dec ? (dec.status === 'complete' ? (isHomeWin(dec) ? 1 : 0) : S.chance.get(dec.id) ?? 0.5) : 0.5;
+  const order = regular.filter(g => g.status === 'complete')
+    .sort((a, b) => new Date(a.finished_at ?? 0) - new Date(b.finished_at ?? 0) || a.slot - b.slot);
+  const done = new Set();
+  let h = 0, a = 0;
+  const pts = [{ p: homeChance(regular, done, dec ? (S.chance.get(dec.id) ?? 0.5) : 0.5), label: 'Before the first game' }];
+  for (const g of order) {
+    done.add(g.id);
+    if (isHomeWin(g)) h++; else a++;
+    const last = done.size === regular.length && !dec;
+    pts.push({ p: homeChance(regular, done, dec ? (S.chance.get(dec.id) ?? 0.5) : 0.5), label: `After ${g.game_label ?? 'game'} · ${h}–${a}`, last });
+  }
+  if (dec?.status === 'complete') pts.push({ p: decChance, label: `After the decider · ${h + (decChance ? 1 : 0)}–${a + (decChance ? 0 : 1)}`, last: true });
+  return pts;
+}
+
+function winChart() {
+  if (S.t.status !== 'complete' || !S.chance) return '';
+  const pts = chartPoints();
+  if (pts.length < 2) return '';
+  const { home, away } = score();
+  const homeTop = home >= away;
+  const top = homeTop ? S.t.home_team : S.t.away_team, bottom = homeTop ? S.t.away_team : S.t.home_team;
+  const ys = pts.map(x => (homeTop ? x.p : 1 - x.p));
+  const W = 600, H = 180, n = ys.length - 1;
+  const xAt = i => (i / n) * W;
+  const line = ys.map((p, i) => `${i ? 'L' : 'M'}${xAt(i).toFixed(1)},${((1 - p) * H).toFixed(1)}`).join(' ');
+  return `<section class="win-chart">
+    <h2>Win probability</h2>
+    <div class="wc-frame fx-wc" data-ys="${esc(JSON.stringify(ys.map(p => Math.round(p * 10000) / 10000)))}"
+         data-labels="${esc(JSON.stringify(pts.map(x => x.label)))}" data-top="${esc(top)}" data-bottom="${esc(bottom)}">
+      <span class="wc-name top">${esc(top)}</span>
+      <div class="wc-guide" hidden></div><div class="wc-dot" hidden></div><div class="wc-tip" hidden></div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+           aria-label="Win probability game by game, ending with ${esc(top)} winning">
+        <line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="wc-mid" vector-effect="non-scaling-stroke"/>
+        ${ys.slice(1, -1).map((_, i) => `<line x1="${xAt(i + 1)}" x2="${xAt(i + 1)}" y1="0" y2="${H}" class="wc-leg" vector-effect="non-scaling-stroke"/>`).join('')}
+        <path d="${line} L${W},${H / 2} L0,${H / 2} Z" class="wc-area"/>
+        <path d="${line}" class="wc-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <span class="wc-name bottom">${esc(bottom)}</span>
+    </div>
+  </section>`;
+}
+
+// Hover with a mouse, or tap (and slide) on a phone, to read it after any game.
+function chartAt(frame, clientX) {
+  const ys = JSON.parse(frame.dataset.ys), labels = JSON.parse(frame.dataset.labels);
+  const r = frame.getBoundingClientRect();
+  const n = ys.length - 1;
+  const i = Math.max(0, Math.min(n, Math.round(((clientX - r.left) / r.width) * n)));
+  const xPct = (i / n) * 100;
+  const [g, d, tip] = ['.wc-guide', '.wc-dot', '.wc-tip'].map(s => frame.querySelector(s));
+  g.style.left = d.style.left = `${xPct}%`;
+  d.style.top = `${(1 - ys[i]) * 100}%`;
+  const [a, b] = pctPair(ys[i], i === n);
+  tip.innerHTML = `<b>${esc(frame.dataset.top)} ${a}%</b><span>${esc(frame.dataset.bottom)} ${b}%</span><small>${esc(labels[i])}</small>`;
+  tip.style.left = xPct > 55 ? '' : `calc(${xPct}% + 10px)`;
+  tip.style.right = xPct > 55 ? `calc(${100 - xPct}% + 10px)` : '';
+  g.hidden = d.hidden = tip.hidden = false;
+}
+const chartOff = f => f.querySelectorAll('.wc-guide, .wc-dot, .wc-tip').forEach(el => { el.hidden = true; });
+app.addEventListener('pointermove', e => {
+  const f = e.target.closest?.('.fx-wc');
+  if (f && (e.pointerType === 'mouse' || e.buttons)) chartAt(f, e.clientX);
+});
+app.addEventListener('pointerdown', e => {
+  const f = e.target.closest?.('.fx-wc');
+  if (f) chartAt(f, e.clientX); else app.querySelectorAll('.fx-wc').forEach(chartOff);
+});
+app.addEventListener('pointerout', e => {
+  const f = e.target.closest?.('.fx-wc');
+  if (f && e.pointerType === 'mouse' && !f.contains(e.relatedTarget)) chartOff(f);
+});
 
 // Consecutive games of the same type and length share a heading.
 function blocks() {
@@ -140,7 +253,8 @@ function render() {
         ${b.g.game_type === 'decider' ? '<p class="muted small">The match finished level. One leg of 1001, with every player in both squads throwing in turn.</p>' : ''}
         <div class="m-grid">${b.games.map(g => matchCard(g, 1)).join('')}</div>
       </section>`).join('')}
-    <p class="muted small">Tap a game to pick players and score it.</p>
+    ${winChart()}
+    ${t.status === 'complete' ? '' : '<p class="muted small">Tap a game to pick players and score it.</p>'}
     <p class="fx-actions"><button data-act="edit" class="link">Edit match</button>
     ${canDelete && t.status !== 'complete' ? '<button data-act="delete" class="link danger-link">Delete this match</button>' : ''}</p>`;
 }
@@ -157,6 +271,7 @@ async function loadInner() {
   if (!t.data.kind) { location.replace(`/tournament/?id=${id}`); return; }
   S.t = t.data;
   S.games = g.data;
+  await loadChart();
   document.title = `${S.t.home_team} v ${S.t.away_team} · ${HUBS[S.t.kind].name}`;
   render();
 }

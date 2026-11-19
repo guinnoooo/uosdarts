@@ -91,10 +91,12 @@ export function isThin(pv) {
 // mean, since partners take turns at the board. Returns the same shape as
 // match_preview, so the prices and the win probability work the same way.
 // If anyone in the game has no profile on the site there's nothing to price
-// them on, so the result is just { unavailable: true }.
-export function teamPreview(np, oomRows) {
+// them on, so the result is just { unavailable: true }. With guests allowed
+// (the team match chart, which never shows prices), they count as the
+// baseline player instead.
+export function teamPreview(np, oomRows, guests = false) {
   if (!np?.side1?.length || !np?.side2?.length) return null;
-  if ([...np.side1, ...np.side2].some(x => !x.id)) return { unavailable: true };
+  if (!guests && [...np.side1, ...np.side2].some(x => !x.id)) return { unavailable: true };
   const side = list => {
     const rated = list.map(x => {
       const c = careerOf({ p1: x.career, p1_prov: x.prov }, 1);
