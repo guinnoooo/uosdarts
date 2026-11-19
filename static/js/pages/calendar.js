@@ -1,4 +1,4 @@
-import { sb, showLoadError, debounce } from '../db.js';
+import { sb, showLoadError, debounce, jittered } from '../db.js';
 import { kindOf, anyCard, cardData, europaVisible } from '../events.js';
 
 // Everything coming up: tournaments and booked UDUK and Franny matches,
@@ -51,7 +51,7 @@ async function load() {
   try { await loadInner(); } catch (e) { showLoadError(app, e); }
 }
 
-const reload = debounce(load, 400);
+const reload = debounce(jittered(load), 400);
 sb.channel('calendar')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments' }, reload)
   .subscribe();

@@ -22,6 +22,10 @@ export async function currentUserId() {
   return session?.user?.id ?? null;
 }
 
+// Waits a random 0 to 2 seconds before reloading, so when one change reaches
+// every open copy of a page they don't all hit the database at once.
+export const jittered = fn => () => setTimeout(fn, Math.random() * 2000);
+
 export function qs(name) {
   return new URLSearchParams(location.search).get(name);
 }

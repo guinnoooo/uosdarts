@@ -1,4 +1,4 @@
-import { sb, showLoadError, esc, toast, debounce, ensureSignedIn, HUBS } from '../db.js';
+import { sb, showLoadError, esc, toast, debounce, jittered, ensureSignedIn, HUBS } from '../db.js';
 import { fixtureCard, cardData, section, venuePicker, bindVenue, readVenue } from '../events.js';
 
 // The UDUK hub (Wednesday uni matches) and the Franny hub (Thursday
@@ -159,7 +159,7 @@ app.addEventListener('submit', async e => {
   }
 });
 
-const reload = debounce(load, 400);
+const reload = debounce(jittered(load), 400);
 sb.channel(`hub-${KIND}`)
   .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments', filter: `kind=eq.${KIND}` }, reload)
   .subscribe();

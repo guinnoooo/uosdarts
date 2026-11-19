@@ -42,6 +42,11 @@ async function init() {
         <select name="start">${[501, 301, 701, 170, 101].map(n => `<option ${n === 501 ? 'selected' : ''}>${n}</option>`).join('')}</select>
       </label>
     </div>
+    <label class="check-row"><input type="checkbox" name="remote"> Remote: each player scores their own throws on their own phone</label>
+    <div class="remote-only" hidden>
+      <label>Match password <input name="rpw" type="text" autocomplete="off" minlength="4" maxlength="40" placeholder="At least 4 characters"></label>
+      <p class="muted small">You're player 1. Send player 2 the match link and this password.</p>
+    </div>
     <label>Friendly password <input name="pw" type="password" autocomplete="off" value="${esc(savedPw())}" required></label>
     <button class="primary big">Start scoring</button>
     <a href="/#friendlies" class="muted small">Back</a>
@@ -62,6 +67,8 @@ app.addEventListener('submit', async e => {
       p_legs: Number(f.get('legs')),
       p_start: Number(f.get('start')),
       p_sets: f.get('format') === 'sets' ? Number(f.get('sets')) : null,
+      p_remote: f.get('remote') === 'on',
+      p_remote_password: f.get('remote') === 'on' ? String(f.get('rpw') ?? '').trim() : null,
     });
     if (error) throw error;
     rememberPw(String(f.get('pw')).trim());
@@ -74,6 +81,12 @@ app.addEventListener('submit', async e => {
 
 // Sets: pick the number of sets, and the legs box becomes legs per set.
 app.addEventListener('change', e => {
+  if (e.target.name === 'remote') {
+    const box = app.querySelector('.remote-only');
+    box.hidden = !e.target.checked;
+    box.querySelector('input').required = e.target.checked;
+    return;
+  }
   if (e.target.name !== 'format') return;
   const sets = e.target.value === 'sets';
   app.querySelector('.sets-only').hidden = !sets;

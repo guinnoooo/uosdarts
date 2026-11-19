@@ -1,4 +1,4 @@
-import { sb, showLoadError, esc, debounce, HUBS } from '../db.js';
+import { sb, showLoadError, esc, debounce, jittered, HUBS } from '../db.js';
 import { kindOf, tournamentCard, anyCard, cardData, section, europaVisible } from '../events.js';
 
 // The Match Hub: what's on now, what's coming up, ways in to the UDUK and
@@ -88,7 +88,7 @@ async function loadInner() {
 
 load();
 sb.channel('tournaments')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments' }, debounce(load))
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments' }, debounce(jittered(load)))
   .subscribe();
 
 // Entry point: never leaves the page sitting on "Loading…".
