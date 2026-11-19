@@ -26,7 +26,7 @@ export function oomScores(rows, name1, name2) {
 // Every number the model uses, in one place, so it can be retuned once there
 // are enough results to measure it against (see tools/model-eval.mjs).
 export const MODEL = {
-  version: 2,
+  version: 3,
   baseline: 40,       // average assumed for someone with no record
   scale: 14,          // average points that make about one step in leg odds
   f9Weight: 0.3,      // how much first 9 counts on top of the average
@@ -36,12 +36,28 @@ export const MODEL = {
   h2hPrior: 4,        // meetings before head-to-head counts for half
   h2hHalfLife: 42,    // days: a meeting's weight halves every six weeks
   knownDarts: 300,    // career darts for a full record (less is pulled to 50/50)
+  provDarts: 150,     // how much record a provisional average is worth
   oomWeight: 0.6,     // order of merit gap to leg odds, with little history
   oomWithHistory: 0.4, // ...and the share of that left once both have a full record
   legCap: 0.85,       // no one rated more than this to win a leg before it starts
 };
 
 const num = (v, fallback) => { const n = parseFloat(v); return Number.isFinite(n) ? n : fallback; };
+
+// Career figures for player n, with any provisional average folded in. A
+// provisional average is entered by hand for someone with little or no
+// record. It stands in for the darts they haven't thrown yet and fades out
+// as real ones come in, so it stops counting once they reach knownDarts.
+export function careerOf(pv, n) {
+  const c = pv?.[`p${n}`] ?? null;
+  const prov = num(pv?.[`p${n}_prov`], NaN);
+  if (!Number.isFinite(prov)) return c;
+  const d = num(c?.darts, 0);
+  if (d >= MODEL.knownDarts) return c;
+  const w = d / MODEL.knownDarts;
+  const mix = real => prov + w * (num(real, prov) - prov);
+  return { ...c, avg: mix(c?.avg), first9: mix(c?.first9 ?? c?.avg), darts: Math.max(d, MODEL.provDarts) };
+}
 
 // One player's level: overall ability (career figures) moved towards recent
 // form, by more the more they've played lately. Recent form comes from
@@ -64,7 +80,8 @@ export function ability(career, form) {
 // counting more), and the order of merit, which matters most when there's
 // little history. Players with little history are pulled towards 50/50.
 export function legChance(pv) {
-  const a1 = ability(pv.p1, pv.p1_form), a2 = ability(pv.p2, pv.p2_form);
+  const c1 = careerOf(pv, 1), c2 = careerOf(pv, 2);
+  const a1 = ability(c1, pv.p1_form), a2 = ability(c2, pv.p2_form);
   let p = sigmoid((a1.strength - a2.strength) / MODEL.scale);
   const h2h = pv.h2h ?? [];
   if (h2h.length) {
@@ -79,7 +96,7 @@ export function legChance(pv) {
     const w = meetings / (meetings + MODEL.h2hPrior);
     p = p * (1 - w) + share * w;
   }
-  const known = Math.min(1, Math.min(num(pv.p1?.darts, 0), num(pv.p2?.darts, 0)) / MODEL.knownDarts);
+  const known = Math.min(1, Math.min(num(c1?.darts, 0), num(c2?.darts, 0)) / MODEL.knownDarts);
   p = 0.5 + (p - 0.5) * (0.5 + 0.5 * known);
   if (pv.oom) {
     p = sigmoid(logit(p) + (pv.oom.p1 - pv.oom.p2) * MODEL.oomWeight * (1 - (1 - MODEL.oomWithHistory) * known));
@@ -160,13 +177,13 @@ export function liveChance(pv, m, form) {
   // Averages for this leg: career, moved towards tonight's form (60 darts of
   // career count about the same as 60 darts tonight).
   const avg = n => {
-    const c = n === 1 ? ability(pv.p1, pv.p1_form).avg : ability(pv.p2, pv.p2_form).avg;
+    const c = ability(careerOf(pv, n), pv[`p${n}_form`]).avg;
     const f = form?.[n === 1 ? 'p1' : 'p2'];
     if (!f?.darts) return c;
     return (c * 60 + (f.scored / f.darts) * 3 * f.darts) / (60 + f.darts);
   };
   const a1 = avg(1), a2 = avg(2);
-  const c1 = ability(pv.p1, pv.p1_form).avg, c2 = ability(pv.p2, pv.p2_form).avg;
+  const c1 = ability(careerOf(pv, 1), pv.p1_form).avg, c2 = ability(careerOf(pv, 2), pv.p2_form).avg;
   const start = m.start_score ?? 501;
   // Line the live model up with the pre-match one: with career averages at
   // the start of a leg it gives exactly the pre-match leg chance. Tonight's
