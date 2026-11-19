@@ -59,7 +59,11 @@ async function loadInner() {
     // Doubles, trebles, guests and friendlies: typed-in names, rated player by player.
     S.preview = null;
     const [np, oom] = await Promise.all([sb.rpc('names_preview', { p_match: id }), sb.rpc('oom_table')]);
-    if (!np.error) S.preview = teamPreview(np.data, oom.data ?? []);
+    if (!np.error) {
+      S.names = np.data;
+      S.preview = teamPreview(np.data, oom.data ?? []);
+      if (S.preview && !S.preview.unavailable) S.preview.h2h = np.data?.h2h ?? [];
+    }
   }
   render();
   watch();
@@ -538,39 +542,70 @@ function oddsBlock(pv) {
 
 const winRate = (won, played) => (played ? `${Math.round((won / played) * 100)}%` : null);
 
-function previewBlock() {
-  const pv = S.preview;
-  if (!pv) return '';
-  if (pv.unavailable) {
-    return `<section class="preview"><h2>Match preview</h2>
-      <div class="odds"><h3>GuinnessBet</h3><p class="muted small">Odds not available for this fixture</p></div>
-    </section>`;
-  }
-  if (pv.team) {
-    return `<section class="preview"><h2>Match preview</h2>
-      ${oddsBlock(pv)}
-    </section>`;
-  }
-  const a = pv.p1 ?? {}, b = pv.p2 ?? {};
+// The stats table: career figures side by side, win rates and the head to
+// head. a and b are each side's career figures (or {} for no profile).
+function previewTable(a, b, rate1, rate2, h2h) {
   const row = (label, x, y) => `<tr><td>${x ?? '–'}</td><th>${label}</th><td>${y ?? '–'}</td></tr>`;
-  const h2h = pv.h2h ?? [];
-  const w1 = h2h.filter(x => x.p1_won).length;
-  const meetings = h2h.slice(0, 5).map(x => `<li>
-      <span class="muted small">${esc(x.tournament)} · ${new Date(x.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-      <b>${x.p1_legs}–${x.p2_legs}</b>
-      <span class="small">${esc(nameOf(x.p1_won ? 1 : 2))}</span></li>`).join('');
-  return `<section class="preview"><h2>Match preview</h2>
-    <table class="stats">
+  const w1 = (h2h ?? []).filter(x => x.p1_won).length;
+  return `<table class="stats">
       <thead><tr><th>${esc(nameOf(1))}</th><th></th><th>${esc(nameOf(2))}</th></tr></thead>
       ${row('Average', a.avg, b.avg)}
       ${row('First 9 average', a.first9, b.first9)}
       ${row('Doubles', a.dbl_pct, b.dbl_pct)}
-      ${row('Win rate', winRate(pv.p1_won, pv.p1_played), winRate(pv.p2_won, pv.p2_played))}
-      ${row('Head to head', h2h.length ? w1 : 0, h2h.length ? h2h.length - w1 : 0)}
-    </table>
-    ${oddsBlock(pv)}
-    ${h2h.length ? `<h3>Previous meetings</h3><ul class="meetings">${meetings}</ul>`
-      : '<p class="muted small center">First meeting on the site.</p>'}
+      ${row('Win rate', rate1, rate2)}
+      ${h2h ? row('Head to head', w1, h2h.length - w1) : ''}
+    </table>`;
+}
+
+function meetingsList(h2h) {
+  if (!h2h) return '';
+  if (!h2h.length) return '<p class="muted small center">First meeting on the site.</p>';
+  return `<h3>Previous meetings</h3><ul class="meetings">${h2h.slice(0, 5).map(x => `<li>
+      <span class="muted small">${esc(x.tournament)} · ${new Date(x.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+      <b>${x.p1_legs}–${x.p2_legs}</b>
+      <span class="small">${esc(nameOf(x.p1_won ? 1 : 2))}</span></li>`).join('')}</ul>`;
+}
+
+// Games between typed-in names. One on one: the usual table, with '–' for
+// anyone without a profile. Doubles and trebles: each player's figures, side by side.
+function namesStats() {
+  const np = S.names;
+  if (!np?.side1 || !np?.side2 || ![...np.side1, ...np.side2].some(x => x.id)) return '';
+  if (np.side1.length === 1 && np.side2.length === 1) {
+    const [x, y] = [np.side1[0], np.side2[0]];
+    const rate = p => (p.id ? winRate(p.won, p.played) : null);
+    return previewTable(x.career ?? {}, y.career ?? {}, rate(x), rate(y), x.id && y.id ? np.h2h ?? [] : null);
+  }
+  const side = list => `<table class="stats team-stats">
+      <thead><tr><th></th><th>Avg</th><th>F9</th><th>Dbl</th></tr></thead>
+      ${list.map(p => `<tr><th>${esc(p.name)}</th>${p.id
+        ? `<td>${p.career?.avg ?? '–'}</td><td>${p.career?.first9 ?? '–'}</td><td>${p.career?.dbl_pct ?? '–'}</td>`
+        : '<td colspan="3" class="muted small">No profile</td>'}</tr>`).join('')}
+    </table>`;
+  return `<h3>${esc(S.match.tournament?.home_team ?? 'Home')}</h3>${side(np.side1)}
+    <h3>${esc(S.match.tournament?.away_team ?? 'Away')}</h3>${side(np.side2)}`;
+}
+
+function previewBlock() {
+  const pv = S.preview;
+  if (!pv) return '';
+  const odds = pv.unavailable
+    ? '<div class="odds"><h3>GuinnessBet</h3><p class="muted small">Odds not available for this fixture</p></div>'
+    : oddsBlock(pv);
+  if (pv.unavailable || pv.team) {
+    const np = S.names;
+    const single = np?.side1?.length === 1 && np?.side2?.length === 1 && np.side1[0].id && np.side2[0].id;
+    return `<section class="preview"><h2>Match preview</h2>
+      ${namesStats()}
+      ${odds}
+      ${single ? meetingsList(np.h2h ?? []) : ''}
+    </section>`;
+  }
+  const a = pv.p1 ?? {}, b = pv.p2 ?? {};
+  return `<section class="preview"><h2>Match preview</h2>
+    ${previewTable(a, b, winRate(pv.p1_won, pv.p1_played), winRate(pv.p2_won, pv.p2_played), pv.h2h ?? [])}
+    ${odds}
+    ${meetingsList(pv.h2h ?? [])}
   </section>`;
 }
 
@@ -690,6 +725,7 @@ async function savePlayers(form) {
     S.pick = null;
     S.oomPlayers = null;   // someone may have been added
     S.preview = undefined; // new players, new prices
+    S.names = undefined;
     await load();
   } catch (err) {
     toast(err.message);
