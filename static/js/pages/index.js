@@ -22,6 +22,10 @@ function europaVisible(all) {
 }
 
 const hoursAgo = t => (Date.now() - new Date(t.created_at).getTime()) / 3600000;
+const isTeamMatch = t => ['uduk', 'franny'].includes(kindOf(t));
+// A UDUK or Franny match booked for later than the next hour.
+const scheduledLater = t => isTeamMatch(t) && t.status === 'upcoming'
+  && new Date(t.starts_at).getTime() > Date.now() + 3600 * 1000;
 
 async function loadInner() {
   const [open, done, friendlyOn, hubsOn] = await Promise.all([
@@ -40,11 +44,15 @@ async function loadInner() {
   // Tournaments.
   const tours = open.data.filter(t => kindOf(t) === 'tournament').filter(europaVisible(all));
   const liveTours = tours.filter(t => t.status === 'live');
-  const upcoming = tours.filter(t => t.status === 'upcoming');
+  // Upcoming tournaments, plus UDUK and Franny matches booked for later.
+  const upcoming = [...tours.filter(t => t.status === 'upcoming'), ...open.data.filter(scheduledLater)]
+    .sort((a, b) => (a.starts_at ? Date.parse(a.starts_at) : Infinity) - (b.starts_at ? Date.parse(b.starts_at) : Infinity));
 
   // Everything else that's on: being played, or set up in the last 12 hours.
-  const onNow = open.data.filter(t => kindOf(t) !== 'tournament'
-    && (t.status === 'live' || hoursAgo(t) < 12))
+  // A scheduled team match joins this list an hour before it starts.
+  const onNow = open.data.filter(t => kindOf(t) !== 'tournament' && !scheduledLater(t)
+    && (t.status === 'live' || hoursAgo(t) < 12
+      || (isTeamMatch(t) && Date.now() - new Date(t.starts_at).getTime() < 12 * 3600 * 1000)))
     .sort((a, b) => (a.status === 'live' ? 0 : 1) - (b.status === 'live' ? 0 : 1)
       || new Date(b.created_at) - new Date(a.created_at));
 
@@ -54,7 +62,7 @@ async function loadInner() {
     const k = kindOf(t);
     (recent[k] ??= []).length < 3 && recent[k].push(t);
   }
-  const extra = await cardData([...onNow, ...Object.values(recent).flat()]);
+  const extra = await cardData([...onNow, ...upcoming.filter(isTeamMatch), ...Object.values(recent).flat()]);
 
   const onGroups = ['uduk', 'franny', 'friendly']
     .map(k => [k, onNow.filter(t => kindOf(t) === k)])
@@ -73,7 +81,7 @@ async function loadInner() {
         </div>`).join('')
         : '<p class="muted">No UDUK, Franny or friendly matches on at the moment.</p>'}
     </section>` +
-    section('Upcoming tournaments', upcoming.map(tournamentCard), 'No tournaments scheduled yet.') +
+    section('Upcoming', upcoming.map(t => anyCard(t, extra)), 'Nothing scheduled yet.') +
     `<section class="hub-links"><h2>Hubs</h2>
       <div class="hub-buttons">
         <a class="hub-button" href="/uduk/"><b>UDUK</b><span>${esc(HUBS.uduk.blurb)}</span></a>

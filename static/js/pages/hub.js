@@ -10,7 +10,7 @@ const PW_KEY = 'uosdarts:hubpw';
 const savedPw = () => { try { return localStorage.getItem(PW_KEY) ?? ''; } catch { return ''; } };
 const rememberPw = v => { try { localStorage.setItem(PW_KEY, v); } catch { /* private mode */ } };
 
-const S = { form: { home: HUB.teams[0], homeOther: '', away: '', awayOther: '', competition: 'league', bull: '' } };
+const S = { form: { home: HUB.teams[0], homeOther: '', away: '', awayOther: '', competition: 'league', bull: '', later: false, when: '' } };
 
 // A team box: our own teams to pick from, or "Another team" to type one in.
 function teamPicker(side, label) {
@@ -44,12 +44,19 @@ function startForm(enabled) {
       </div>
       <p class="muted small">The winners throw first in the odd numbered games. If you haven't done it yet, you can enter it on the match page.</p>
     </fieldset>` : '<p class="muted small">The away team throws first in singles 1, 3 and 5 and doubles 2.</p>'}
+    <div class="hub-when">
+      <div class="seg" role="radiogroup" aria-label="When">
+        <label><input type="radio" name="later" value="" ${S.form.later ? '' : 'checked'}> Start now</label>
+        <label><input type="radio" name="later" value="1" ${S.form.later ? 'checked' : ''}> Later</label>
+      </div>
+      <input name="when" type="datetime-local" value="${esc(S.form.when)}" ${S.form.later ? 'required' : 'hidden'}>
+    </div>
     <label>Team match password <input name="pw" type="password" autocomplete="off" value="${esc(savedPw())}" required></label>
     <label>Scoring password for this match
       <input name="spw" type="text" autocomplete="off" minlength="4" maxlength="40" required placeholder="At least 4 characters">
     </label>
     <p class="muted small">Everyone scoring or picking players for this match's games uses the scoring password, so you can share it with the other team.</p>
-    <button class="primary big">Start match</button>
+    <button class="primary big" data-submit>${S.form.later ? 'Schedule match' : 'Start match'}</button>
   </form>`;
 }
 
@@ -69,7 +76,8 @@ async function loadInner() {
   if (list.error) throw list.error;
   const all = list.data;
   const live = all.filter(t => t.status === 'live');
-  const waiting = all.filter(t => t.status === 'upcoming');
+  const waiting = all.filter(t => t.status === 'upcoming')
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
   const done = all.filter(t => t.status === 'complete').slice(0, 6);
   const extra = await cardData([...live, ...waiting, ...done]);
   const cards = l => l.map(t => fixtureCard(t, extra.score.get(t.id)));
@@ -77,7 +85,7 @@ async function loadInner() {
   app.innerHTML = `
     <div class="page-head"><h1>${HUB.name}</h1><p class="muted">${esc(HUB.blurb)}</p></div>
     ${section('Live', cards(live), 'Nothing being played right now.')}
-    ${waiting.length ? section('Not started yet', cards(waiting), '') : ''}
+    ${waiting.length ? section('Coming up', cards(waiting), '') : ''}
     ${startForm(!!on.data)}
     ${section('Recent results', cards(done), 'No results yet.')}
     <p><a class="button-link" href="/archive/?type=${KIND}">All ${HUB.name} results</a></p>`;
@@ -91,6 +99,15 @@ app.addEventListener('change', e => {
     const other = app.querySelector(`[data-other="${t.dataset.team}"]`);
     other.hidden = t.value !== '';
     if (!other.hidden) other.focus();
+  } else if (t.name === 'later') {
+    S.form.later = !!t.value;
+    const w = app.querySelector('[name=when]');
+    w.hidden = !S.form.later;
+    w.required = S.form.later;
+    if (S.form.later) w.focus();
+    app.querySelector('[data-submit]').textContent = S.form.later ? 'Schedule match' : 'Start match';
+  } else if (t.name === 'when') {
+    S.form.when = t.value;
   } else if (t.name === 'bull') {
     S.form.bull = t.value;
   } else if (t.name === 'competition') {
@@ -115,10 +132,13 @@ app.addEventListener('submit', async e => {
     const pw = String(f.get('pw')).trim();
     const spw = String(f.get('spw')).trim();
     if (spw.length < 4) { toast('The scoring password needs at least 4 characters'); btn.disabled = false; return; }
+    const when = S.form.later ? String(f.get('when') ?? '') : '';
+    if (S.form.later && !when) { toast('Pick when the match starts'); btn.disabled = false; return; }
     const { data: id, error } = await sb.rpc('create_fixture', {
       p_kind: KIND, p_password: pw, p_home: home, p_away: away,
       p_competition: KIND === 'uduk' ? S.form.competition : null,
       p_scoring_password: spw,
+      ...(when ? { p_starts_at: new Date(when).toISOString() } : {}),
     });
     if (error) throw error;
     rememberPw(pw);
