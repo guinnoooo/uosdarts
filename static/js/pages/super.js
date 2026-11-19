@@ -9,7 +9,7 @@ const SEASON = '2026/27';
 
 const S = {
   role: null, players: [], admins: [], sel: null, points: [], usage: null,
-  filter: '', mergeInto: '',
+  filter: '', mergeInto: '', friendlies: [], showReviewed: false,
 };
 
 const check = r => { if (r.error) throw r.error; return r.data; };
@@ -41,6 +41,7 @@ async function loadInner() {
   S.admins = check(await sb.rpc('super_list_admins'));
   S.friendliesOn = (await sb.rpc('friendlies_enabled')).data ?? false;
   S.hubsOn = (await sb.rpc('hub_enabled', { p_kind: 'uduk' })).data ?? false;
+  S.friendlies = check(await sb.rpc('super_list_friendlies')) ?? [];
   if (S.sel) {
     S.sel = S.players.find(p => p.id === S.sel.id) ?? null;
   }
@@ -174,12 +175,57 @@ function friendlyPanel() {
     <h2>Friendly matches</h2>
     <p class="muted small">Friendlies are ${S.friendliesOn ? '<b>on</b>' : '<b>off</b>'}.
       Anyone with this password can start a friendly at <a href="/friendly/">/friendly/</a>.
-      Friendlies don't count towards the order of merit or anyone's stats.</p>
+      Friendlies don't count towards the order of merit or anyone's stats, unless you count one under Friendlies to check.</p>
     <div class="row">
       <label>New password <input type="text" id="fr-pw" autocomplete="off" placeholder="At least 4 characters"></label>
       <button data-act="set-friendly-pw" class="primary">Save</button>
       ${S.friendliesOn ? '<button data-act="clear-friendly-pw">Switch friendlies off</button>' : ''}
     </div>
+  </section>`;
+}
+
+// Finished friendlies to check. One that was played properly can count
+// towards each player's averages, first 9, doubles % and the odds model
+// (never 180s, 100+ checkouts, sheet legs, win rates or the order of merit).
+// Players never see any of this.
+function reviewPanel() {
+  const todo = S.friendlies.filter(f => f.counted === null);
+  const done = S.friendlies.filter(f => f.counted !== null);
+  const opts = sel => `<option value="">No profile, skip</option>${S.players.map(p =>
+    `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}`;
+  const score = f => f.sets_to_win ? `${f.p1_sets}–${f.p2_sets} sets` : `${f.p1_legs}–${f.p2_legs}`;
+  const when = f => f.finished ? new Date(f.finished).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+  const nameOf = id => S.players.find(p => p.id === id)?.name;
+  const row = f => `<div class="fr-review" data-fr="${f.tournament_id}">
+      <div class="fr-head">
+        <a href="/match/?id=${f.match_id}">${esc(f.p1_name)} ${score(f)} ${esc(f.p2_name)}</a>
+        <span class="muted small">${when(f)} · ${f.visits} visits${f.remote ? ' · remote' : ''}</span>
+      </div>
+      <div class="row">
+        <label>${esc(f.p1_name)} <span class="muted small">(avg ${f.p1_avg ?? '–'})</span>
+          <select data-side="1">${opts(f.match_p1_id)}</select></label>
+        <label>${esc(f.p2_name)} <span class="muted small">(avg ${f.p2_avg ?? '–'})</span>
+          <select data-side="2">${opts(f.match_p2_id)}</select></label>
+      </div>
+      <div class="row">
+        <button data-frcount="${f.tournament_id}" class="primary">Played properly, count it</button>
+        <button data-frskip="${f.tournament_id}">Don't count</button>
+      </div>
+    </div>`;
+  const doneRow = f => `<tr>
+      <td><a href="/match/?id=${f.match_id}">${esc(f.p1_name)} ${score(f)} ${esc(f.p2_name)}</a> <span class="muted small">${when(f)}</span></td>
+      <td>${f.counted ? `Counted${[f.counted_p1_id, f.counted_p2_id].some(Boolean)
+        ? `: ${[f.counted_p1_id, f.counted_p2_id].map(nameOf).filter(Boolean).map(esc).join(', ')}` : ''}` : 'Not counted'}</td>
+      <td><button data-frreset="${f.tournament_id}">Undo</button></td>
+    </tr>`;
+  return `<section class="panel">
+    <h2>Friendlies to check (${todo.length})</h2>
+    <p class="muted small">If a finished friendly was played properly, pick each player's profile and count it.
+      Their averages, first 9, doubles % and odds then include it. 180s, 100+ checkouts, sheet legs,
+      win rates and the order of merit never do. Only super admins see this.</p>
+    ${todo.length ? todo.map(row).join('') : '<p class="muted">Nothing to check.</p>'}
+    ${done.length ? `<p><button data-act="toggle-reviewed" class="link">${S.showReviewed ? 'Hide' : 'Show'} checked friendlies (${done.length})</button></p>
+      ${S.showReviewed ? `<table class="points-list"><tbody>${done.map(doneRow).join('')}</tbody></table>` : ''}` : ''}
   </section>`;
 }
 
@@ -231,7 +277,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${friendlyPanel()}${hubPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${friendlyPanel()}${hubPanel()}${adminsPanel()}`;
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
@@ -269,6 +315,18 @@ app.addEventListener('click', async e => {
       'Entry removed');
     return;
   }
+  if (el.dataset.frcount || el.dataset.frskip || el.dataset.frreset) {
+    const t = el.dataset.frcount || el.dataset.frskip || el.dataset.frreset;
+    const box = app.querySelector(`[data-fr="${t}"]`);
+    const side = n => box?.querySelector(`[data-side="${n}"]`)?.value || null;
+    const counted = el.dataset.frcount ? true : el.dataset.frskip ? false : null;
+    if (counted && !side(1) && !side(2)) { toast('Pick a profile for at least one player'); return; }
+    await run(async () => check(await sb.rpc('super_count_friendly', {
+      p_tournament: t, p_counted: counted,
+      p_p1: counted ? side(1) : null, p_p2: counted ? side(2) : null,
+    })), counted ? 'Counted' : counted === false ? 'Marked as not counting' : 'Back to unchecked');
+    return;
+  }
   if (el.dataset.rmadmin) {
     if (!confirm(`Remove admin access for ${el.dataset.email}?`)) return;
     await run(async () => check(await sb.rpc('super_remove_admin', { p_user: el.dataset.rmadmin })),
@@ -277,6 +335,10 @@ app.addEventListener('click', async e => {
   }
 
   switch (el.dataset.act) {
+    case 'toggle-reviewed':
+      S.showReviewed = !S.showReviewed;
+      render();
+      break;
     case 'add-player': {
       const name = val('#p-new');
       if (!name) { toast('Type a name first'); break; }
