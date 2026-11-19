@@ -10,7 +10,7 @@ const PW_KEY = 'uosdarts:hubpw';
 const savedPw = () => { try { return localStorage.getItem(PW_KEY) ?? ''; } catch { return ''; } };
 const rememberPw = v => { try { localStorage.setItem(PW_KEY, v); } catch { /* private mode */ } };
 
-const S = { form: { home: HUB.teams[0], homeOther: '', away: '', awayOther: '', competition: 'league' } };
+const S = { form: { home: HUB.teams[0], homeOther: '', away: '', awayOther: '', competition: 'league', bull: '' } };
 
 // A team box: our own teams to pick from, or "Another team" to type one in.
 function teamPicker(side, label) {
@@ -36,6 +36,14 @@ function startForm(enabled) {
       <label><input type="radio" name="competition" value="cup" ${S.form.competition === 'cup' ? 'checked' : ''}> Cup</label>
     </div>` : ''}
     <p class="muted small hub-format">${formatLine()}</p>
+    ${KIND === 'uduk' ? `<fieldset class="hub-bull"><legend>Who won the bull off?</legend>
+      <div class="seg" role="radiogroup" aria-label="Bull off">
+        <label><input type="radio" name="bull" value="1" ${S.form.bull === '1' ? 'checked' : ''}> Home</label>
+        <label><input type="radio" name="bull" value="2" ${S.form.bull === '2' ? 'checked' : ''}> Away</label>
+        <label><input type="radio" name="bull" value="" ${S.form.bull === '' ? 'checked' : ''}> Not yet</label>
+      </div>
+      <p class="muted small">The winners throw first in the odd numbered games. If you haven't done it yet, you can enter it on the match page.</p>
+    </fieldset>` : '<p class="muted small">The away team throws first in singles 1, 3 and 5 and doubles 2.</p>'}
     <label>Team match password <input name="pw" type="password" autocomplete="off" value="${esc(savedPw())}" required></label>
     <label>Scoring password for this match
       <input name="spw" type="text" autocomplete="off" minlength="4" maxlength="40" required placeholder="At least 4 characters">
@@ -83,6 +91,8 @@ app.addEventListener('change', e => {
     const other = app.querySelector(`[data-other="${t.dataset.team}"]`);
     other.hidden = t.value !== '';
     if (!other.hidden) other.focus();
+  } else if (t.name === 'bull') {
+    S.form.bull = t.value;
   } else if (t.name === 'competition') {
     S.form.competition = t.value;
     app.querySelector('.hub-format').textContent = formatLine();
@@ -112,6 +122,10 @@ app.addEventListener('submit', async e => {
     });
     if (error) throw error;
     rememberPw(pw);
+    if (KIND === 'uduk' && S.form.bull) {
+      const r = await sb.rpc('set_fixture_bull', { p_tournament: id, p_password: spw, p_side: Number(S.form.bull) });
+      if (r.error) toast(r.error.message);
+    }
     // Whoever set it up isn't asked for the match's password again on this phone.
     try { localStorage.setItem(`uosdarts:pw:${id}`, spw); } catch { /* private mode */ }
     location.href = `/fixture/?id=${id}`;

@@ -162,6 +162,19 @@ const isFriendly = () => !!S.match.tournament?.is_friendly;
 const hubKind = () => S.match.tournament?.kind ?? null;   // 'uduk' or 'franny' for a team match game
 const isScorer = () => !!S.match.scorer_id && S.match.scorer_id === S.uid;
 
+// Team match games have a set throw (the database applies the same rule).
+// UDUK: bull off winners throw first in the odd numbered games, and in a
+// cup decider. Franny: the away team in the odd games. null = ask who won the bull.
+function setThrower(m) {
+  const t = m.tournament;
+  if (!t?.kind) return null;
+  if (m.game_type === 'decider') return t.bull_winner ?? null;
+  const odd = m.slot % 2 === 1;
+  if (t.kind === 'franny') return odd ? 2 : 1;
+  if (!t.bull_winner) return null;
+  return odd ? t.bull_winner : 3 - t.bull_winner;
+}
+
 // ---------------------------------------------------------------- rendering
 
 function playerPanel(n, d) {
@@ -679,6 +692,15 @@ function actionZone(d) {
       ${isScorer() ? '<div class="center"><button data-act="undo">Undo last visit</button></div>' : ''}`;
   }
   if (hubKind() && m.status === 'pending' && !m.scorer_id && (!ready || S.editPlayers)) return pickForm();
+  if (isScorer() && m.status === 'pending' && setThrower(m)) {
+    const f = setThrower(m);
+    return `<div class="panel center"><h3>${esc(nameOf(f))} throws first</h3>
+      <p class="muted small">${m.game_type === 'decider'
+        ? 'They won the bull off. Every player in both squads throws in turn.'
+        : hubKind() === 'franny' ? 'Set by the game order.' : 'Set by the bull off and the game order.'}</p>
+      <div class="modal-btns"><button data-first="${f}" class="primary big">Start</button></div>
+      <button data-act="release" class="link">Cancel, I'm not scoring</button></div>`;
+  }
   if (isScorer() && m.status === 'pending') {
     return `<div class="panel center"><h3>Who won the bull?</h3>
       <div class="modal-btns">
@@ -707,7 +729,7 @@ function actionZone(d) {
         : m.called_at && m.referee_name ? `${esc(m.referee_name)} to mark.` : 'This match needs a scorer.'}</p>
       <button data-act="claim" class="primary big">Score this match</button>
       ${m.tournament?.requires_password ? '<p class="muted small">A scoring password is needed.</p>' : ''}
-      ${hubKind() && m.status === 'pending' ? '<button data-act="edit-players" class="link">Change players</button>' : ''}
+      ${hubKind() && m.status === 'pending' && m.game_type !== 'decider' ? '<button data-act="edit-players" class="link">Change players</button>' : ''}
       </div>`;
   }
   if (m.scorer_id) return '<p class="muted center">Being scored live.</p>';
