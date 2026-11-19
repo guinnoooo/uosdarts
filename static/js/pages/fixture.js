@@ -19,16 +19,11 @@ const TYPE = { singles: 'Singles', doubles: 'Doubles', trebles: 'Trebles', decid
 // every game in order. Franny: the away team in the odd games.
 function throwPanel() {
   const t = S.t;
-  if (t.kind === 'franny') {
-    return `<p class="muted small center">${esc(t.away_team)} throw first in singles 1, 3 and 5 and doubles 2.</p>`;
-  }
+  if (t.kind === 'franny') return '';
   const started = S.games.some(g => g.status !== 'pending');
   const team = n => n === 1 ? t.home_team : t.away_team;
   if (t.bull_winner && !S.bullEdit) {
-    const odd = t.competition === 'cup'
-      ? 'singles 1, 3, 5, 7, 9, doubles 2 and 4, second set singles 2, 4, 6, 8 and any decider'
-      : 'trebles 1, doubles 1 and 3, and singles 2, 4 and 6';
-    return `<p class="muted small center">${esc(team(t.bull_winner))} won the bull off, so they throw first in ${odd}.
+    return `<p class="muted small center">${esc(team(t.bull_winner))} won the bull.
       ${started ? '' : '<button data-act="bull-edit" class="link">Change</button>'}</p>`;
   }
   return `<div class="panel narrow center fx-bull">
