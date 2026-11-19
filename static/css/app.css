@@ -220,14 +220,41 @@ td { padding: .42rem .5rem; border-bottom: 1px solid var(--line); }
 
 /* ---------------------------------------------------------------- bracket */
 
-.ko-bracket { display: flex; gap: 1.1rem; overflow-x: auto; padding: .4rem 0 1rem; }
+.ko-bracket { --b-gap: 2rem; display: flex; gap: var(--b-gap); overflow-x: auto; padding: .4rem 0 1rem; }
+@media (hover: hover) and (pointer: fine) {
+  .ko-bracket { cursor: grab; }
+  .ko-bracket.dragging { cursor: grabbing; user-select: none; }
+  .ko-bracket.dragging .match-card { pointer-events: none; }
+}
 .b-col { min-width: 230px; display: flex; flex-direction: column; }
 .b-col h3 {
   font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
   color: var(--accent-mid); margin: 0 0 .6rem; padding-bottom: .4rem;
   border-bottom: 1px solid var(--accent-dim);
 }
-.b-matches { display: flex; flex-direction: column; justify-content: space-around; flex: 1; gap: .5rem; }
+.b-matches { display: grid; grid-auto-rows: 1fr; flex: 1; }
+/* Bracket lines: a stub out of each match, a bar joining each pair, and a
+   stub into the match they feed. Every slot in a column is the same height (the
+   tallest card's), so the lines meet in the middle. */
+.b-pair { display: grid; grid-auto-rows: 1fr; position: relative; }
+.b-slot { display: flex; flex-direction: column; justify-content: center; position: relative; padding: .25rem 0; }
+.b-slot > .match-card { position: relative; z-index: 1; }
+.b-col:not(.b-last) .b-slot::after, .b-col:not(.b-first) .b-slot::before {
+  content: ''; position: absolute; top: 50%; width: calc(var(--b-gap) / 2); border-top: 1px solid var(--accent-dim);
+}
+.b-col:not(.b-last) .b-slot::after { right: calc(var(--b-gap) / -2); }
+.b-col:not(.b-first) .b-slot::before { left: calc(var(--b-gap) / -2); }
+.b-col:not(.b-last) .b-pair.two::after {
+  content: ''; position: absolute; top: 25%; bottom: 25%; right: calc(var(--b-gap) / -2);
+  border-right: 1px solid var(--accent-dim);
+}
+
+/* Odds to win the tournament */
+.outright { margin-top: 1.4rem; }
+.outright-list { width: 100%; border-collapse: collapse; }
+.outright-list td { padding: .45rem .3rem; border-bottom: 1px solid var(--line); text-align: right; }
+.outright-list td.l { text-align: left; width: 60%; }
+.outright-list td:first-child { width: 1.6rem; text-align: left; }
 
 /* ---------------------------------------------------------------- match page */
 

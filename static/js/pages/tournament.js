@@ -1,6 +1,8 @@
 import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, roundName, hasPlayers, MATCH_SELECT } from '../db.js';
 import { standings } from '../fixtures.js';
 import { matchCard, setWatching } from '../ui.js';
+import { oomScore } from '../winprob.js';
+import { outrightOdds, outrightPrice } from '../outright.js';
 
 const app = document.getElementById('app');
 const id = qs('id');
@@ -50,7 +52,62 @@ async function loadInner() {
   S.entrants = e.data;
   S.matches = m.data;
   S.players = new Map(e.data.map(x => [x.player_id, x.players]));
+  await loadOdds();
   render();
+}
+
+// ---------------------------------------------------------------- outright odds
+
+// Each entrant's figures, fetched with the page. The odds themselves are
+// worked out here in the browser and refreshed as results come in.
+async function loadOdds() {
+  S.odds = null;
+  if (S.t.status === 'complete' || S.t.is_friendly || !S.matches.length) return;
+  const [fig, oom] = await Promise.all([
+    sb.rpc('tournament_odds_data', { p_tournament: id }),
+    sb.rpc('oom_table'),
+  ]);
+  if (fig.error) return;
+  const rows = oom.data ?? [];
+  S.oddsData = {
+    figures: fig.data ?? [],
+    oom: new Map(S.entrants.map(x => [x.player_id, oomScore(rows, x.players?.name)])),
+  };
+  computeOdds();
+}
+
+function computeOdds() {
+  if (!S.oddsData) return;
+  try {
+    S.odds = outrightOdds({ ...S.oddsData, t: S.t, entrants: S.entrants, matches: S.matches.map(m => ({ ...m })) });
+  } catch {
+    S.odds = null;
+  }
+  S.oddsAt = Date.now();
+}
+
+// A score update can arrive several times a second; the odds are redone at
+// most every few seconds.
+let oddsTimer = null;
+function scheduleOdds() {
+  if (!S.oddsData || oddsTimer) return;
+  oddsTimer = setTimeout(() => { oddsTimer = null; computeOdds(); scheduleRender(); },
+    Math.max(0, 4000 - (Date.now() - (S.oddsAt ?? 0))));
+}
+
+function oddsSection() {
+  const list = S.odds ?? [];
+  if (list.length < 2) return '';
+  const shown = S.oddsAll ? list : list.slice(0, 5);
+  const thin = shown.some(x => x.thin);
+  const pctText = p => (p < 0.001 ? '<0.1' : (Math.round(p * 1000) / 10).toFixed(1));
+  return `<section class="outright"><h2>Live odds to win the tournament${thin ? '<sup class="odds-star">*</sup>' : ''}</h2>
+    <table class="outright-list"><tbody>${shown.map((x, i) => `<tr>
+      <td class="muted">${i + 1}</td><td class="l">${esc(x.name)}</td>
+      <td class="muted">${pctText(x.p)}%</td><td><b>${outrightPrice(x.p)}</b></td></tr>`).join('')}</tbody></table>
+    ${list.length > 5 ? `<button data-act="odds-toggle" class="link">${S.oddsAll ? 'Show top 5' : `Show all ${list.length}`}</button>` : ''}
+    ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players</p>' : ''}
+  </section>`;
 }
 
 // A realtime row carries the match's own columns but not the joined player
@@ -65,6 +122,7 @@ function applyMatchRow(row) {
   const i = S.matches.findIndex(m => m.id === row.id);
   if (i === -1) return false;
   S.matches[i] = withNames({ ...S.matches[i], ...row });
+  scheduleOdds();
   return true;
 }
 
@@ -105,7 +163,8 @@ function matchesTab() {
   return block('Live now', live, 'No matches in progress.') +
     (called.length ? block('Board calls', called, '') : '') +
     block('Up next', next, 'No matches waiting to start.') +
-    block('Results', done, 'No results yet.');
+    block('Results', done, 'No results yet.') +
+    oddsSection();
 }
 
 function groupsTab() {
@@ -126,16 +185,46 @@ function groupsTab() {
   }).join('');
 }
 
+// Matches go in pairs that feed the same match in the next round, so lines
+// can join each pair to it. Every slot takes an equal share of the column's
+// height, which keeps each match level with the middle of the two before it.
 function bracketTab() {
   const kr = koRounds();
   const cols = [];
   for (let r = 1; r <= kr; r++) {
-    const ms = S.matches.filter(m => m.stage === 'knockout' && m.round === r);
-    cols.push(`<div class="b-col"><h3>${roundName(r, kr)}</h3>
-      <div class="b-matches">${ms.map(m => matchCard(m, kr)).join('')}</div></div>`);
+    const ms = S.matches.filter(m => m.stage === 'knockout' && m.round === r).sort((a, b) => a.slot - b.slot);
+    const pairs = [];
+    for (let i = 0; i < ms.length; i += 2) pairs.push(ms.slice(i, i + 2));
+    cols.push(`<div class="b-col${r === 1 ? ' b-first' : ''}${r === kr ? ' b-last' : ''}"><h3>${roundName(r, kr)}</h3>
+      <div class="b-matches">${pairs.map(p => `<div class="b-pair${p.length === 2 ? ' two' : ''}">
+        ${p.map(m => `<div class="b-slot">${matchCard(m, kr)}</div>`).join('')}</div>`).join('')}</div></div>`);
   }
   return `<div class="ko-bracket">${cols.join('')}</div>`;
 }
+
+// On a computer the bracket can be dragged sideways with the mouse. A drag
+// that moves more than a few pixels doesn't count as a click on a match.
+const drag = { on: false, x: 0, left: 0, moved: false };
+app.addEventListener('pointerdown', e => {
+  const kb = e.target.closest('.ko-bracket');
+  if (!kb || e.pointerType !== 'mouse' || e.button !== 0) return;
+  Object.assign(drag, { on: true, x: e.clientX, left: kb.scrollLeft, moved: false, el: kb });
+});
+window.addEventListener('pointermove', e => {
+  if (!drag.on) return;
+  const dx = e.clientX - drag.x;
+  if (!drag.moved && Math.abs(dx) > 5) { drag.moved = true; drag.el.classList.add('dragging'); }
+  if (drag.moved) { drag.el.scrollLeft = drag.left - dx; e.preventDefault(); }
+});
+window.addEventListener('pointerup', () => {
+  if (!drag.on) return;
+  drag.on = false;
+  drag.el?.classList.remove('dragging');
+});
+app.addEventListener('click', e => {
+  if (drag.moved && e.target.closest('.ko-bracket')) { e.preventDefault(); e.stopPropagation(); drag.moved = false; }
+}, true);
+app.addEventListener('dragstart', e => { if (e.target.closest?.('.ko-bracket')) e.preventDefault(); });
 
 // ---------------------------------------------------------------- summary
 
@@ -227,6 +316,7 @@ function render() {
 }
 
 app.addEventListener('click', e => {
+  if (e.target.closest('[data-act="odds-toggle"]')) { S.oddsAll = !S.oddsAll; render(); return; }
   const b = e.target.closest('[data-tab]');
   if (!b) return;
   S.tab = b.dataset.tab;
