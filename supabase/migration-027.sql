@@ -301,7 +301,7 @@ after update of status on public.matches
 for each row execute function public.fixture_follow_games();
 
 -- Games won by each side, for cards and results.
-create or replace view public.fixture_scores as
+create or replace view public.fixture_scores with (security_invoker = true) as
 select m.tournament_id,
        count(*) as games,
        count(*) filter (where m.status = 'complete') as finished,
