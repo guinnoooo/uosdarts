@@ -391,7 +391,7 @@ function probTimeline() {
 // edge and the other player's 100% the bottom, left to right from first dart
 // to last, with a faint line where each leg began.
 function winChart() {
-  if (!S.preview || !S.visits.length) return '';
+  if (!S.preview || S.preview.unavailable || !S.visits.length) return '';
   const { pts, legStarts } = probTimeline();
   const w = winnerSide(S.match) ?? 1;
   const ys = pts.map(p => (w === 1 ? p : 1 - p));
@@ -541,11 +541,16 @@ const winRate = (won, played) => (played ? `${Math.round((won / played) * 100)}%
 function previewBlock() {
   const pv = S.preview;
   if (!pv) return '';
+  if (pv.unavailable) {
+    return `<section class="preview"><h2>Match preview</h2>
+      <div class="odds"><h3>GuinnessBet</h3><p class="muted small">Odds not available for this fixture</p></div>
+    </section>`;
+  }
   if (pv.team) {
     const many = /&/.test(`${S.match.p1_name ?? ''}${S.match.p2_name ?? ''}`);
     return `<section class="preview"><h2>Match preview</h2>
       ${oddsBlock(pv)}
-      <p class="muted small">${many ? 'Based on each player\'s own figures, averaged across their side. ' : ''}Players without an order of merit profile count as a 40 average.</p>
+      ${many ? '<p class="muted small">Based on each player\'s own figures, averaged across their side.</p>' : ''}
     </section>`;
   }
   const a = pv.p1 ?? {}, b = pv.p2 ?? {};
@@ -777,7 +782,7 @@ function render() {
     </div>
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
     ${actionZone(d)}
-    ${m.status === 'pending' && !isScorer() ? previewBlock() : ''}`;
+    ${m.status === 'pending' ? previewBlock() : ''}`;
   app.querySelector('#m-bottom').innerHTML = `
     ${scoring || m.status === 'complete' ? '' : legTable(d.leg)}
     ${scoring ? '' : statsTable()}

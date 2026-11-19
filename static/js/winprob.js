@@ -73,11 +73,13 @@ export function isThin(pv) {
 // Doubles, trebles and any game between typed-in names (from names_preview).
 // Each player is rated on their own, with their career, recent form,
 // provisional average and order of merit place, and each side gets the
-// mean, since partners take turns at the board. Anyone without a profile
-// counts as the baseline. Returns the same shape as match_preview, so the
-// prices and the win probability work the same way.
+// mean, since partners take turns at the board. Returns the same shape as
+// match_preview, so the prices and the win probability work the same way.
+// If anyone in the game has no profile on the site there's nothing to price
+// them on, so the result is just { unavailable: true }.
 export function teamPreview(np, oomRows) {
   if (!np?.side1?.length || !np?.side2?.length) return null;
+  if ([...np.side1, ...np.side2].some(x => !x.id)) return { unavailable: true };
   const side = list => {
     const rated = list.map(x => {
       const c = careerOf({ p1: x.career, p1_prov: x.prov }, 1);
