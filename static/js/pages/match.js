@@ -615,7 +615,7 @@ function pickForm() {
     <h3>Players for ${esc(m.game_label ?? 'this game')}</h3>
     <div class="pick-sides">${side(1)}${side(2)}</div>
     <datalist id="oom-names">${(S.oomPlayers ?? []).map(p => `<option value="${esc(p.name)}">`).join('')}</datalist>
-    <label>Password <input data-pickpw type="password" autocomplete="off" value="${esc(savedPw())}"></label>
+    <label>Scoring password for this match <input data-pickpw type="password" autocomplete="off" value="${esc(savedPw())}"></label>
     <div class="modal-btns">
       <button class="primary">Save players</button>
       ${hasPlayers(m) ? '<button type="button" data-act="cancel-players">Cancel</button>' : ''}
@@ -641,7 +641,9 @@ async function savePlayers(form) {
       if (names.length === 1 && sideIsOurs(k)) {
         let pid = byName.get(names[0].toLowerCase());
         if (!pid && S.pick.add[k]) {
-          const { data, error } = await sb.rpc('add_hub_player', { p_kind: kind, p_password: pw, p_name: names[0] });
+          const { data, error } = await sb.rpc('add_hub_player', {
+            p_kind: kind, p_password: pw, p_name: names[0], p_tournament: m.tournament_id,
+          });
           if (error) throw error;
           pid = data;
         }
@@ -692,7 +694,7 @@ function actionZone(d) {
       return `<div class="panel center pw-panel">
         <h3>Scoring password</h3>
         <p class="muted">${isFriendly() ? 'Friendlies use the friendly password.'
-          : hubKind() ? 'UDUK and Franny games use the team match password.'
+          : hubKind() ? 'Use the scoring password set for this match when it was started.'
           : 'Ask whoever is running the tournament.'}</p>
         <input id="pw-input" type="password" autocomplete="off" placeholder="Password" autofocus>
         <div class="modal-btns">
@@ -805,7 +807,8 @@ async function submit(score) {
 }
 
 // The password is remembered per tournament so a scorer types it once a night.
-function pwKey() { return isFriendly() ? 'uosdarts:friendlypw' : hubKind() ? 'uosdarts:hubpw' : `uosdarts:pw:${S.match.tournament_id}`; }
+// UDUK and Franny games use their match's own scoring password, remembered per match like a tournament's.
+function pwKey() { return isFriendly() ? 'uosdarts:friendlypw' : `uosdarts:pw:${S.match.tournament_id}`; }
 function savedPw() { try { return localStorage.getItem(pwKey()) ?? ''; } catch { return ''; } }
 function rememberPw(v) { try { localStorage.setItem(pwKey(), v); } catch { /* private mode */ } }
 function forgetPw() { try { localStorage.removeItem(pwKey()); } catch { /* private mode */ } }

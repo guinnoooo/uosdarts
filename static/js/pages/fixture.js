@@ -51,7 +51,7 @@ function render() {
         <h2>${TYPE[b.g.game_type] ?? 'Games'} <span class="muted small">best of ${b.g.legs_to_win * 2 - 1} · ${b.g.start_score}</span></h2>
         <div class="m-grid">${b.games.map(g => matchCard(g, 1)).join('')}</div>
       </section>`).join('')}
-    <p class="muted small">Tap a game to pick its players and score it. ${hub.name} games need the team match password.</p>
+    <p class="muted small">Tap a game to pick its players and score it, using the scoring password set when this match was started.</p>
     ${canDelete && t.status !== 'complete' ? '<p><button data-act="delete" class="link danger-link">Delete this match</button></p>' : ''}`;
 }
 
