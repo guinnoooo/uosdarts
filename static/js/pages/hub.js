@@ -42,8 +42,8 @@ function startForm(enabled) {
         <label><input type="radio" name="bull" value="2" ${S.form.bull === '2' ? 'checked' : ''}> Away</label>
         <label><input type="radio" name="bull" value="" ${S.form.bull === '' ? 'checked' : ''}> Not yet</label>
       </div>
-      <p class="muted small">The winners throw first in the odd numbered games. If you haven't done it yet, you can enter it on the match page.</p>
-    </fieldset>` : '<p class="muted small">The away team throws first in singles 1, 3 and 5 and doubles 2.</p>'}
+      <p class="muted small">Not done yet? You can add it on the match page.</p>
+    </fieldset>` : ''}
     ${venuePicker(S.form.venue)}
     <div class="hub-when">
       <div class="seg" role="radiogroup" aria-label="When">
@@ -56,7 +56,7 @@ function startForm(enabled) {
     <label>Scoring password for this match
       <input name="spw" type="text" autocomplete="off" minlength="4" maxlength="40" required placeholder="At least 4 characters">
     </label>
-    <p class="muted small">Everyone scoring or picking players for this match's games uses the scoring password, so you can share it with the other team.</p>
+    <p class="muted small">Share this with the other team so they can score too.</p>
     <button class="primary big" data-submit>${S.form.later ? 'Schedule match' : 'Start match'}</button>
   </form>`;
 }

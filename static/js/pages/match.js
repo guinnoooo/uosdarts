@@ -547,10 +547,8 @@ function previewBlock() {
     </section>`;
   }
   if (pv.team) {
-    const many = /&/.test(`${S.match.p1_name ?? ''}${S.match.p2_name ?? ''}`);
     return `<section class="preview"><h2>Match preview</h2>
       ${oddsBlock(pv)}
-      ${many ? '<p class="muted small">Based on each player\'s own figures, averaged across their side.</p>' : ''}
     </section>`;
   }
   const a = pv.p1 ?? {}, b = pv.p2 ?? {};
@@ -573,7 +571,6 @@ function previewBlock() {
     ${oddsBlock(pv)}
     ${h2h.length ? `<h3>Previous meetings</h3><ul class="meetings">${meetings}</ul>`
       : '<p class="muted small center">First meeting on the site.</p>'}
-    <p class="muted small">Averages are across every tournament scored on the site.</p>
   </section>`;
 }
 
@@ -637,7 +634,7 @@ function pickForm() {
     const team = k === 1 ? t.home_team : t.away_team;
     const ours = sideIsOurs(k);
     return `<fieldset class="pick-side">
-      <legend>${esc(team)}${ours ? ' <span class="muted small">(OoM players listed)</span>' : ''}</legend>
+      <legend>${esc(team)}${ours ? ' <span class="muted small">(pick from the OoM or type a name)</span>' : ''}</legend>
       ${S.pick[k].map((v, i) => `<input data-pick="${k}-${i}" maxlength="40" autocomplete="off"
           ${ours ? 'list="oom-names"' : ''} placeholder="${need > 1 ? `Player ${i + 1}` : 'Player'}" value="${esc(v)}">`).join('')}
       ${ours && need === 1 ? `<label class="check-row"><input type="checkbox" data-pickadd="${k}" ${S.pick.add[k] ? 'checked' : ''}>
@@ -716,9 +713,7 @@ function actionZone(d) {
   if (isScorer() && m.status === 'pending' && setThrower(m)) {
     const f = setThrower(m);
     return `<div class="panel center"><h3>${esc(nameOf(f))} throws first</h3>
-      <p class="muted small">${m.game_type === 'decider'
-        ? 'They won the bull off. Every player in both squads throws in turn.'
-        : hubKind() === 'franny' ? 'Set by the game order.' : 'Set by the bull off and the game order.'}</p>
+      ${m.game_type === 'decider' ? '<p class="muted small">Both full squads throw in turn.</p>' : ''}
       <div class="modal-btns"><button data-first="${f}" class="primary big">Start</button></div>
       <button data-act="release" class="link">Cancel, I'm not scoring</button></div>`;
   }
@@ -737,7 +732,7 @@ function actionZone(d) {
       return `<div class="panel center pw-panel">
         <h3>Scoring password</h3>
         <p class="muted">${isFriendly() ? 'Friendlies use the friendly password.'
-          : hubKind() ? 'Use the scoring password set for this match when it was started.'
+          : hubKind() ? 'Use this match\'s scoring password.'
           : 'Ask whoever is running the tournament.'}</p>
         <input id="pw-input" type="password" autocomplete="off" placeholder="Password" autofocus>
         <div class="modal-btns">
@@ -947,7 +942,7 @@ app.addEventListener('click', async e => {
       else { await navigator.clipboard.writeText(url); toast('Link copied', false); }
     } catch { /* share sheet closed */ }
   } else if (act === 'delete-friendly') {
-    if (!confirm('Delete this friendly? Its scores go with it.')) return;
+    if (!confirm('Delete this friendly and its scores?')) return;
     try {
       const { error } = await sb.rpc('delete_friendly', { p_match: id });
       if (error) throw error;

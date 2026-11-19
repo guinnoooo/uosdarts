@@ -189,8 +189,7 @@ function createFlags() {
 // blank. These download a fresh copy of that fallback to commit to the repo.
 function snapshotSection() {
   return `<section class="panel"><h2>Published fallback</h2>
-    <p class="muted small">The order of merit pages show live points. These files are what they fall back on
-      before the live data arrives, or if Supabase is unreachable. Download them, drop them in
+    <p class="muted small">Backup standings, used if live points can't load. Download them, drop them in
       <code>assets/data/</code> and push.</p>
     <div class="row">
       <button data-act="snap-main">Download rankings.csv</button>
@@ -331,7 +330,7 @@ function deletedSection() {
       <button data-act="restore" data-id="${t.id}" class="primary">Restore</button>
       <button data-act="purge" data-id="${t.id}">Delete now</button>
     </div>`).join('')}
-    <p class="muted small">Kept for 24 hours with everything scored in them intact, then cleared automatically.</p>
+    <p class="muted small">Restorable for 24 hours.</p>
   </section>`;
 }
 
@@ -420,7 +419,7 @@ function manageSection() {
             </datalist>
             <button data-act="add-entrant" class="primary">Add</button>
           </div>
-          <p class="muted small">Suggests from the ${S.players.length} players on file. A name that isn't on the list opens a new profile.</p>`}
+          <p class="muted small">A new name creates a new profile.</p>`}
 
           ${picked.length ? `<div class="picked">${picked.map(e => {
             const pl = S.players.find(x => x.id === e.player_id);
