@@ -333,12 +333,12 @@ function remoteZone(d) {
         <button data-act="pw-cancel">Cancel</button>
       </div></div>`;
   }
-  const freeSeat = !m.scorer_id ? 1 : !m.scorer2_id ? 2 : 0;
+  const free = [1, 2].filter(n => !(n === 1 ? m.scorer_id : m.scorer2_id));
   if (!seat) {
-    if (freeSeat) {
+    if (free.length) {
       return `<div class="panel center">
         <p>Remote match. Each player scores their own throws on their own phone.</p>
-        <button data-act="claim" class="primary big">Join as ${other(freeSeat)}</button>
+        <div class="modal-btns">${free.map(n => `<button data-act="claim" data-seat="${n}" class="primary">Join as ${other(n)}</button>`).join('')}</div>
         <p class="muted small">You'll need the match password.</p></div>`;
     }
     return `<p class="muted center">${m.status === 'live' ? 'Being scored live by both players.' : 'Both players are in. Starting soon.'}</p>`;
@@ -365,7 +365,8 @@ function remoteZone(d) {
     return `<div class="panel center">
       <p>${gone ? `${other(3 - seat)} has left the match. They can rejoin with the password.` : `Waiting for ${other(d.turn ?? 3 - seat)} to throw…`}</p>
       <div class="modal-btns"><button data-act="undo">Undo my last visit</button></div>
-      ${leave}</div>`;
+      ${leave}
+      ${seat === 1 ? '<button data-act="delete-friendly" class="link danger-link">Delete this friendly</button>' : ''}</div>`;
   }
   return null;
 }
@@ -963,7 +964,7 @@ async function claim(password = null) {
     toast(`Couldn't sign in: ${e.message}`);
     return;
   }
-  const ok = await rpc('claim_match', { p_match: id, p_password: password });
+  const ok = await rpc('claim_match', { p_match: id, p_password: password, ...(S.joinSeat ? { p_seat: S.joinSeat } : {}) });
   if (ok && password) rememberPw(password);
   if (!ok && password) {
     forgetPw();
@@ -1019,6 +1020,7 @@ app.addEventListener('click', async e => {
     S.entry = '';
     await rpc('undo_visit', { p_match: id });
   } else if (act === 'claim') {
+    S.joinSeat = el.dataset.seat ? Number(el.dataset.seat) : null;
     await startClaim();
   } else if (act === 'pw-submit') {
     const input = app.querySelector('#pw-input');
