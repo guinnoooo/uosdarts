@@ -48,7 +48,7 @@ export function fixtureCard(t, sc) {
   const state = t.status === 'complete' ? (home === away ? 'Draw' : `🏆 ${esc(home > away ? t.home_team : t.away_team)}`)
     : t.status === 'live' ? `${played} of ${games} games played` : 'Not started';
   return `<a class="t-card fixture-card ${t.status}" href="/fixture/?id=${t.id}">
-    <div class="t-name">${esc(t.home_team)} <b class="fx-score">${home}–${away}</b> ${esc(t.away_team)}</div>
+    <div class="t-name">${esc(t.home_team)} ${t.status === 'upcoming' ? '<span class="muted">v</span>' : `<b class="fx-score">${home}–${away}</b>`} ${esc(t.away_team)}</div>
     <div class="t-meta">${fmtDate(t.starts_at ?? t.created_at)} · ${what}</div>
     <div class="${t.status === 'complete' ? 't-champ' : 't-meta'}">${state}</div>
     ${liveBadge(t)}
@@ -75,6 +75,20 @@ export function anyCard(t, extra) {
   if (k === 'friendly') return friendlyCard(t, extra.match.get(t.id));
   if (k === 'uduk' || k === 'franny') return fixtureCard(t, extra.score.get(t.id));
   return tournamentCard(t);
+}
+
+// Every PC has a Europa waiting behind it. An unstarted one only shows up on
+// the night (its PC is live, or finished within the last day), otherwise the
+// upcoming lists would be full of empty Europas.
+export function europaVisible(all) {
+  const byId = new Map(all.map(t => [t.id, t]));
+  return t => {
+    if (!t.parent_id || t.status !== 'upcoming') return true;
+    const pc = byId.get(t.parent_id);
+    if (!pc) return false;
+    if (pc.status === 'live') return true;
+    return pc.status === 'complete' && Date.now() - new Date(pc.starts_at).getTime() < 36 * 3600 * 1000;
+  };
 }
 
 export function section(title, cards, empty, id = '') {
