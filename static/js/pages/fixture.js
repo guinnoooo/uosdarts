@@ -1,4 +1,4 @@
-import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, toast, currentUserId, HUBS, MATCH_SELECT } from '../db.js';
+import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, toast, currentUserId, ensureSignedIn, HUBS, MATCH_SELECT } from '../db.js';
 import { matchCard, setWatching } from '../ui.js';
 
 // A UDUK or Franny team match: the two teams, the score in games won, and
@@ -6,9 +6,39 @@ import { matchCard, setWatching } from '../ui.js';
 // are picked and it's scored.
 const app = document.getElementById('app');
 const id = qs('id');
-const S = { t: null, games: [], admin: false, uid: null };
+const S = { t: null, games: [], admin: false, uid: null, bullEdit: false };
+const PW_KEY = () => `uosdarts:pw:${id}`;
+const savedPw = () => { try { return localStorage.getItem(PW_KEY()) ?? ''; } catch { return ''; } };
 
-const TYPE = { singles: 'Singles', doubles: 'Doubles', trebles: 'Trebles' };
+const TYPE = { singles: 'Singles', doubles: 'Doubles', trebles: 'Trebles', decider: 'Decider' };
+
+// Who throws first. UDUK: the bull off winners in the odd games, counting
+// every game in order. Franny: the away team in the odd games.
+function throwPanel() {
+  const t = S.t;
+  if (t.kind === 'franny') {
+    return `<p class="muted small center">${esc(t.away_team)} throw first in singles 1, 3 and 5 and doubles 2.</p>`;
+  }
+  const started = S.games.some(g => g.status !== 'pending');
+  const team = n => n === 1 ? t.home_team : t.away_team;
+  if (t.bull_winner && !S.bullEdit) {
+    const odd = t.competition === 'cup'
+      ? 'singles 1, 3, 5, 7, 9, doubles 2 and 4, second set singles 2, 4, 6, 8 and any decider'
+      : 'trebles 1, doubles 1 and 3, and singles 2, 4 and 6';
+    return `<p class="muted small center">${esc(team(t.bull_winner))} won the bull off, so they throw first in ${odd}.
+      ${started ? '' : '<button data-act="bull-edit" class="link">Change</button>'}</p>`;
+  }
+  return `<div class="panel narrow center fx-bull">
+      <h3>Who won the bull off?</h3>
+      <p class="muted small">The winners throw first in the odd numbered games.</p>
+      ${savedPw() ? '' : '<input id="bull-pw" type="password" autocomplete="off" placeholder="Scoring password for this match">'}
+      <div class="modal-btns">
+        <button data-bull="1" class="primary">${esc(t.home_team)}</button>
+        <button data-bull="2" class="primary">${esc(t.away_team)}</button>
+      </div>
+      ${S.bullEdit ? '<button data-act="bull-cancel" class="link">Cancel</button>' : ''}
+    </div>`;
+}
 
 // Games won by each side: legs (or sets) decide each finished game.
 function score() {
@@ -47,8 +77,10 @@ function render() {
     <p class="muted center small">${hub.name}${t.competition ? ` ${t.competition}` : ''} · ${fmtDate(t.created_at)} ·
       ${t.status === 'complete' ? 'Full time' : `${done} of ${S.games.length} games played`}
       ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}</p>
+    ${throwPanel()}
     ${blocks().map(b => `<section class="fx-block">
         <h2>${TYPE[b.g.game_type] ?? 'Games'} <span class="muted small">best of ${b.g.legs_to_win * 2 - 1} · ${b.g.start_score}</span></h2>
+        ${b.g.game_type === 'decider' ? '<p class="muted small">The match finished level. One leg of 1001, with every player in both squads throwing in turn.</p>' : ''}
         <div class="m-grid">${b.games.map(g => matchCard(g, 1)).join('')}</div>
       </section>`).join('')}
     <p class="muted small">Tap a game to pick its players and score it, using the scoring password set when this match was started.</p>
@@ -72,6 +104,28 @@ async function loadInner() {
 }
 
 app.addEventListener('click', async e => {
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'bull-edit') { S.bullEdit = true; render(); return; }
+  if (act === 'bull-cancel') { S.bullEdit = false; render(); return; }
+  const bull = e.target.closest('[data-bull]');
+  if (bull) {
+    const typed = app.querySelector('#bull-pw')?.value.trim();
+    const pw = typed || savedPw();
+    if (!pw && !S.admin) { toast('Enter the scoring password for this match'); return; }
+    bull.disabled = true;
+    try {
+      await ensureSignedIn();
+      const { error } = await sb.rpc('set_fixture_bull', { p_tournament: id, p_password: pw, p_side: Number(bull.dataset.bull) });
+      if (error) throw error;
+      if (typed) { try { localStorage.setItem(PW_KEY(), typed); } catch { /* private mode */ } }
+      S.bullEdit = false;
+      await load();
+    } catch (err) {
+      toast(err.message);
+      bull.disabled = false;
+    }
+    return;
+  }
   if (e.target.closest('[data-act="delete"]')) {
     if (!confirm('Delete this match and every game in it?')) return;
     const { error } = await sb.rpc('delete_fixture', { p_tournament: id });
