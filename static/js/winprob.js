@@ -27,8 +27,8 @@ export function oomScores(rows, name1, name2) {
 // Every number the model uses, in one place, so it can be retuned once there
 // are enough results to measure it against (see tools/model-eval.mjs).
 export const MODEL = {
-  version: 3,
-  baseline: 40,       // average assumed for someone with no record
+  version: 4,
+  baseline: 45,       // average assumed for someone with no record and no provisional average
   scale: 14,          // average points that make about one step in leg odds
   f9Weight: 0.3,      // how much first 9 counts on top of the average
   dblWeight: 0.15,    // average points per percentage point of doubles above 25%
