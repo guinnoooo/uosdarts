@@ -27,7 +27,7 @@ export function oomScores(rows, name1, name2) {
 // Every number the model uses, in one place, so it can be retuned once there
 // are enough results to measure it against (see tools/model-eval.mjs).
 export const MODEL = {
-  version: 4,
+  version: 5,
   baseline: 45,       // average assumed for someone with no record and no provisional average
   scale: 14,          // average points that make about one step in leg odds
   f9Weight: 0.3,      // how much first 9 counts on top of the average
@@ -41,8 +41,23 @@ export const MODEL = {
   thinDarts: 100,     // fewer real darts than this (and no provisional average) gets the odds asterisk
   oomWeight: 0.6,     // order of merit gap to leg odds, with little history
   oomWithHistory: 0.4, // ...and the share of that left once both have a full record
+  winRatePrior: 10,   // matches of 50% added to everyone's record, so a short record barely counts
+  winRateWeight: 0.3, // how far the gap in (adjusted) win rates moves the leg odds
+  winRateCap: 0.6,    // the most win rate can move them, in the model's steps (about 15 points at evens)
   legCap: 0.85,       // no one rated more than this to win a leg before it starts
 };
+
+// Win rate, pulled towards 50% by winRatePrior matches. 3 from 4 reads as
+// 57%, 15 from 20 as 67%, 60 from 80 as 72%: it counts for more the more
+// matches someone has played, without a lucky short run counting for much.
+export function shrunkRate(won, played) {
+  return (num(won, 0) + MODEL.winRatePrior / 2) / (num(played, 0) + MODEL.winRatePrior);
+}
+
+function winRateShift(pv) {
+  const r = pv.wr ?? { p1: shrunkRate(pv.p1_won, pv.p1_played), p2: shrunkRate(pv.p2_won, pv.p2_played) };
+  return clamp(MODEL.winRateWeight * (logit(r.p1) - logit(r.p2)), -MODEL.winRateCap, MODEL.winRateCap);
+}
 
 const num = (v, fallback) => { const n = parseFloat(v); return Number.isFinite(n) ? n : fallback; };
 
@@ -88,17 +103,20 @@ export function teamPreview(np, oomRows) {
         known: num(c?.darts, 0),
         thin: num(x.career?.darts, 0) < MODEL.thinDarts && !Number.isFinite(num(x.prov, NaN)),
         oom: oomScore(oomRows, x.name),
+        wr: shrunkRate(x.won, x.played),
       };
     });
     const mean = f => rated.reduce((t, r) => t + f(r), 0) / rated.length;
     return {
       career: { avg: mean(r => r.a.avg), first9: mean(r => r.a.f9), dbl_pct: mean(r => r.a.dbl), darts: Math.min(...rated.map(r => r.known)) },
       oom: mean(r => r.oom),
+      wr: mean(r => r.wr),
       thin: rated.some(r => r.thin),
     };
   };
   const s1 = side(np.side1), s2 = side(np.side2);
-  return { p1: s1.career, p2: s2.career, oom: { p1: s1.oom, p2: s2.oom }, h2h: [], team: true, thin: s1.thin || s2.thin };
+  return { p1: s1.career, p2: s2.career, oom: { p1: s1.oom, p2: s2.oom }, wr: { p1: s1.wr, p2: s2.wr },
+    h2h: [], team: true, thin: s1.thin || s2.thin };
 }
 
 // One player's level: overall ability (career figures) moved towards recent
@@ -117,10 +135,11 @@ export function ability(career, form) {
   return { avg, f9, dbl, strength: avg + (f9 - avg) * MODEL.f9Weight + (dbl - 25) * MODEL.dblWeight };
 }
 
-// Chance player 1 wins a single leg, before it starts. Three things go in:
+// Chance player 1 wins a single leg, before it starts. Four things go in:
 // overall ability and recent form (above), the head-to-head (recent meetings
-// counting more), and the order of merit, which matters most when there's
-// little history. Players with little history are pulled towards 50/50.
+// counting more), win rate (counting more the more matches played), and the
+// order of merit, which matters most when there's little history. Players
+// with little history are pulled towards 50/50.
 export function legChance(pv) {
   const c1 = careerOf(pv, 1), c2 = careerOf(pv, 2);
   const a1 = ability(c1, pv.p1_form), a2 = ability(c2, pv.p2_form);
@@ -140,6 +159,7 @@ export function legChance(pv) {
   }
   const known = Math.min(1, Math.min(num(c1?.darts, 0), num(c2?.darts, 0)) / MODEL.knownDarts);
   p = 0.5 + (p - 0.5) * (0.5 + 0.5 * known);
+  p = sigmoid(logit(p) + winRateShift(pv));
   if (pv.oom) {
     p = sigmoid(logit(p) + (pv.oom.p1 - pv.oom.p2) * MODEL.oomWeight * (1 - (1 - MODEL.oomWithHistory) * known));
   }

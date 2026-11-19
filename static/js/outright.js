@@ -36,6 +36,8 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
     p1: fig.get(a)?.career ?? null, p1_form: fig.get(a)?.form ?? null, p1_prov: fig.get(a)?.prov ?? null,
     p2: fig.get(b)?.career ?? null, p2_form: fig.get(b)?.form ?? null, p2_prov: fig.get(b)?.prov ?? null,
     oom: { p1: oom.get(a) ?? 0.3, p2: oom.get(b) ?? 0.3 },
+    p1_won: fig.get(a)?.won, p1_played: fig.get(a)?.played,
+    p2_won: fig.get(b)?.won, p2_played: fig.get(b)?.played,
   });
   const legMemo = new Map();
   const leg = (a, b) => {
