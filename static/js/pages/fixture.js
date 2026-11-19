@@ -1,12 +1,15 @@
 import { sb, showLoadError, showMissing, validId, qs, esc, fmtDate, debounce, toast, currentUserId, ensureSignedIn, HUBS, MATCH_SELECT } from '../db.js';
 import { matchCard, setWatching } from '../ui.js';
+import { venuePicker, bindVenue, readVenue } from '../events.js';
 
 // A UDUK or Franny team match: the two teams, the score in games won, and
 // every game in order. Each game opens on the match page, where its players
 // are picked and it's scored.
 const app = document.getElementById('app');
 const id = qs('id');
-const S = { t: null, games: [], admin: false, uid: null, bullEdit: false, timeEdit: false };
+const S = { t: null, games: [], admin: false, uid: null, bullEdit: false, timeEdit: false, edit: false };
+const HUB_PW_KEY = 'uosdarts:hubpw';
+const savedHubPw = () => { try { return localStorage.getItem(HUB_PW_KEY) ?? ''; } catch { return ''; } };
 const PW_KEY = () => `uosdarts:pw:${id}`;
 const savedPw = () => { try { return localStorage.getItem(PW_KEY()) ?? ''; } catch { return ''; } };
 
@@ -89,8 +92,40 @@ function timePanel() {
     </div>`;
 }
 
+// Change the teams, venue, time, scoring password or (before any game has
+// started) the UDUK competition. Needs the team match password.
+function editForm() {
+  const t = S.t, hub = HUBS[t.kind];
+  const started = S.games.some(g => g.status !== 'pending');
+  return `<form class="panel narrow hub-form fx-edit" data-form="edit">
+    <h2>Edit match</h2>
+    <datalist id="our-teams">${hub.teams.map(x => `<option value="${esc(x)}">`).join('')}</datalist>
+    <div class="row hub-teams">
+      <label>Home <input name="home" list="our-teams" maxlength="40" required value="${esc(t.home_team)}"></label>
+      <label>Away <input name="away" list="our-teams" maxlength="40" required value="${esc(t.away_team)}"></label>
+    </div>
+    ${t.kind === 'uduk' ? `<div class="seg" role="radiogroup" aria-label="Competition">
+      <label><input type="radio" name="competition" value="league" ${t.competition === 'league' ? 'checked' : ''} ${started ? 'disabled' : ''}> League</label>
+      <label><input type="radio" name="competition" value="cup" ${t.competition === 'cup' ? 'checked' : ''} ${started ? 'disabled' : ''}> Cup</label>
+    </div>
+    <p class="muted small">${started ? 'Games have started, so the competition is fixed.' : 'Changing the competition sets up the games again and clears any players picked.'}</p>` : ''}
+    ${venuePicker(t.venue)}
+    ${t.status === 'upcoming' ? `<label>Start time <input name="when" type="datetime-local" value="${localValue(t.starts_at)}"></label>` : ''}
+    <label>New scoring password <input name="spw" type="text" autocomplete="off" minlength="4" maxlength="40" placeholder="Leave blank to keep the current one"></label>
+    <label>Team match password <input name="pw" type="password" autocomplete="off" value="${esc(savedHubPw())}" ${S.admin ? '' : 'required'}></label>
+    <div class="modal-btns">
+      <button class="primary">Save changes</button>
+      <button type="button" data-act="edit-cancel">Cancel</button>
+    </div>
+  </form>`;
+}
+
 function render() {
   const t = S.t, hub = HUBS[t.kind];
+  if (S.edit) {
+    app.innerHTML = `<a class="back-link plain" href="/${t.kind}/">‹ ${hub.name} hub</a>${editForm()}`;
+    return;
+  }
   const { home, away } = score();
   const done = S.games.filter(g => g.status === 'complete').length;
   const canDelete = S.admin || (S.uid && t.created_by === S.uid);
@@ -101,7 +136,7 @@ function render() {
       <div class="fx-big">${home}<span>–</span>${away}</div>
       <div class="fx-team away">${esc(t.away_team)}</div>
     </div>
-    <p class="muted center small">${hub.name}${t.competition ? ` ${t.competition}` : ''} · ${fmtDate(t.starts_at ?? t.created_at)} ·
+    <p class="muted center small">${hub.name}${t.competition ? ` ${t.competition}` : ''} · ${fmtDate(t.starts_at ?? t.created_at)}${t.venue ? ` · ${esc(t.venue)}` : ''} ·
       ${t.status === 'complete' ? 'Full time' : `${done} of ${S.games.length} games played`}
       ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}</p>
     ${timePanel()}
@@ -112,7 +147,8 @@ function render() {
         <div class="m-grid">${b.games.map(g => matchCard(g, 1)).join('')}</div>
       </section>`).join('')}
     <p class="muted small">Tap a game to pick its players and score it, using the scoring password set when this match was started.</p>
-    ${canDelete && t.status !== 'complete' ? '<p><button data-act="delete" class="link danger-link">Delete this match</button></p>' : ''}`;
+    <p class="fx-actions"><button data-act="edit" class="link">Edit match</button>
+    ${canDelete && t.status !== 'complete' ? '<button data-act="delete" class="link danger-link">Delete this match</button>' : ''}</p>`;
 }
 
 async function loadInner() {
@@ -133,6 +169,8 @@ async function loadInner() {
 
 app.addEventListener('click', async e => {
   const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'edit') { S.edit = true; render(); return; }
+  if (act === 'edit-cancel') { S.edit = false; render(); return; }
   if (act === 'time-edit') { S.timeEdit = true; render(); return; }
   if (act === 'time-cancel') { S.timeEdit = false; render(); return; }
   if (act === 'time-save') {
@@ -183,7 +221,42 @@ app.addEventListener('click', async e => {
   }
 });
 
-const reload = debounce(load, 300);
+bindVenue(app);
+app.addEventListener('submit', async e => {
+  if (!e.target.matches('[data-form="edit"]')) return;
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const comp = S.t.kind === 'uduk' ? (f.get('competition') ?? S.t.competition) : null;
+  if (comp !== S.t.competition && !confirm('Changing the competition sets up the games again and clears any players picked. Carry on?')) return;
+  const btn = e.target.querySelector('button.primary');
+  btn.disabled = true;
+  try {
+    await ensureSignedIn();
+    const pw = String(f.get('pw') ?? '').trim();
+    const spw = String(f.get('spw') ?? '').trim();
+    const when = f.get('when');
+    const { error } = await sb.rpc('update_fixture', {
+      p_tournament: id, p_password: pw, p_home: String(f.get('home')).trim(), p_away: String(f.get('away')).trim(),
+      p_competition: comp, p_venue: readVenue(e.target), p_scoring_password: spw || null,
+      // Only sent when changed, so an unstarted match from earlier today can still be edited.
+      p_starts_at: when && when !== localValue(S.t.starts_at) ? new Date(String(when)).toISOString() : null,
+    });
+    if (error) throw error;
+    try {
+      if (pw) localStorage.setItem(HUB_PW_KEY, pw);
+      if (spw) localStorage.setItem(PW_KEY(), spw);
+    } catch { /* private mode */ }
+    S.edit = false;
+    toast('Match updated');
+    await load();
+  } catch (err) {
+    toast(err.message);
+    btn.disabled = false;
+  }
+});
+
+// Don't redraw over the edit form while someone's filling it in.
+const reload = debounce(() => { if (!S.edit) load(); }, 300);
 sb.channel(`fixture-${id}`)
   .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `tournament_id=eq.${id}` }, reload)
   .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments', filter: `id=eq.${id}` }, reload)
@@ -198,14 +271,14 @@ watchCh.on('presence', { event: 'sync' }, () => {
     if (meta) counts.set(meta.match, (counts.get(meta.match) ?? 0) + 1);
   }
   setWatching(counts);
-  if (S.t) render();
+  if (S.t && !S.edit) render();
 }).subscribe();
 
 load();
 (async () => {
   S.uid = await currentUserId().catch(() => null);
   S.admin = !!(await sb.rpc('my_admin_role')).data;
-  if (S.t) render();
+  if (S.t && !S.edit) render();
 })();
 
 async function load() {

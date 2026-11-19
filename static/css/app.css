@@ -959,3 +959,5 @@ a.back-link.plain { display: inline-block; margin-bottom: .6rem; font-size: .9re
 .hub-when .seg label { flex: 1; text-align: center; }
 .odds-star { color: var(--accent); margin-left: .1rem; }
 .odds-note { margin-top: .5rem; font-size: .8rem; }
+.fx-actions { display: flex; gap: 1.2rem; flex-wrap: wrap; }
+.fx-edit { margin-top: 1rem; }

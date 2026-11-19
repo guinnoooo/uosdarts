@@ -1,4 +1,4 @@
-import { sb, esc, fmtDate, scoreText, winnerSide, HUBS } from './db.js';
+import { sb, esc, fmtDate, scoreText, winnerSide, HUBS, VENUES } from './db.js';
 
 // Everything on the site is stored as a "tournament": real tournaments,
 // friendlies (one match), and UDUK / Franny team matches (one game per row).
@@ -49,7 +49,7 @@ export function fixtureCard(t, sc) {
     : t.status === 'live' ? `${played} of ${games} games played` : 'Not started';
   return `<a class="t-card fixture-card ${t.status}" href="/fixture/?id=${t.id}">
     <div class="t-name">${esc(t.home_team)} ${t.status === 'upcoming' ? '<span class="muted">v</span>' : `<b class="fx-score">${home}–${away}</b>`} ${esc(t.away_team)}</div>
-    <div class="t-meta">${fmtDate(t.starts_at ?? t.created_at)} · ${what}</div>
+    <div class="t-meta">${fmtDate(t.starts_at ?? t.created_at)} · ${what}${t.venue ? ` · ${esc(t.venue)}` : ''}</div>
     <div class="${t.status === 'complete' ? 't-champ' : 't-meta'}">${state}</div>
     ${liveBadge(t)}
   </a>`;
@@ -75,6 +75,38 @@ export function anyCard(t, extra) {
   if (k === 'friendly') return friendlyCard(t, extra.match.get(t.id));
   if (k === 'uduk' || k === 'franny') return fixtureCard(t, extra.score.get(t.id));
   return tournamentCard(t);
+}
+
+// A venue box for team matches: the usual venues, or "Somewhere else" to
+// type one in. bindVenue shows and hides the text box; readVenue gets the value.
+export function venuePicker(value) {
+  const v = value ?? '';
+  const other = v !== '' && !VENUES.includes(v);
+  return `<label>Venue
+    <select data-venue>
+      <option value="" ${v === '' ? 'selected' : ''}>Not set</option>
+      ${VENUES.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('')}
+      <option value="other" ${other ? 'selected' : ''}>Somewhere else…</option>
+    </select>
+    <input data-venue-other maxlength="60" placeholder="Venue name" value="${other ? esc(v) : ''}" ${other ? '' : 'hidden'}>
+  </label>`;
+}
+
+export function bindVenue(root) {
+  root.addEventListener('change', e => {
+    const sel = e.target.closest('[data-venue]');
+    if (!sel) return;
+    const box = sel.parentElement.querySelector('[data-venue-other]');
+    box.hidden = sel.value !== 'other';
+    if (!box.hidden) box.focus();
+  });
+}
+
+export function readVenue(root) {
+  const sel = root.querySelector('[data-venue]');
+  if (!sel) return null;
+  if (sel.value === 'other') return root.querySelector('[data-venue-other]').value.trim() || null;
+  return sel.value || null;
 }
 
 // Every PC has a Europa waiting behind it. An unstarted one only shows up on
