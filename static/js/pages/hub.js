@@ -36,7 +36,11 @@ function startForm(enabled) {
       <label><input type="radio" name="competition" value="cup" ${S.form.competition === 'cup' ? 'checked' : ''}> Cup</label>
     </div>` : ''}
     <p class="muted small hub-format">${formatLine()}</p>
-    <label>Password <input name="pw" type="password" autocomplete="off" value="${esc(savedPw())}" required></label>
+    <label>Team match password <input name="pw" type="password" autocomplete="off" value="${esc(savedPw())}" required></label>
+    <label>Scoring password for this match
+      <input name="spw" type="text" autocomplete="off" minlength="4" maxlength="40" required placeholder="At least 4 characters">
+    </label>
+    <p class="muted small">Everyone scoring or picking players for this match's games uses the scoring password, so you can share it with the other team.</p>
     <button class="primary big">Start match</button>
   </form>`;
 }
@@ -99,12 +103,17 @@ app.addEventListener('submit', async e => {
   try {
     await ensureSignedIn();
     const pw = String(f.get('pw')).trim();
+    const spw = String(f.get('spw')).trim();
+    if (spw.length < 4) { toast('The scoring password needs at least 4 characters'); btn.disabled = false; return; }
     const { data: id, error } = await sb.rpc('create_fixture', {
       p_kind: KIND, p_password: pw, p_home: home, p_away: away,
       p_competition: KIND === 'uduk' ? S.form.competition : null,
+      p_scoring_password: spw,
     });
     if (error) throw error;
     rememberPw(pw);
+    // Whoever set it up isn't asked for the match's password again on this phone.
+    try { localStorage.setItem(`uosdarts:pw:${id}`, spw); } catch { /* private mode */ }
     location.href = `/fixture/?id=${id}`;
   } catch (err) {
     toast(err.message);
