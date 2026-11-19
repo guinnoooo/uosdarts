@@ -60,6 +60,9 @@ export const HUBS = {
   franny: { name: 'Franny', blurb: 'Thursday Franchise League', teams: ["Accy D's", 'Boobs', 'Slingers'] },
 };
 
+// Where team matches are usually played. Anywhere else can be typed in.
+export const VENUES = ['Crookes', 'Beehive', 'Springy'];
+
 // "Best of 3 · 701" for a game in a team match.
 export const gameFormat = m => `Bo${m.legs_to_win * 2 - 1} · ${m.start_score}`;
 

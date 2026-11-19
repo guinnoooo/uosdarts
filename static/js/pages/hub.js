@@ -1,5 +1,5 @@
 import { sb, showLoadError, esc, toast, debounce, ensureSignedIn, HUBS } from '../db.js';
-import { fixtureCard, cardData, section } from '../events.js';
+import { fixtureCard, cardData, section, venuePicker, bindVenue, readVenue } from '../events.js';
 
 // The UDUK hub (Wednesday uni matches) and the Franny hub (Thursday
 // Franchise League) share this page; the layout says which one it is.
@@ -10,7 +10,7 @@ const PW_KEY = 'uosdarts:hubpw';
 const savedPw = () => { try { return localStorage.getItem(PW_KEY) ?? ''; } catch { return ''; } };
 const rememberPw = v => { try { localStorage.setItem(PW_KEY, v); } catch { /* private mode */ } };
 
-const S = { form: { home: HUB.teams[0], homeOther: '', away: '', awayOther: '', competition: 'league', bull: '', later: false, when: '' } };
+const S = { form: { home: HUB.teams[0], homeOther: '', away: '', awayOther: '', competition: 'league', bull: '', later: false, when: '', venue: '' } };
 
 // A team box: our own teams to pick from, or "Another team" to type one in.
 function teamPicker(side, label) {
@@ -44,6 +44,7 @@ function startForm(enabled) {
       </div>
       <p class="muted small">The winners throw first in the odd numbered games. If you haven't done it yet, you can enter it on the match page.</p>
     </fieldset>` : '<p class="muted small">The away team throws first in singles 1, 3 and 5 and doubles 2.</p>'}
+    ${venuePicker(S.form.venue)}
     <div class="hub-when">
       <div class="seg" role="radiogroup" aria-label="When">
         <label><input type="radio" name="later" value="" ${S.form.later ? '' : 'checked'}> Start now</label>
@@ -92,8 +93,10 @@ async function loadInner() {
 }
 
 // Keep the form's choices when the page redraws.
+bindVenue(app);
 app.addEventListener('change', e => {
   const t = e.target;
+  if (t.matches('[data-venue]')) S.form.venue = t.value === 'other' ? (app.querySelector('[data-venue-other]').value || '') : t.value;
   if (t.dataset.team) {
     S.form[t.dataset.team] = t.value;
     const other = app.querySelector(`[data-other="${t.dataset.team}"]`);
@@ -116,6 +119,7 @@ app.addEventListener('change', e => {
   }
 });
 app.addEventListener('input', e => {
+  if (e.target.matches('[data-venue-other]')) S.form.venue = e.target.value;
   if (e.target.dataset.other) S.form[`${e.target.dataset.other}Other`] = e.target.value;
 });
 
@@ -138,6 +142,7 @@ app.addEventListener('submit', async e => {
       p_kind: KIND, p_password: pw, p_home: home, p_away: away,
       p_competition: KIND === 'uduk' ? S.form.competition : null,
       p_scoring_password: spw,
+      p_venue: readVenue(e.target),
       ...(when ? { p_starts_at: new Date(when).toISOString() } : {}),
     });
     if (error) throw error;
