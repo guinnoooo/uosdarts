@@ -6,7 +6,7 @@ import { matchCard, setWatching } from '../ui.js';
 // are picked and it's scored.
 const app = document.getElementById('app');
 const id = qs('id');
-const S = { t: null, games: [], admin: false, uid: null, bullEdit: false };
+const S = { t: null, games: [], admin: false, uid: null, bullEdit: false, timeEdit: false };
 const PW_KEY = () => `uosdarts:pw:${id}`;
 const savedPw = () => { try { return localStorage.getItem(PW_KEY()) ?? ''; } catch { return ''; } };
 
@@ -62,6 +62,33 @@ function blocks() {
   return out;
 }
 
+// For a datetime-local box: the time in the viewer's own timezone.
+const localValue = d => {
+  const x = new Date(d);
+  return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
+// A match that hasn't started can be moved by whoever set it up, an admin,
+// or anyone with its scoring password.
+function timePanel() {
+  const t = S.t;
+  if (t.status !== 'upcoming') return '';
+  if (!S.timeEdit) {
+    const future = new Date(t.starts_at) > new Date();
+    return `<p class="muted small center">${future ? `Starts ${esc(fmtDate(t.starts_at))}. ` : ''}<button data-act="time-edit" class="link">${future ? 'Change time' : 'Schedule for later'}</button></p>`;
+  }
+  const mine = S.admin || (S.uid && t.created_by === S.uid) || savedPw();
+  return `<div class="panel narrow center fx-time">
+      <h3>When does it start?</h3>
+      <input id="fx-when" type="datetime-local" value="${localValue(t.starts_at)}">
+      ${mine ? '' : '<input id="time-pw" type="password" autocomplete="off" placeholder="Scoring password for this match">'}
+      <div class="modal-btns">
+        <button data-act="time-save" class="primary">Save</button>
+        <button data-act="time-cancel">Cancel</button>
+      </div>
+    </div>`;
+}
+
 function render() {
   const t = S.t, hub = HUBS[t.kind];
   const { home, away } = score();
@@ -74,9 +101,10 @@ function render() {
       <div class="fx-big">${home}<span>–</span>${away}</div>
       <div class="fx-team away">${esc(t.away_team)}</div>
     </div>
-    <p class="muted center small">${hub.name}${t.competition ? ` ${t.competition}` : ''} · ${fmtDate(t.created_at)} ·
+    <p class="muted center small">${hub.name}${t.competition ? ` ${t.competition}` : ''} · ${fmtDate(t.starts_at ?? t.created_at)} ·
       ${t.status === 'complete' ? 'Full time' : `${done} of ${S.games.length} games played`}
       ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}</p>
+    ${timePanel()}
     ${throwPanel()}
     ${blocks().map(b => `<section class="fx-block">
         <h2>${TYPE[b.g.game_type] ?? 'Games'} <span class="muted small">best of ${b.g.legs_to_win * 2 - 1} · ${b.g.start_score}</span></h2>
@@ -105,6 +133,27 @@ async function loadInner() {
 
 app.addEventListener('click', async e => {
   const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'time-edit') { S.timeEdit = true; render(); return; }
+  if (act === 'time-cancel') { S.timeEdit = false; render(); return; }
+  if (act === 'time-save') {
+    const v = app.querySelector('#fx-when')?.value;
+    if (!v) { toast('Pick a start time'); return; }
+    const typed = app.querySelector('#time-pw')?.value.trim();
+    const btn = e.target.closest('button');
+    btn.disabled = true;
+    try {
+      await ensureSignedIn();
+      const { error } = await sb.rpc('set_fixture_time', { p_tournament: id, p_password: typed || savedPw() || null, p_starts_at: new Date(v).toISOString() });
+      if (error) throw error;
+      if (typed) { try { localStorage.setItem(PW_KEY(), typed); } catch { /* private mode */ } }
+      S.timeEdit = false;
+      await load();
+    } catch (err) {
+      toast(err.message);
+      btn.disabled = false;
+    }
+    return;
+  }
   if (act === 'bull-edit') { S.bullEdit = true; render(); return; }
   if (act === 'bull-cancel') { S.bullEdit = false; render(); return; }
   const bull = e.target.closest('[data-bull]');

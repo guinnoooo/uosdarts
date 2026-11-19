@@ -49,7 +49,7 @@ export function fixtureCard(t, sc) {
     : t.status === 'live' ? `${played} of ${games} games played` : 'Not started';
   return `<a class="t-card fixture-card ${t.status}" href="/fixture/?id=${t.id}">
     <div class="t-name">${esc(t.home_team)} <b class="fx-score">${home}–${away}</b> ${esc(t.away_team)}</div>
-    <div class="t-meta">${fmtDate(t.created_at)} · ${what}</div>
+    <div class="t-meta">${fmtDate(t.starts_at ?? t.created_at)} · ${what}</div>
     <div class="${t.status === 'complete' ? 't-champ' : 't-meta'}">${state}</div>
     ${liveBadge(t)}
   </a>`;
