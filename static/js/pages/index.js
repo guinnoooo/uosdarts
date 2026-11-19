@@ -1,21 +1,11 @@
-import { sb, showLoadError, esc, fmtDate, debounce, scoreText, winnerSide } from '../db.js';
+import { sb, showLoadError, esc, debounce, HUBS } from '../db.js';
+import { kindOf, tournamentCard, anyCard, cardData, section } from '../events.js';
 
+// The Match Hub: what's on now, what's coming up, ways in to the UDUK and
+// Franny hubs and friendlies, and the latest results.
 const app = document.getElementById('app');
 
-const FORMAT = {
-  knockout: 'Knockout',
-  groups: 'Round robin',
-  groups_knockout: 'Groups + knockout',
-};
-
-function card(t) {
-  return `<a class="t-card ${t.status}" href="/tournament/?id=${t.id}">
-    <div class="t-name">${esc(t.name)}</div>
-    <div class="t-meta">${fmtDate(t.starts_at)} · ${FORMAT[t.format]} · ${t.start_score}</div>
-    ${t.champion ? `<div class="t-champ">🏆 ${esc(t.champion.name)}</div>` : ''}
-    ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}
-  </a>`;
-}
+const SELECT = '*, champion:players!tournaments_champion_id_fkey(id,name)';
 
 // Every PC has a Europa waiting behind it. An unstarted one only shows up on
 // the night (its PC is live, or finished within the last day), otherwise the
@@ -31,72 +21,74 @@ function europaVisible(all) {
   };
 }
 
-// A friendly is a one-match tournament, so its card links straight to the match.
-function friendlyCard(t, m) {
-  const score = m.status === 'pending' ? 'Not started' : scoreText(m);
-  const winner = t.status === 'complete' ? (winnerSide({ ...m, status: 'complete' }) === 1 ? m.p1_name : m.p2_name) : null;
-  const length = m.sets_to_win ? `first to ${m.sets_to_win} sets` : `first to ${t.knockout_legs_to_win}`;
-  return `<a class="t-card ${t.status}" href="/match/?id=${m.id}">
-    <div class="t-name">${esc(m.p1_name)} v ${esc(m.p2_name)}</div>
-    <div class="t-meta">Friendly · ${score} · ${length} · ${t.start_score}</div>
-    ${winner ? `<div class="t-champ">🏆 ${esc(winner)}</div>` : ''}
-    ${t.status === 'live' ? '<span class="badge live">Live</span>' : ''}
-  </a>`;
-}
-
-function section(title, cards, empty, id = '') {
-  return `<section${id ? ` id="${id}"` : ''}><h2>${title}</h2>
-    ${cards.length ? `<div class="t-grid">${cards.join('')}</div>` : `<p class="muted">${empty}</p>`}
-  </section>`;
-}
+const hoursAgo = t => (Date.now() - new Date(t.created_at).getTime()) / 3600000;
 
 async function loadInner() {
-  const [{ data, error }, enabledRes] = await Promise.all([
-    sb.from('tournaments').select('*, champion:players!tournaments_champion_id_fkey(id,name)')
+  const [open, done, friendlyOn, hubsOn] = await Promise.all([
+    sb.from('tournaments').select(SELECT).in('status', ['upcoming', 'live']).is('deleted_at', null)
       .order('starts_at', { ascending: true, nullsFirst: false }),
+    // Plenty to find the latest three of each kind.
+    sb.from('tournaments').select(SELECT).eq('status', 'complete').is('deleted_at', null)
+      .order('starts_at', { ascending: false, nullsFirst: false }).limit(60),
     sb.rpc('friendlies_enabled'),
+    sb.rpc('hub_enabled', { p_kind: 'uduk' }),
   ]);
-  if (error) {
-    app.innerHTML = `<p class="error">${esc(error.message)}</p>`;
-    return;
+  if (open.error) throw open.error;
+  if (done.error) throw done.error;
+  const all = [...open.data, ...done.data];
+
+  // Tournaments.
+  const tours = open.data.filter(t => kindOf(t) === 'tournament').filter(europaVisible(all));
+  const liveTours = tours.filter(t => t.status === 'live');
+  const upcoming = tours.filter(t => t.status === 'upcoming');
+
+  // Everything else that's on: being played, or set up in the last 12 hours.
+  const onNow = open.data.filter(t => kindOf(t) !== 'tournament'
+    && (t.status === 'live' || hoursAgo(t) < 12))
+    .sort((a, b) => (a.status === 'live' ? 0 : 1) - (b.status === 'live' ? 0 : 1)
+      || new Date(b.created_at) - new Date(a.created_at));
+
+  // The latest three results of each kind.
+  const recent = {};
+  for (const t of done.data) {
+    const k = kindOf(t);
+    (recent[k] ??= []).length < 3 && recent[k].push(t);
   }
-  const enabled = !!enabledRes.data;
+  const extra = await cardData([...onNow, ...Object.values(recent).flat()]);
 
-  const list = data.filter(t => !t.is_friendly).filter(europaVisible(data));
-  const live = list.filter(t => t.status === 'live');
-  const upcoming = list.filter(t => t.status === 'upcoming');
-  const done = list.filter(t => t.status === 'complete');
+  const onGroups = ['uduk', 'franny', 'friendly']
+    .map(k => [k, onNow.filter(t => kindOf(t) === k)])
+    .filter(([, list]) => list.length);
+  const groupTitle = { uduk: 'UDUK', franny: 'Franny', friendly: 'Friendlies' };
 
-  // Friendlies: anything being played or set up in the last 12 hours shows
-  // as live; anything finished in the last day goes in with the results.
-  const hours = t => (Date.now() - new Date(t.created_at).getTime()) / 3600000;
-  const fr = data.filter(t => t.is_friendly && (t.status === 'live'
-    || (t.status === 'upcoming' && hours(t) < 12)
-    || (t.status === 'complete' && hours(t) < 24)));
-  let fm = [];
-  if (fr.length) {
-    const r = await sb.from('matches').select('*')
-      .in('tournament_id', fr.map(t => t.id));
-    fm = r.data ?? [];
-  }
-  const withMatch = t => ({ t, m: fm.find(x => x.tournament_id === t.id) });
-  const liveFr = fr.filter(t => t.status !== 'complete').map(withMatch).filter(x => x.m)
-    .sort((a, b) => (a.t.status === 'live' ? 0 : 1) - (b.t.status === 'live' ? 0 : 1)
-      || new Date(b.t.created_at) - new Date(a.t.created_at));
-
-  // Results: finished tournaments and today's finished friendlies, newest first.
-  const results = done.map(t => ({ when: new Date(t.starts_at ?? t.created_at), html: card(t) }))
-    .concat(fr.filter(t => t.status === 'complete').map(withMatch).filter(x => x.m)
-      .map(({ t, m }) => ({ when: new Date(t.created_at), html: friendlyCard(t, m) })))
-    .sort((a, b) => b.when - a.when).slice(0, 12).map(x => x.html);
+  const resultGroups = [['tournament', 'Tournaments'], ['uduk', 'UDUK'], ['franny', 'Franny'], ['friendly', 'Friendlies']]
+    .filter(([k]) => recent[k]?.length);
 
   app.innerHTML =
-    section('Live tournaments', live.map(card), 'No tournaments live right now.') +
-    section('Live friendlies', liveFr.map(({ t, m }) => friendlyCard(t, m)), 'No friendlies on at the moment.', 'friendlies') +
-    (enabled ? `<section class="start-friendly"><h2>Start a friendly</h2>
-      <a class="button-link" href="/friendly/">Start a friendly</a></section>` : '') +
-    section('Upcoming tournaments', upcoming.map(card), 'No tournaments scheduled yet.') +
-    section('Recent results', results, 'No results yet.');
+    section('Live tournaments', liveTours.map(tournamentCard), 'No tournaments live right now.') +
+    `<section id="live-matches"><h2>Live matches</h2>
+      ${onGroups.length ? onGroups.map(([k, list]) => `<div class="hub-group" id="${k === 'friendly' ? 'friendlies' : k}">
+          <h3>${groupTitle[k]}</h3>
+          <div class="t-grid">${list.map(t => anyCard(t, extra)).join('')}</div>
+        </div>`).join('')
+        : '<p class="muted">No UDUK, Franny or friendly matches on at the moment.</p>'}
+    </section>` +
+    section('Upcoming tournaments', upcoming.map(tournamentCard), 'No tournaments scheduled yet.') +
+    `<section class="hub-links"><h2>Hubs</h2>
+      <div class="hub-buttons">
+        <a class="hub-button" href="/uduk/"><b>UDUK</b><span>${esc(HUBS.uduk.blurb)}</span></a>
+        <a class="hub-button" href="/franny/"><b>Franny</b><span>${esc(HUBS.franny.blurb)}</span></a>
+        ${friendlyOn.data ? '<a class="hub-button" href="/friendly/"><b>Start a friendly</b><span>A one-off 1v1</span></a>' : ''}
+      </div>
+      ${hubsOn.data === false ? '<p class="muted small">Starting UDUK and Franny matches is switched off at the moment.</p>' : ''}
+    </section>` +
+    `<section class="recent-results"><h2>Recent results</h2>
+      ${resultGroups.length ? resultGroups.map(([k, title]) => `<div class="hub-group">
+          <h3>${title}</h3>
+          <div class="t-grid">${recent[k].map(t => anyCard(t, extra)).join('')}</div>
+        </div>`).join('') : '<p class="muted">No results yet.</p>'}
+      <p><a class="button-link" href="/archive/">Show more results</a></p>
+    </section>`;
 }
 
 load();

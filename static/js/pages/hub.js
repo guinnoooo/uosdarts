@@ -1,0 +1,125 @@
+import { sb, showLoadError, esc, toast, debounce, ensureSignedIn, HUBS } from '../db.js';
+import { fixtureCard, cardData, section } from '../events.js';
+
+// The UDUK hub (Wednesday uni matches) and the Franny hub (Thursday
+// Franchise League) share this page; the layout says which one it is.
+const app = document.getElementById('app');
+const KIND = app.dataset.kind;
+const HUB = HUBS[KIND];
+const PW_KEY = 'uosdarts:hubpw';
+const savedPw = () => { try { return localStorage.getItem(PW_KEY) ?? ''; } catch { return ''; } };
+const rememberPw = v => { try { localStorage.setItem(PW_KEY, v); } catch { /* private mode */ } };
+
+const S = { form: { home: HUB.teams[0], homeOther: '', away: '', awayOther: '', competition: 'league' } };
+
+// A team box: our own teams to pick from, or "Another team" to type one in.
+function teamPicker(side, label) {
+  const f = S.form;
+  const v = f[side];
+  return `<label>${label}
+    <select data-team="${side}">
+      ${HUB.teams.map(t => `<option ${v === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}
+      <option value="" ${HUB.teams.includes(v) ? '' : 'selected'}>Another team…</option>
+    </select>
+    <input data-other="${side}" maxlength="40" placeholder="Team name" value="${esc(f[`${side}Other`])}"
+      ${HUB.teams.includes(v) ? 'hidden' : ''}>
+  </label>`;
+}
+
+function startForm(enabled) {
+  if (!enabled) return '<p class="muted">Starting matches here is switched off at the moment.</p>';
+  return `<form class="panel narrow hub-form" data-form="start">
+    <h2>Start a match</h2>
+    <div class="row hub-teams">${teamPicker('home', 'Home')}${teamPicker('away', 'Away')}</div>
+    ${KIND === 'uduk' ? `<div class="seg" role="radiogroup" aria-label="Competition">
+      <label><input type="radio" name="competition" value="league" ${S.form.competition === 'league' ? 'checked' : ''}> League</label>
+      <label><input type="radio" name="competition" value="cup" ${S.form.competition === 'cup' ? 'checked' : ''}> Cup</label>
+    </div>` : ''}
+    <p class="muted small hub-format">${formatLine()}</p>
+    <label>Password <input name="pw" type="password" autocomplete="off" value="${esc(savedPw())}" required></label>
+    <button class="primary big">Start match</button>
+  </form>`;
+}
+
+function formatLine() {
+  if (KIND === 'franny') return '5 singles (best of 5, 501), then 2 doubles (best of 3, 701).';
+  return S.form.competition === 'cup'
+    ? '9 singles (best of 5, 501), 4 doubles (best of 3, 701), then 9 more singles (best of 5, 501).'
+    : '2 trebles (best of 3, 701), 3 doubles (best of 3, 701), then 6 singles (best of 3, 501).';
+}
+
+async function loadInner() {
+  const [list, on] = await Promise.all([
+    sb.from('tournaments').select('*').eq('kind', KIND).is('deleted_at', null)
+      .order('created_at', { ascending: false }).limit(40),
+    sb.rpc('hub_enabled', { p_kind: KIND }),
+  ]);
+  if (list.error) throw list.error;
+  const all = list.data;
+  const live = all.filter(t => t.status === 'live');
+  const waiting = all.filter(t => t.status === 'upcoming');
+  const done = all.filter(t => t.status === 'complete').slice(0, 6);
+  const extra = await cardData([...live, ...waiting, ...done]);
+  const cards = l => l.map(t => fixtureCard(t, extra.score.get(t.id)));
+
+  app.innerHTML = `
+    <div class="page-head"><h1>${HUB.name}</h1><p class="muted">${esc(HUB.blurb)}</p></div>
+    ${section('Live', cards(live), 'Nothing being played right now.')}
+    ${waiting.length ? section('Not started yet', cards(waiting), '') : ''}
+    ${startForm(!!on.data)}
+    ${section('Recent results', cards(done), 'No results yet.')}
+    <p><a class="button-link" href="/archive/?type=${KIND}">All ${HUB.name} results</a></p>`;
+}
+
+// Keep the form's choices when the page redraws.
+app.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.team) {
+    S.form[t.dataset.team] = t.value;
+    const other = app.querySelector(`[data-other="${t.dataset.team}"]`);
+    other.hidden = t.value !== '';
+    if (!other.hidden) other.focus();
+  } else if (t.name === 'competition') {
+    S.form.competition = t.value;
+    app.querySelector('.hub-format').textContent = formatLine();
+  }
+});
+app.addEventListener('input', e => {
+  if (e.target.dataset.other) S.form[`${e.target.dataset.other}Other`] = e.target.value;
+});
+
+app.addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const team = side => (S.form[side] || S.form[`${side}Other`]).trim();
+  const home = team('home'), away = team('away');
+  if (!home || !away) { toast('Pick or type both teams'); return; }
+  const btn = e.target.querySelector('button');
+  btn.disabled = true;
+  try {
+    await ensureSignedIn();
+    const pw = String(f.get('pw')).trim();
+    const { data: id, error } = await sb.rpc('create_fixture', {
+      p_kind: KIND, p_password: pw, p_home: home, p_away: away,
+      p_competition: KIND === 'uduk' ? S.form.competition : null,
+    });
+    if (error) throw error;
+    rememberPw(pw);
+    location.href = `/fixture/?id=${id}`;
+  } catch (err) {
+    toast(err.message);
+    btn.disabled = false;
+  }
+});
+
+const reload = debounce(load, 400);
+sb.channel(`hub-${KIND}`)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments', filter: `kind=eq.${KIND}` }, reload)
+  .subscribe();
+
+load();
+async function load() {
+  // Don't redraw over a half-filled form.
+  if (app.contains(document.activeElement) && document.activeElement.matches('input, select')) { reload(); return; }
+  try { await loadInner(); } catch (e) { showLoadError(app, e); }
+}

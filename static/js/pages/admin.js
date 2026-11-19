@@ -244,7 +244,7 @@ function newTournamentSection() {
 }
 
 function tournamentsSection() {
-  const alive = S.tournaments.filter(t => !t.deleted_at && !t.is_friendly);
+  const alive = S.tournaments.filter(t => !t.deleted_at && !t.is_friendly && !t.kind);
   const pcs = alive.filter(t => t.is_pc);
   const byId = new Map(alive.map(t => [t.id, t]));
   // Europas sit under their PC. One only joins the general lists once its PC
@@ -290,18 +290,19 @@ function tournamentsSection() {
     </section>`;
 }
 
-// Friendlies from the last week, so a junk or abandoned one can be removed.
+// Friendlies and UDUK / Franny matches from the last week, so a junk or
+// abandoned one can be removed.
 function friendliesSection() {
   const week = Date.now() - 7 * 86400000;
-  const list = S.tournaments.filter(t => t.is_friendly && !t.deleted_at && new Date(t.created_at) > week);
+  const list = S.tournaments.filter(t => (t.is_friendly || t.kind) && !t.deleted_at && new Date(t.created_at) > week);
   if (!list.length) return '';
   return `<details class="archive-box friendlies-box">
-    <summary>Friendlies this week <span class="count">${list.length}</span></summary>
+    <summary>Friendlies and team matches this week <span class="count">${list.length}</span></summary>
     <div class="archive-body">${list.map(t => `<div class="t-row">
       <span class="t-row-main"><b>${esc(t.name.replace(/^Friendly: /, ''))}</b>
-        <span class="muted small">${fmtDate(t.created_at)} · ${t.status}</span></span>
-      <a href="/tournament/?id=${t.id}" class="muted small">View</a>
-      <button data-remove="${t.id}" data-name="${esc(t.name)}">Delete</button>
+        <span class="muted small">${t.kind ? `${t.kind === 'uduk' ? 'UDUK' : 'Franny'} · ` : ''}${fmtDate(t.created_at)} · ${t.status}</span></span>
+      <a href="/${t.kind ? 'fixture' : 'tournament'}/?id=${t.id}" class="muted small">View</a>
+      <button data-remove="${t.id}" data-name="${esc(t.name)}" data-notpc="1">Delete</button>
     </div>`).join('')}</div>
   </details>`;
 }
@@ -967,7 +968,7 @@ app.addEventListener('click', async e => {
     return;
   }
   if (el.dataset.remove) {
-    const pc = !el.dataset.name.startsWith('Friendly: ');
+    const pc = !el.dataset.notpc;
     if (!confirm(`Remove ${el.dataset.name}?${pc ? ' Fixtures after it move up a number.' : ''} `
       + 'You can restore it from Recently deleted for 24 hours.')) return;
     await run(async () => {
