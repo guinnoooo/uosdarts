@@ -26,7 +26,7 @@ async function init() {
     <label>Player 1 <input name="p1" list="player-names" maxlength="40" autocomplete="off" required></label>
     <label>Player 2 <input name="p2" list="player-names" maxlength="40" autocomplete="off" required></label>
     <datalist id="player-names">${names}</datalist>
-    <p class="muted small">Pick names from the order of merit list to get GuinnessBet odds. Friendlies never count towards the order of merit or anyone's stats.</p>
+    <p class="muted small">Pick names from the list for GuinnessBet odds. Friendlies don't count towards any stats.</p>
     <div class="seg friendly-format" role="radiogroup" aria-label="Format">
       <label><input type="radio" name="format" value="legs" checked> Legs</label>
       <label><input type="radio" name="format" value="sets"> Sets</label>

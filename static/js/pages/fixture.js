@@ -28,7 +28,6 @@ function throwPanel() {
   }
   return `<div class="panel narrow center fx-bull">
       <h3>Who won the bull off?</h3>
-      <p class="muted small">The winners throw first in the odd numbered games.</p>
       ${savedPw() ? '' : '<input id="bull-pw" type="password" autocomplete="off" placeholder="Scoring password for this match">'}
       <div class="modal-btns">
         <button data-bull="1" class="primary">${esc(t.home_team)}</button>
@@ -141,7 +140,7 @@ function render() {
         ${b.g.game_type === 'decider' ? '<p class="muted small">The match finished level. One leg of 1001, with every player in both squads throwing in turn.</p>' : ''}
         <div class="m-grid">${b.games.map(g => matchCard(g, 1)).join('')}</div>
       </section>`).join('')}
-    <p class="muted small">Tap a game to pick its players and score it, using the scoring password set when this match was started.</p>
+    <p class="muted small">Tap a game to pick players and score it.</p>
     <p class="fx-actions"><button data-act="edit" class="link">Edit match</button>
     ${canDelete && t.status !== 'complete' ? '<button data-act="delete" class="link danger-link">Delete this match</button>' : ''}</p>`;
 }

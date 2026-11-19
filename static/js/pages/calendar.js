@@ -25,7 +25,7 @@ async function loadInner() {
 
   app.innerHTML = `
     <a class="back-link plain" href="/">‹ Match Hub</a>
-    <div class="page-head"><h1>Calendar</h1><p class="muted">Tournaments and UDUK and Franny matches coming up.</p></div>
+    <div class="page-head"><h1>Calendar</h1></div>
     ${days.length ? days.map(d => `<section class="cal-day"><h2>${d.key}</h2>
         <div class="t-grid">${d.items.map(t => anyCard(t, extra)).join('')}</div>
       </section>`).join('') : '<p class="muted">Nothing scheduled yet.</p>'}`;
