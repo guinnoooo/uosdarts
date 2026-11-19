@@ -313,7 +313,6 @@ function keypad(d) {
       <button data-act="undo">Undo</button>
     </div>
     <button data-act="release" class="link">Stop scoring this match</button>
-    ${isFriendly() && mySeat() !== 2 ? '<button data-act="delete-friendly" class="link danger-link">Delete this friendly</button>' : ''}
   </div>`;
 }
 
@@ -348,16 +347,14 @@ function remoteZone(d) {
       return `<div class="panel center">
         <h3>Waiting for ${other(2)} to join</h3>
         <p class="muted small">Send them this page and the match password.</p>
-        <div class="modal-btns"><button data-act="share" class="primary">Share link</button></div>
-        <button data-act="delete-friendly" class="link danger-link">Delete this friendly</button></div>`;
+        <div class="modal-btns"><button data-act="share" class="primary">Share link</button></div></div>`;
     }
     if (seat === 2) return `<div class="panel center"><p>Waiting for ${other(1)} to start the match.</p>${leave}</div>`;
     return `<div class="panel center"><h3>Who throws first?</h3>
       <div class="modal-btns">
         <button data-first="1" class="primary">${other(1)}</button>
         <button data-first="2" class="primary">${other(2)}</button>
-      </div>
-      <button data-act="delete-friendly" class="link danger-link">Delete this friendly</button></div>`;
+      </div></div>`;
   }
   if (m.status === 'live') {
     if (myTurn(d)) return keypad(d);
@@ -366,7 +363,7 @@ function remoteZone(d) {
       <p>${gone ? `${other(3 - seat)} has left the match. They can rejoin with the password.` : `Waiting for ${other(d.turn ?? 3 - seat)} to throw…`}</p>
       <div class="modal-btns"><button data-act="undo">Undo my last visit</button></div>
       ${leave}
-      ${seat === 1 ? '<button data-act="delete-friendly" class="link danger-link">Delete this friendly</button>' : ''}</div>`;
+</div>`;
   }
   return null;
 }
@@ -829,7 +826,7 @@ function actionZone(d) {
         <button data-first="2" class="primary">${esc(nameOf(2))}</button>
       </div>
       <button data-act="release" class="link">Cancel, I'm not scoring</button>
-      ${isFriendly() ? '<button data-act="delete-friendly" class="link danger-link">Delete this friendly</button>' : ''}</div>`;
+</div>`;
   }
   if (isScorer() && m.status === 'live') return keypad(d);
   if (!m.scorer_id && ready) {
@@ -883,7 +880,11 @@ function render() {
     <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
     ${actionZone(d)}
     ${m.status === 'pending' ? previewBlock() : ''}`;
+  // Whoever set up a friendly can delete it until it's finished. It sits
+  // under the chat, out of the way of the scoring buttons.
+  const canDelete = isFriendly() && m.status !== 'complete' && (isRemote() ? mySeat() === 1 : isScorer());
   app.querySelector('#m-bottom').innerHTML = `
+    ${canDelete ? '<p class="center delete-friendly"><button data-act="delete-friendly" class="link danger-link">Delete this friendly</button></p>' : ''}
     ${scoring || m.status === 'complete' ? '' : legTable(d.leg)}
     ${scoring ? '' : statsTable()}
     ${m.status === 'complete' ? winChart() : ''}
