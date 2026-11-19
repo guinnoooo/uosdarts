@@ -1,5 +1,5 @@
 import {
-  sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, formatText, MATCH_SELECT,
+  sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, formatText, HUBS, MATCH_SELECT,
 } from '../db.js';
 import { mountChat } from '../chat.js';
 import { oomScores, matchChance, liveChance, pctPair } from '../winprob.js';
@@ -12,6 +12,8 @@ const S = {
   match: null, legs: [], visits: [], koRounds: 0, uid: null,
   entry: '', busy: false, pendingCheckout: null, pendingDoubles: null, pendingBull: false, askPw: false,
   shotTimer: null, preview: undefined, watchers: 0, watch: null, trackedAs: null,
+  // Picking players for a UDUK or Franny game.
+  editPlayers: false, pick: null, oomPlayers: null,
 };
 
 // ---------------------------------------------------------------- data
@@ -39,6 +41,10 @@ async function loadInner() {
   }
   // Before a match starts, spectators get both players' figures and their
   // head-to-head. Fetched once; it doesn't change while the match waits.
+  // UDUK / Franny games waiting for players: the OoM list to pick from.
+  if (S.match.tournament?.kind && S.match.status === 'pending' && !S.oomPlayers) {
+    S.oomPlayers = (await sb.from('players').select('id,name').order('name')).data ?? [];
+  }
   // Upcoming matches use it for the preview, finished ones for the win probability chart.
   if (S.match.status !== 'live' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
     const pv = await sb.rpc('match_preview', { p_match: id });
@@ -153,6 +159,7 @@ function derive() {
 
 const nameOf = n => (n === 1 ? S.match.p1?.name ?? S.match.p1_name : S.match.p2?.name ?? S.match.p2_name) ?? 'TBC';
 const isFriendly = () => !!S.match.tournament?.is_friendly;
+const hubKind = () => S.match.tournament?.kind ?? null;   // 'uduk' or 'franny' for a team match game
 const isScorer = () => !!S.match.scorer_id && S.match.scorer_id === S.uid;
 
 // ---------------------------------------------------------------- rendering
@@ -428,6 +435,22 @@ function chartOff(frame) {
   frame.querySelectorAll('.wc-guide, .wc-dot, .wc-tip').forEach(el => { el.hidden = true; });
 }
 
+// The player boxes keep what's typed even if the page redraws.
+app.addEventListener('input', e => {
+  const k = e.target.dataset.pick;
+  if (k && S.pick) { const [side, i] = k.split('-').map(Number); S.pick[side][i] = e.target.value; }
+});
+app.addEventListener('change', e => {
+  const k = e.target.dataset.pickadd;
+  if (k && S.pick) S.pick.add[k] = e.target.checked;
+});
+app.addEventListener('submit', e => {
+  const form = e.target.closest('[data-form="pick"]');
+  if (!form) return;
+  e.preventDefault();
+  savePlayers(form);
+});
+
 app.addEventListener('pointermove', e => {
   const frame = e.target.closest?.('.wc-frame');
   if (frame && (e.pointerType === 'mouse' || e.buttons)) chartAt(frame, e.clientX);
@@ -554,6 +577,94 @@ function track() {
   S.watch.track({ match: id, scorer: as === 'scorer' }).catch(() => { S.trackedAs = null; });
 }
 
+// ---------------------------------------------------------------- picking players (UDUK / Franny)
+
+const NEED = { singles: 1, doubles: 2, trebles: 3 };
+
+// Our own teams can pick from the order of merit list. In singles a picked
+// (or newly added) player is linked, so the game counts towards their stats;
+// in doubles and trebles the list just saves typing.
+function sideIsOurs(k) { return !!(k === 1 ? S.match.tournament?.home_ours : S.match.tournament?.away_ours); }
+
+function startPick() {
+  const m = S.match, need = NEED[m.game_type] ?? 1;
+  const current = k => {
+    const linked = k === 1 ? m.p1?.name : m.p2?.name;
+    const typed = k === 1 ? m.p1_name : m.p2_name;
+    const names = linked ? [linked] : typed ? typed.split(' & ') : [];
+    return Array.from({ length: need }, (_, i) => names[i] ?? '');
+  };
+  S.pick = { 1: current(1), 2: current(2), add: { 1: false, 2: false } };
+}
+
+function pickForm() {
+  const m = S.match, t = m.tournament, need = NEED[m.game_type] ?? 1;
+  if (!S.pick) startPick();
+  const side = k => {
+    const team = k === 1 ? t.home_team : t.away_team;
+    const ours = sideIsOurs(k);
+    return `<fieldset class="pick-side">
+      <legend>${esc(team)}${ours ? ' <span class="muted small">(OoM players listed)</span>' : ''}</legend>
+      ${S.pick[k].map((v, i) => `<input data-pick="${k}-${i}" maxlength="40" autocomplete="off"
+          ${ours ? 'list="oom-names"' : ''} placeholder="${need > 1 ? `Player ${i + 1}` : 'Player'}" value="${esc(v)}">`).join('')}
+      ${ours && need === 1 ? `<label class="check-row"><input type="checkbox" data-pickadd="${k}" ${S.pick.add[k] ? 'checked' : ''}>
+        Add to the OoM if they're new</label>` : ''}
+    </fieldset>`;
+  };
+  return `<form class="panel pick-form" data-form="pick">
+    <h3>Players for ${esc(m.game_label ?? 'this game')}</h3>
+    <div class="pick-sides">${side(1)}${side(2)}</div>
+    <datalist id="oom-names">${(S.oomPlayers ?? []).map(p => `<option value="${esc(p.name)}">`).join('')}</datalist>
+    <label>Password <input data-pickpw type="password" autocomplete="off" value="${esc(savedPw())}"></label>
+    <div class="modal-btns">
+      <button class="primary">Save players</button>
+      ${hasPlayers(m) ? '<button type="button" data-act="cancel-players">Cancel</button>' : ''}
+    </div>
+    <p class="muted small">Leave a side blank to fill it in later.</p>
+  </form>`;
+}
+
+async function savePlayers(form) {
+  const m = S.match, kind = hubKind();
+  const pw = form.querySelector('[data-pickpw]').value.trim();
+  if (!pw) { toast('Enter the password'); return; }
+  const btn = form.querySelector('button.primary');
+  btn.disabled = true;
+  try {
+    await ensureSignedIn();
+    const byName = new Map((S.oomPlayers ?? []).map(p => [p.name.toLowerCase(), p.id]));
+    const side = async k => {
+      const names = S.pick[k].map(v => v.trim());
+      if (names.every(v => !v)) return [];
+      if (names.some(v => !v)) throw new Error(`Fill in every player for ${k === 1 ? m.tournament.home_team : m.tournament.away_team}, or leave them all blank`);
+      // Singles for one of our teams: link to the OoM where we can.
+      if (names.length === 1 && sideIsOurs(k)) {
+        let pid = byName.get(names[0].toLowerCase());
+        if (!pid && S.pick.add[k]) {
+          const { data, error } = await sb.rpc('add_hub_player', { p_kind: kind, p_password: pw, p_name: names[0] });
+          if (error) throw error;
+          pid = data;
+        }
+        if (pid) return [{ id: pid }];
+      }
+      return names.map(name => ({ name }));
+    };
+    const { error } = await sb.rpc('set_game_players', {
+      p_match: id, p_password: pw, p_home: await side(1), p_away: await side(2),
+    });
+    if (error) throw error;
+    rememberPw(pw);
+    S.editPlayers = false;
+    S.pick = null;
+    S.oomPlayers = null;   // someone may have been added
+    await load();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function actionZone(d) {
   const m = S.match;
   const ready = hasPlayers(m);
@@ -565,6 +676,7 @@ function actionZone(d) {
     return `<div class="banner">${esc(nameOf(w))} wins ${hi}–${lo}${m.sets_to_win ? ' in sets' : ''}</div>
       ${isScorer() ? '<div class="center"><button data-act="undo">Undo last visit</button></div>' : ''}`;
   }
+  if (hubKind() && m.status === 'pending' && !m.scorer_id && (!ready || S.editPlayers)) return pickForm();
   if (isScorer() && m.status === 'pending') {
     return `<div class="panel center"><h3>Who won the bull?</h3>
       <div class="modal-btns">
@@ -579,7 +691,9 @@ function actionZone(d) {
     if (S.askPw) {
       return `<div class="panel center pw-panel">
         <h3>Scoring password</h3>
-        <p class="muted">${isFriendly() ? 'Friendlies use the friendly password.' : 'Ask whoever is running the tournament.'}</p>
+        <p class="muted">${isFriendly() ? 'Friendlies use the friendly password.'
+          : hubKind() ? 'UDUK and Franny games use the team match password.'
+          : 'Ask whoever is running the tournament.'}</p>
         <input id="pw-input" type="password" autocomplete="off" placeholder="Password" autofocus>
         <div class="modal-btns">
           <button data-act="pw-submit" class="primary">Start scoring</button>
@@ -591,6 +705,7 @@ function actionZone(d) {
         : m.called_at && m.referee_name ? `${esc(m.referee_name)} to mark.` : 'This match needs a scorer.'}</p>
       <button data-act="claim" class="primary big">Score this match</button>
       ${m.tournament?.requires_password ? '<p class="muted small">A scoring password is needed.</p>' : ''}
+      ${hubKind() && m.status === 'pending' ? '<button data-act="edit-players" class="link">Change players</button>' : ''}
       </div>`;
   }
   if (m.scorer_id) return '<p class="muted center">Being scored live.</p>';
@@ -611,6 +726,7 @@ function render() {
     <div class="m-head">
       <div class="m-head-top">
         ${isFriendly() ? '<a class="back-link" href="/#friendlies"><span aria-hidden="true">‹</span> Back to friendlies</a>'
+          : hubKind() ? `<a class="back-link" href="/fixture/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`
           : `<a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`}
         <div class="m-head-right">
           <span id="watchers" class="watchers">${watchersText()}</span>
@@ -689,7 +805,7 @@ async function submit(score) {
 }
 
 // The password is remembered per tournament so a scorer types it once a night.
-function pwKey() { return isFriendly() ? 'uosdarts:friendlypw' : `uosdarts:pw:${S.match.tournament_id}`; }
+function pwKey() { return isFriendly() ? 'uosdarts:friendlypw' : hubKind() ? 'uosdarts:hubpw' : `uosdarts:pw:${S.match.tournament_id}`; }
 function savedPw() { try { return localStorage.getItem(pwKey()) ?? ''; } catch { return ''; } }
 function rememberPw(v) { try { localStorage.setItem(pwKey(), v); } catch { /* private mode */ } }
 function forgetPw() { try { localStorage.removeItem(pwKey()); } catch { /* private mode */ } }
@@ -767,6 +883,14 @@ app.addEventListener('click', async e => {
     await claim(v);
   } else if (act === 'pw-cancel') {
     S.askPw = false;
+    render();
+  } else if (act === 'edit-players') {
+    S.editPlayers = true;
+    S.pick = null;
+    render();
+  } else if (act === 'cancel-players') {
+    S.editPlayers = false;
+    S.pick = null;
     render();
   } else if (act === 'share') {
     // Phones get the share sheet (WhatsApp and so on); elsewhere copy the link.

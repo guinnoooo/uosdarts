@@ -40,6 +40,7 @@ async function loadInner() {
   S.players = check(await sb.from('players').select('*').order('name'));
   S.admins = check(await sb.rpc('super_list_admins'));
   S.friendliesOn = (await sb.rpc('friendlies_enabled')).data ?? false;
+  S.hubsOn = (await sb.rpc('hub_enabled', { p_kind: 'uduk' })).data ?? false;
   if (S.sel) {
     S.sel = S.players.find(p => p.id === S.sel.id) ?? null;
   }
@@ -182,6 +183,22 @@ function friendlyPanel() {
   </section>`;
 }
 
+// One password, shared by UDUK and Franny, for starting team matches,
+// picking players and scoring the games. Clearing it switches both off.
+function hubPanel() {
+  return `<section class="panel">
+    <h2>UDUK and Franny matches</h2>
+    <p class="muted small">Team matches are ${S.hubsOn ? '<b>on</b>' : '<b>off</b>'}.
+      Anyone with this password can start a match at <a href="/uduk/">/uduk/</a> or <a href="/franny/">/franny/</a>,
+      pick the players and score the games.</p>
+    <div class="row">
+      <label>New password <input type="text" id="hub-pw" autocomplete="off" placeholder="At least 4 characters"></label>
+      <button data-act="set-hub-pw" class="primary">Save</button>
+      ${S.hubsOn ? '<button data-act="clear-hub-pw">Switch team matches off</button>' : ''}
+    </div>
+  </section>`;
+}
+
 function adminsPanel() {
   return `<section class="panel">
     <h2>Admin logins</h2>
@@ -214,7 +231,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${friendlyPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${friendlyPanel()}${hubPanel()}${adminsPanel()}`;
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
@@ -332,6 +349,18 @@ app.addEventListener('click', async e => {
       if (!confirm('Switch friendlies off? Nobody will be able to start one until a new password is set.')) break;
       await run(async () => check(await sb.rpc('super_set_friendly_password', { p_password: '' })),
         'Friendlies switched off');
+      break;
+    case 'set-hub-pw': {
+      const pw = val('#hub-pw');
+      if (pw.length < 4) { toast('Use at least 4 characters'); break; }
+      await run(async () => check(await sb.rpc('super_set_hub_password', { p_password: pw })),
+        'Team match password saved');
+      break;
+    }
+    case 'clear-hub-pw':
+      if (!confirm('Switch UDUK and Franny matches off? Nobody will be able to start or score them until a new password is set.')) break;
+      await run(async () => check(await sb.rpc('super_set_hub_password', { p_password: '' })),
+        'Team matches switched off');
       break;
     case 'set-admin': {
       const email = val('#a-email');

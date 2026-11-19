@@ -25,6 +25,8 @@ async function loadInner() {
     return;
   }
   S.t = t.data;
+  // UDUK and Franny matches have their own page.
+  if (S.t.kind) { location.replace(`/fixture/?id=${id}`); return; }
   // A finished tournament opens on its summary unless a tab was asked for.
   if (S.t.status === 'complete' && !S.t.is_friendly && !S.tabPicked && !location.hash.slice(1)) S.tab = 'summary';
   S.summary = null;
