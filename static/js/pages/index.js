@@ -1,25 +1,11 @@
 import { sb, showLoadError, esc, debounce, HUBS } from '../db.js';
-import { kindOf, tournamentCard, anyCard, cardData, section } from '../events.js';
+import { kindOf, tournamentCard, anyCard, cardData, section, europaVisible } from '../events.js';
 
 // The Match Hub: what's on now, what's coming up, ways in to the UDUK and
 // Franny hubs and friendlies, and the latest results.
 const app = document.getElementById('app');
 
 const SELECT = '*, champion:players!tournaments_champion_id_fkey(id,name)';
-
-// Every PC has a Europa waiting behind it. An unstarted one only shows up on
-// the night (its PC is live, or finished within the last day), otherwise the
-// upcoming list would be full of empty Europas.
-function europaVisible(all) {
-  const byId = new Map(all.map(t => [t.id, t]));
-  return t => {
-    if (!t.parent_id || t.status !== 'upcoming') return true;
-    const pc = byId.get(t.parent_id);
-    if (!pc) return false;
-    if (pc.status === 'live') return true;
-    return pc.status === 'complete' && Date.now() - new Date(pc.starts_at).getTime() < 36 * 3600 * 1000;
-  };
-}
 
 const hoursAgo = t => (Date.now() - new Date(t.created_at).getTime()) / 3600000;
 const isTeamMatch = t => ['uduk', 'franny'].includes(kindOf(t));
@@ -62,7 +48,7 @@ async function loadInner() {
     const k = kindOf(t);
     (recent[k] ??= []).length < 3 && recent[k].push(t);
   }
-  const extra = await cardData([...onNow, ...upcoming.filter(isTeamMatch), ...Object.values(recent).flat()]);
+  const extra = await cardData([...onNow, ...upcoming.slice(0, 3).filter(isTeamMatch), ...Object.values(recent).flat()]);
 
   const onGroups = ['uduk', 'franny', 'friendly']
     .map(k => [k, onNow.filter(t => kindOf(t) === k)])
@@ -81,7 +67,8 @@ async function loadInner() {
         </div>`).join('')
         : '<p class="muted">No UDUK, Franny or friendly matches on at the moment.</p>'}
     </section>` +
-    section('Upcoming', upcoming.map(t => anyCard(t, extra)), 'Nothing scheduled yet.') +
+    section('Upcoming', upcoming.slice(0, 3).map(t => anyCard(t, extra)), 'Nothing scheduled yet.') +
+    (upcoming.length > 3 ? '<p><a class="button-link" href="/calendar/">View more</a></p>' : '') +
     `<section class="hub-links"><h2>Hubs</h2>
       <div class="hub-buttons">
         <a class="hub-button" href="/uduk/"><b>UDUK</b><span>${esc(HUBS.uduk.blurb)}</span></a>
