@@ -2,7 +2,7 @@ import {
   sb, showLoadError, showMissing, validId, qs, esc, debounce, toast, ensureSignedIn, currentUserId, matchLabel, hasPlayers, winnerSide, formatText, HUBS, MATCH_SELECT,
 } from '../db.js';
 import { mountChat } from '../chat.js';
-import { oomScores, matchChance, liveChance, pctPair } from '../winprob.js';
+import { oomScores, matchChance, liveChance, pctPair, isThin, teamPreview } from '../winprob.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -47,6 +47,7 @@ async function loadInner() {
   }
   // Upcoming matches use it for the preview, finished ones for the win probability chart.
   if (S.match.status !== 'live' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
+    S.preview = null;   // so a second load doesn't fetch it again
     const pv = await sb.rpc('match_preview', { p_match: id });
     S.preview = pv.error ? null : pv.data;
     // Order of merit standing, a small extra factor in the GuinnessBet prices.
@@ -54,6 +55,11 @@ async function loadInner() {
       const oom = await sb.rpc('oom_table');
       if (!oom.error) S.preview.oom = oomScores(oom.data ?? [], nameOf(1), nameOf(2));
     }
+  } else if (S.match.status !== 'live' && hasPlayers(S.match) && S.preview === undefined) {
+    // Doubles, trebles, guests and friendlies: typed-in names, rated player by player.
+    S.preview = null;
+    const [np, oom] = await Promise.all([sb.rpc('names_preview', { p_match: id }), sb.rpc('oom_table')]);
+    if (!np.error) S.preview = teamPreview(np.data, oom.data ?? []);
   }
   render();
   watch();
@@ -519,12 +525,14 @@ function bookPrices(p1) {
 
 function oddsBlock(pv) {
   const [a, b] = bookPrices(matchChance(pv, S.match));
+  const thin = isThin(pv);
   return `<div class="odds">
-    <h3>GuinnessBet</h3>
+    <h3>GuinnessBet${thin ? '<sup class="odds-star">*</sup>' : ''}</h3>
     <div class="odds-row">
       <div><span class="odds-name">${esc(nameOf(1))}</span><b>${a}</b></div>
       <div><span class="odds-name">${esc(nameOf(2))}</span><b>${b}</b></div>
     </div>
+    ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players in this match</p>' : ''}
   </div>`;
 }
 
@@ -533,6 +541,13 @@ const winRate = (won, played) => (played ? `${Math.round((won / played) * 100)}%
 function previewBlock() {
   const pv = S.preview;
   if (!pv) return '';
+  if (pv.team) {
+    const many = /&/.test(`${S.match.p1_name ?? ''}${S.match.p2_name ?? ''}`);
+    return `<section class="preview"><h2>Match preview</h2>
+      ${oddsBlock(pv)}
+      <p class="muted small">${many ? 'Based on each player\'s own figures, averaged across their side. ' : ''}Players without an order of merit profile count as a 40 average.</p>
+    </section>`;
+  }
   const a = pv.p1 ?? {}, b = pv.p2 ?? {};
   const row = (label, x, y) => `<tr><td>${x ?? '–'}</td><th>${label}</th><td>${y ?? '–'}</td></tr>`;
   const h2h = pv.h2h ?? [];
@@ -672,6 +687,7 @@ async function savePlayers(form) {
     S.editPlayers = false;
     S.pick = null;
     S.oomPlayers = null;   // someone may have been added
+    S.preview = undefined; // new players, new prices
     await load();
   } catch (err) {
     toast(err.message);

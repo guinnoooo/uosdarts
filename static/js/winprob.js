@@ -12,15 +12,16 @@ const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 // 0 to 1 for where each player sits in the order of merit: 1 for top,
 // down to 0.4 for the lowest with points. No points at all scores 0.3, which
 // covers both newcomers and people who haven't picked up points yet.
-export function oomScores(rows, name1, name2) {
+export function oomScore(rows, name) {
   const pointed = (rows ?? []).filter(r => Number(r.total_points) > 0);
   const n = pointed.length;
-  const score = name => {
-    const r = pointed.find(x => x.player_name === name);
-    if (!r) return 0.3;
-    return 0.4 + 0.6 * (n > 1 ? 1 - (r.rank - 1) / (n - 1) : 1);
-  };
-  return { p1: score(name1), p2: score(name2) };
+  const r = pointed.find(x => x.player_name === name);
+  if (!r) return 0.3;
+  return 0.4 + 0.6 * (n > 1 ? 1 - (r.rank - 1) / (n - 1) : 1);
+}
+
+export function oomScores(rows, name1, name2) {
+  return { p1: oomScore(rows, name1), p2: oomScore(rows, name2) };
 }
 
 // Every number the model uses, in one place, so it can be retuned once there
@@ -37,6 +38,7 @@ export const MODEL = {
   h2hHalfLife: 42,    // days: a meeting's weight halves every six weeks
   knownDarts: 300,    // career darts for a full record (less is pulled to 50/50)
   provDarts: 150,     // how much record a provisional average is worth
+  thinDarts: 100,     // fewer real darts than this (and no provisional average) gets the odds asterisk
   oomWeight: 0.6,     // order of merit gap to leg odds, with little history
   oomWithHistory: 0.4, // ...and the share of that left once both have a full record
   legCap: 0.85,       // no one rated more than this to win a leg before it starts
@@ -57,6 +59,44 @@ export function careerOf(pv, n) {
   const w = d / MODEL.knownDarts;
   const mix = real => prov + w * (num(real, prov) - prov);
   return { ...c, avg: mix(c?.avg), first9: mix(c?.first9 ?? c?.avg), darts: Math.max(d, MODEL.provDarts) };
+}
+
+// True when someone in the match has too little record for the prices to
+// mean much: under thinDarts real darts and no provisional average.
+export function isThin(pv) {
+  if (!pv) return false;
+  if (typeof pv.thin === 'boolean') return pv.thin;
+  return [1, 2].some(n => num(pv[`p${n}`]?.darts, 0) < MODEL.thinDarts
+    && !Number.isFinite(num(pv[`p${n}_prov`], NaN)));
+}
+
+// Doubles, trebles and any game between typed-in names (from names_preview).
+// Each player is rated on their own, with their career, recent form,
+// provisional average and order of merit place, and each side gets the
+// mean, since partners take turns at the board. Anyone without a profile
+// counts as the baseline. Returns the same shape as match_preview, so the
+// prices and the win probability work the same way.
+export function teamPreview(np, oomRows) {
+  if (!np?.side1?.length || !np?.side2?.length) return null;
+  const side = list => {
+    const rated = list.map(x => {
+      const c = careerOf({ p1: x.career, p1_prov: x.prov }, 1);
+      return {
+        a: ability(c, x.form),
+        known: num(c?.darts, 0),
+        thin: num(x.career?.darts, 0) < MODEL.thinDarts && !Number.isFinite(num(x.prov, NaN)),
+        oom: oomScore(oomRows, x.name),
+      };
+    });
+    const mean = f => rated.reduce((t, r) => t + f(r), 0) / rated.length;
+    return {
+      career: { avg: mean(r => r.a.avg), first9: mean(r => r.a.f9), dbl_pct: mean(r => r.a.dbl), darts: Math.min(...rated.map(r => r.known)) },
+      oom: mean(r => r.oom),
+      thin: rated.some(r => r.thin),
+    };
+  };
+  const s1 = side(np.side1), s2 = side(np.side2);
+  return { p1: s1.career, p2: s2.career, oom: { p1: s1.oom, p2: s2.oom }, h2h: [], team: true, thin: s1.thin || s2.thin };
 }
 
 // One player's level: overall ability (career figures) moved towards recent
