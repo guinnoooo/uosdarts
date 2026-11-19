@@ -130,7 +130,7 @@ async function onMatchRow(row) {
 
   // Spectators get a brief confirmation, then the next leg. The scorer already
   // knows, having just entered it, and the end of the match has its own banner.
-  if (legWon && !isScorer() && row.status !== 'complete') {
+  if (legWon && (!isScorer() || isRemote()) && row.status !== 'complete') {
     showGameShot(winner, legNo);
   }
 }
@@ -170,7 +170,15 @@ function derive() {
 const nameOf = n => (n === 1 ? S.match.p1?.name ?? S.match.p1_name : S.match.p2?.name ?? S.match.p2_name) ?? 'TBC';
 const isFriendly = () => !!S.match.tournament?.is_friendly;
 const hubKind = () => S.match.tournament?.kind ?? null;   // 'uduk' or 'franny' for a team match game
-const isScorer = () => !!S.match.scorer_id && S.match.scorer_id === S.uid;
+// A remote friendly has two scorers, one per player, each on their own phone.
+const isRemote = () => !!S.match.tournament?.is_remote;
+const mySeat = () => !S.uid ? 0
+  : S.match.scorer_id === S.uid ? 1
+  : isRemote() && S.match.scorer2_id === S.uid ? 2 : 0;
+const isScorer = () => mySeat() > 0;
+// Whether this scorer enters the visit being thrown now. Always, except in a
+// remote friendly, where it has to be their own player's turn.
+const myTurn = d => !isRemote() || (d.turn !== null && d.turn === mySeat());
 
 // Team match games have a set throw (the database applies the same rule).
 // UDUK: bull off winners throw first in the odd numbered games, and in a
@@ -305,8 +313,61 @@ function keypad(d) {
       <button data-act="undo">Undo</button>
     </div>
     <button data-act="release" class="link">Stop scoring this match</button>
-    ${isFriendly() ? '<button data-act="delete-friendly" class="link danger-link">Delete this friendly</button>' : ''}
+    ${isFriendly() && mySeat() !== 2 ? '<button data-act="delete-friendly" class="link danger-link">Delete this friendly</button>' : ''}
   </div>`;
+}
+
+// Remote friendlies: each player joins with the match password, then scores
+// their own throws. Returns null when the normal panels apply.
+function remoteZone(d) {
+  const m = S.match, seat = mySeat();
+  const other = n => esc(nameOf(n));
+  const leave = '<button data-act="release" class="link">Leave this match</button>';
+  if (S.askPw && !seat) {
+    return `<div class="panel center pw-panel">
+      <h3>Match password</h3>
+      <p class="muted">Use the password ${other(1)} set for this match.</p>
+      <input id="pw-input" type="password" autocomplete="off" placeholder="Password" autofocus>
+      <div class="modal-btns">
+        <button data-act="pw-submit" class="primary">Join</button>
+        <button data-act="pw-cancel">Cancel</button>
+      </div></div>`;
+  }
+  const freeSeat = !m.scorer_id ? 1 : !m.scorer2_id ? 2 : 0;
+  if (!seat) {
+    if (freeSeat) {
+      return `<div class="panel center">
+        <p>Remote match. Each player scores their own throws on their own phone.</p>
+        <button data-act="claim" class="primary big">Join as ${other(freeSeat)}</button>
+        <p class="muted small">You'll need the match password.</p></div>`;
+    }
+    return `<p class="muted center">${m.status === 'live' ? 'Being scored live by both players.' : 'Both players are in. Starting soon.'}</p>`;
+  }
+  if (m.status === 'pending') {
+    if (seat === 1 && !m.scorer2_id) {
+      return `<div class="panel center">
+        <h3>Waiting for ${other(2)} to join</h3>
+        <p class="muted small">Send them this page and the match password.</p>
+        <div class="modal-btns"><button data-act="share" class="primary">Share link</button></div>
+        <button data-act="delete-friendly" class="link danger-link">Delete this friendly</button></div>`;
+    }
+    if (seat === 2) return `<div class="panel center"><p>Waiting for ${other(1)} to start the match.</p>${leave}</div>`;
+    return `<div class="panel center"><h3>Who throws first?</h3>
+      <div class="modal-btns">
+        <button data-first="1" class="primary">${other(1)}</button>
+        <button data-first="2" class="primary">${other(2)}</button>
+      </div>
+      <button data-act="delete-friendly" class="link danger-link">Delete this friendly</button></div>`;
+  }
+  if (m.status === 'live') {
+    if (myTurn(d)) return keypad(d);
+    const gone = seat === 1 ? !m.scorer2_id : !m.scorer_id;
+    return `<div class="panel center">
+      <p>${gone ? `${other(3 - seat)} has left the match. They can rejoin with the password.` : `Waiting for ${other(d.turn ?? 3 - seat)} to throw…`}</p>
+      <div class="modal-btns"><button data-act="undo">Undo my last visit</button></div>
+      ${leave}</div>`;
+  }
+  return null;
 }
 
 // Two questions on a checkout: total darts thrown, then how many of those
@@ -630,7 +691,10 @@ function watch() {
     if (el) el.textContent = watchersText();
   });
   // Also fires after a reconnect (a phone waking up), when presence has to be sent again.
-  ch.subscribe(status => { if (status === 'SUBSCRIBED') { S.trackedAs = null; track(); } });
+  // Joining is spread over a couple of seconds so a crowd opening the same
+  // match at once doesn't arrive as one burst.
+  setTimeout(() => ch.subscribe(status => { if (status === 'SUBSCRIBED') { S.trackedAs = null; track(); } }),
+    Math.random() * 2000);
 }
 
 // Re-sent when this viewer starts or stops scoring, so they drop out of the count.
@@ -745,6 +809,10 @@ function actionZone(d) {
     return `<div class="banner">${esc(nameOf(w))} wins ${hi}–${lo}${m.sets_to_win ? ' in sets' : ''}</div>
       ${isScorer() ? '<div class="center"><button data-act="undo">Undo last visit</button></div>' : ''}`;
   }
+  if (isRemote()) {
+    const z = remoteZone(d);
+    if (z !== null) return z;
+  }
   if (hubKind() && m.status === 'pending' && !m.scorer_id && (!ready || S.editPlayers)) return pickForm();
   if (isScorer() && m.status === 'pending' && setThrower(m)) {
     const f = setThrower(m);
@@ -791,7 +859,7 @@ function actionZone(d) {
 function render() {
   const m = S.match;
   const d = derive();
-  const scoring = isScorer() && m.status === 'live';
+  const scoring = isScorer() && m.status === 'live' && myTurn(d);
   // The page is drawn in two parts with the chat between them, so the chat
   // (and anything half typed in it) survives every redraw.
   if (!app.querySelector('#m-top')) {
@@ -882,7 +950,7 @@ async function submit(score) {
 
 // The password is remembered per tournament so a scorer types it once a night.
 // UDUK and Franny games use their match's own scoring password, remembered per match like a tournament's.
-function pwKey() { return isFriendly() ? 'uosdarts:friendlypw' : `uosdarts:pw:${S.match.tournament_id}`; }
+function pwKey() { return isFriendly() && !isRemote() ? 'uosdarts:friendlypw' : `uosdarts:pw:${S.match.tournament_id}`; }
 function savedPw() { try { return localStorage.getItem(pwKey()) ?? ''; } catch { return ''; } }
 function rememberPw(v) { try { localStorage.setItem(pwKey(), v); } catch { /* private mode */ } }
 function forgetPw() { try { localStorage.removeItem(pwKey()); } catch { /* private mode */ } }
@@ -985,7 +1053,7 @@ app.addEventListener('click', async e => {
       location.href = '/#friendlies';
     } catch (e) { toast(e.message); }
   } else if (act === 'release') {
-    if (confirm('Stop scoring? Someone else will be able to take over.')) {
+    if (confirm(isRemote() ? 'Leave this match? You can rejoin with the password.' : 'Stop scoring? Someone else will be able to take over.')) {
       await rpc('release_match', { p_match: id });
     }
   } else if (act === 'bulloff') {
@@ -1022,7 +1090,7 @@ document.addEventListener('keydown', async e => {
     }
     return;
   }
-  if (!S.match || !isScorer() || S.match.status !== 'live' || S.pendingCheckout || S.pendingDoubles || S.pendingBull) return;
+  if (!S.match || !isScorer() || S.match.status !== 'live' || !myTurn(derive()) || S.pendingCheckout || S.pendingDoubles || S.pendingBull) return;
   if (/^\d$/.test(e.key) && S.entry.length < 3) {
     S.entry = (S.entry + e.key).replace(/^0+(?=\d)/, '');
     render();
