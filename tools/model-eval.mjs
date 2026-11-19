@@ -82,7 +82,7 @@ if (train.length < 15 || test.length < 5) {
 }
 const KNOBS = {
   scale: [6, 30], formWeight: [0, 1], formFull: [30, 600], h2hPrior: [0.5, 20],
-  oomWeight: [0, 2], oomWithHistory: [0, 1], f9Weight: [0, 1], dblWeight: [0, 0.5], knownDarts: [50, 1000], provDarts: [0, 300],
+  oomWeight: [0, 2], oomWithHistory: [0, 1], f9Weight: [0, 1], dblWeight: [0, 0.5], knownDarts: [50, 1000], provDarts: [0, 300], winRateWeight: [0, 1], winRatePrior: [2, 40],
 };
 // Leg log loss, plus a small pull back to the current weights so a handful of
 // odd results can't drag anything to an extreme.
