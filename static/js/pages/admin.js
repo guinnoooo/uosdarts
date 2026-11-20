@@ -470,6 +470,8 @@ function manageSection() {
 
     ${canDrawKo ? '<div class="row"><button data-act="draw-ko" class="primary">Group stage done: draw knockout</button></div>' : ''}
 
+    ${lateEntryBlock()}
+
     ${boardsPanel(t)}
 
     ${hasFixtures ? boardCallsBlock(koRounds) : ''}
@@ -485,6 +487,55 @@ function manageSection() {
 
     <div class="row danger"><button data-act="delete">Delete tournament</button></div>
   </section>`;
+}
+
+// ---------------------------------------------------------------- late entries
+
+// Who a late entrant could be drawn against, best first. Someone with a
+// first-round bye whose next match hasn't been called, claimed or started
+// plays them instead of the bye. Only if the draw has no byes at all, anyone
+// in a first-round match that hasn't been called, claimed or started can be
+// sent into a new preliminary round against them (everyone else gets a bye
+// through it). The database checks all of this again when it's done.
+function lateOptions() {
+  const t = S.sel;
+  if (!t || t.format !== 'knockout' || t.status === 'complete') return [];
+  const ko = S.matches.filter(m => m.stage === 'knockout');
+  if (!ko.length) return [];
+  const free = m => m && m.status === 'pending' && !m.board && !m.called_at && !m.scorer_id;
+  const byId = new Map(ko.map(m => [m.id, m]));
+  const r1 = ko.filter(m => m.round === 1);
+  const oneSeat = m => (m.player1_id == null) !== (m.player2_id == null);
+  const byes = r1.filter(m => oneSeat(m) && m.status === 'complete' && free(byId.get(m.next_match_id)));
+  if (byes.length) return byes.map(m => ({ id: m.player1_id ?? m.player2_id, bye: true }));
+  if (r1.some(oneSeat)) return [];
+  return r1.filter(m => free(m) && m.player1_id && m.player2_id)
+    .flatMap(m => [m.player1_id, m.player2_id]).map(id => ({ id, bye: false }));
+}
+
+function lateEntryBlock() {
+  const t = S.sel;
+  if (!t || t.format !== 'knockout' || t.status === 'complete' || !S.matches.some(m => m.stage === 'knockout')) return '';
+  const opts = lateOptions();
+  const name = id => S.players.find(p => p.id === id)?.name ?? 'Unknown';
+  const inIt = new Set(S.entrants.map(e => e.player_id));
+  return `<div class="entrant-box late-entry">
+    <div class="entrant-head"><b>Add a player late</b></div>
+    <div class="entrant-body">
+    ${opts.length ? `
+      <div class="row">
+        <label>Player <input type="text" id="late-player" list="late-options" autocomplete="off" placeholder="Type a name"></label>
+        <datalist id="late-options">${S.players.filter(p => !inIt.has(p.id)).map(p => `<option value="${esc(p.name)}"></option>`).join('')}</datalist>
+        <label>Plays <select id="late-opp">${opts.map(o => `<option value="${o.id}">${esc(name(o.id))}${o.bye ? ' (instead of their bye)' : ''}</option>`).join('')}</select></label>
+        <button data-act="late-add" class="primary">Add</button>
+      </div>
+      <p class="muted small">${opts[0].bye
+        ? 'They play a preliminary match against someone who had a bye. The winner goes through to that player\'s next match.'
+        : 'There are no byes, so a preliminary round is added: they play the person you pick, the winner takes that person\'s place, and everyone else goes straight through.'}
+        Only players who already have a profile can be added here.</p>`
+      : '<p class="muted small">No space for a late entry: every first-round match, and every bye\'s next match, has already been called or started.</p>'}
+    </div>
+  </div>`;
 }
 
 // Everyone with a profile, closed by default and below the working parts of
@@ -1007,6 +1058,19 @@ app.addEventListener('click', async e => {
   }
 
   switch (el.dataset.act) {
+    case 'late-add': {
+      const typed = (app.querySelector('#late-player')?.value ?? '').trim().toLowerCase();
+      const pl = S.players.find(p => p.name.toLowerCase() === typed);
+      if (!pl) { toast(typed ? 'No player with that name. Only players who already have a profile can be added.' : 'Type a player first'); break; }
+      const opp = app.querySelector('#late-opp')?.value;
+      const oppName = S.players.find(p => p.id === opp)?.name ?? 'them';
+      if (!confirm(`Add ${pl.name} to ${t.name}, playing ${oppName} in a preliminary match?`)) break;
+      await run(async () => {
+        check(await sb.rpc('admin_add_late_player', { p_tournament: t.id, p_player: pl.id, p_opponent: opp }));
+        await refreshSelection(t);
+      }, `${pl.name} added`);
+      break;
+    }
     case 'add-entrant':
       await run(addEntrant);
       break;
