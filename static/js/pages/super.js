@@ -42,6 +42,8 @@ async function loadInner() {
   S.friendliesOn = (await sb.rpc('friendlies_enabled')).data ?? false;
   S.hubsOn = (await sb.rpc('hub_enabled', { p_kind: 'uduk' })).data ?? false;
   S.friendlies = check(await sb.rpc('super_list_friendlies')) ?? [];
+  S.seeds = new Map((check(await sb.from('player_seeds').select('player_id, rating')) ?? [])
+    .map(r => [r.player_id, Number(r.rating)]));
   if (S.sel) {
     S.sel = S.players.find(p => p.id === S.sel.id) ?? null;
   }
@@ -104,6 +106,23 @@ function profileBlock(p) {
   </div>`;
 }
 
+// Starting rating for the odds model, from what you know of their level.
+// Results move it from there. Only super admins can see it.
+const TIERS = [[1900, 'Very top'], [1750, 'Top'], [1650, 'Mid to top'], [1550, 'Mid'], [1450, 'Lower'], [1350, 'Beginner']];
+function seedBlock(p) {
+  const cur = S.seeds?.get(p.id) ?? null;
+  const known = TIERS.some(([r]) => r === cur);
+  return `<div class="row">
+      <label>Starting rating <select id="p-seed">
+        <option value="">No seed (starts at 1500)</option>
+        ${TIERS.map(([r, t]) => `<option value="${r}" ${r === cur ? 'selected' : ''}>${t} (${r})</option>`).join('')}
+        ${cur !== null && !known ? `<option value="${cur}" selected>${cur}</option>` : ''}
+      </select></label>
+      <button data-act="set-seed" class="primary">Save</button>
+      <span class="muted small">Used by the odds. Results move it from there.</span>
+    </div>`;
+}
+
 function playerPanel() {
   const p = S.sel;
   if (!p) return '';
@@ -120,6 +139,7 @@ function playerPanel() {
     </div>
 
     ${profileBlock(p)}
+    ${seedBlock(p)}
 
     <div class="row">
       <span class="muted small">In ${u.matches} match${u.matches === 1 ? '' : 'es'},
@@ -393,6 +413,13 @@ app.addEventListener('click', async e => {
         p_is_pc: app.querySelector('#pt-pc').checked,
         p_is_major: app.querySelector('#pt-major').checked,
       })), 'Points saved');
+      break;
+    }
+    case 'set-seed': {
+      const v = val('#p-seed');
+      await run(async () => check(await sb.rpc('super_set_seed', {
+        p_player: S.sel.id, p_rating: v ? Number(v) : null,
+      })), v ? 'Starting rating saved' : 'Seed removed');
       break;
     }
     case 'merge': {
