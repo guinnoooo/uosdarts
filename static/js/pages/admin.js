@@ -526,12 +526,12 @@ function lateEntryBlock() {
       <div class="row">
         <label>Player <input type="text" id="late-player" list="late-options" autocomplete="off" placeholder="Type a name"></label>
         <datalist id="late-options">${S.players.filter(p => !inIt.has(p.id)).map(p => `<option value="${esc(p.name)}"></option>`).join('')}</datalist>
-        <label>Plays <select id="late-opp">${opts.map(o => `<option value="${o.id}">${esc(name(o.id))}${o.bye ? ' (instead of their bye)' : ''}</option>`).join('')}</select></label>
+        <label>Plays <select id="late-opp"><option value="">Random${opts[0].bye ? ' (someone with a bye)' : ''}</option>${opts.map(o => `<option value="${o.id}">${esc(name(o.id))}${o.bye ? ' (instead of their bye)' : ''}</option>`).join('')}</select></label>
         <button data-act="late-add" class="primary">Add</button>
       </div>
       <p class="muted small">${opts[0].bye
-        ? 'They play a preliminary match against someone who had a bye. The winner goes through to that player\'s next match.'
-        : 'There are no byes, so a preliminary round is added: they play the person you pick, the winner takes that person\'s place, and everyone else goes straight through.'}
+        ? 'They play a preliminary match against someone who had a bye, picked at random unless you choose. The winner goes through to that player\'s next match.'
+        : 'There are no byes, so a preliminary round is added: they play someone from a first-round match that hasn\'t started (picked at random unless you choose), the winner takes that person\'s place, and everyone else goes straight through.'}
         Only players who already have a profile can be added here.</p>`
       : '<p class="muted small">No space for a late entry: every first-round match, and every bye\'s next match, has already been called or started.</p>'}
     </div>
@@ -1062,8 +1062,8 @@ app.addEventListener('click', async e => {
       const typed = (app.querySelector('#late-player')?.value ?? '').trim().toLowerCase();
       const pl = S.players.find(p => p.name.toLowerCase() === typed);
       if (!pl) { toast(typed ? 'No player with that name. Only players who already have a profile can be added.' : 'Type a player first'); break; }
-      const opp = app.querySelector('#late-opp')?.value;
-      const oppName = S.players.find(p => p.id === opp)?.name ?? 'them';
+      const opp = app.querySelector('#late-opp')?.value || null;
+      const oppName = opp ? S.players.find(p => p.id === opp)?.name ?? 'them' : 'someone picked at random';
       if (!confirm(`Add ${pl.name} to ${t.name}, playing ${oppName} in a preliminary match?`)) break;
       await run(async () => {
         check(await sb.rpc('admin_add_late_player', { p_tournament: t.id, p_player: pl.id, p_opponent: opp }));
