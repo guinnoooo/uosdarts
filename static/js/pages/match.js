@@ -448,6 +448,7 @@ function probTimeline() {
   const form = { p1: { darts: 0, scored: 0 }, p2: { darts: 0, scored: 0 } };
   const pts = [], legStarts = [];
   const legs = [...S.legs].sort((a, b) => a.leg_no - b.leg_no);
+  st.first = legs[0]?.starter ?? null;   // who threw first: the throw alternates from there
   for (const leg of legs) {
     st.p1_rem = st.p2_rem = m.start_score;
     st.turn = leg.starter;

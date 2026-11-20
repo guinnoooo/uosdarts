@@ -13,7 +13,7 @@
 // new weights if they also do better on matches they never saw.
 
 import fs from 'fs';
-import { MODEL, legChance, matchChance } from '../static/js/winprob.js';
+import { MODEL, legChance, legFor, matchChance } from '../static/js/winprob.js';
 
 const file = process.argv[2];
 if (!file) { console.error('Usage: node tools/model-eval.mjs model-data.json'); process.exit(1); }
@@ -30,14 +30,16 @@ const eps = 1e-6;
 const ll = (p, won) => -Math.log(Math.min(1 - eps, Math.max(eps, won ? p : 1 - p)));
 const brier = (p, won) => (p - (won ? 1 : 0)) ** 2;
 
-// Every leg (bull offs left out) is one prediction: the pre-match leg chance.
-// Matches are scored too, but there are far fewer of them.
+// Every leg (bull offs left out) is one prediction: the pre-match leg chance,
+// with whoever threw first in that leg counted. Matches are scored too, but
+// there are far fewer of them.
 function score(rows) {
   let legLL = 0, legBr = 0, legs = 0, mLL = 0, mBr = 0, ms = 0;
   for (const d of rows) {
-    const p = legChance(d.features);
+    const p0 = legChance(d.features);
     for (const l of d.legs) {
       if (l.bull_off) continue;
+      const p = legFor(p0, l.starter);
       legLL += ll(p, l.winner === 1); legBr += brier(p, l.winner === 1); legs++;
     }
     if (d.winner) {
@@ -58,14 +60,20 @@ console.log('Career only       ', fmt(withModel({ formWeight: 0, oomWeight: 0, h
 console.log('No recent form    ', fmt(withModel({ formWeight: 0 }, () => score(data))));
 console.log('No order of merit ', fmt(withModel({ oomWeight: 0 }, () => score(data))));
 console.log('No head-to-head   ', fmt(withModel({ h2hPrior: 1e9 }, () => score(data))));
+console.log('No throw edge     ', fmt(withModel({ throwEdge: 0 }, () => score(data))));
+console.log('No rating         ', fmt(withModel({ ratingWeight: 0 }, () => score(data))));
+console.log('No spread         ', fmt(withModel({ sdWeight: 0 }, () => score(data))));
+console.log('No win rate       ', fmt(withModel({ winRateWeight: 0 }, () => score(data))));
+console.log('Version 5 setup   ', fmt(withModel({ throwEdge: 0, ratingWeight: 0, sdWeight: 0, winRateWeight: 0.3 }, () => score(data))));
 
 // Calibration: when the model says 60-70%, does that player win 60-70% of legs?
 console.log('\nCalibration (player 1 leg chance):');
 const buckets = Array.from({ length: 10 }, () => ({ n: 0, won: 0, sum: 0 }));
 for (const d of data) {
-  const p = legChance(d.features);
+  const p0 = legChance(d.features);
   for (const l of d.legs) {
     if (l.bull_off) continue;
+    const p = legFor(p0, l.starter);
     const b = buckets[Math.min(9, Math.floor(p * 10))];
     b.n++; b.sum += p; if (l.winner === 1) b.won++;
   }
@@ -83,6 +91,7 @@ if (train.length < 15 || test.length < 5) {
 const KNOBS = {
   scale: [6, 30], formWeight: [0, 1], formFull: [30, 600], h2hPrior: [0.5, 20],
   oomWeight: [0, 2], oomWithHistory: [0, 1], f9Weight: [0, 1], dblWeight: [0, 0.5], knownDarts: [50, 1000], provDarts: [0, 300], winRateWeight: [0, 1], winRatePrior: [2, 40],
+  throwEdge: [0, 0.5], ratingWeight: [0, 1], ratingCap: [0.2, 1.5], sdWeight: [0, 2],
 };
 // Leg log loss, plus a small pull back to the current weights so a handful of
 // odd results can't drag anything to an extreme.

@@ -27,7 +27,7 @@ export function oomScores(rows, name1, name2) {
 // Every number the model uses, in one place, so it can be retuned once there
 // are enough results to measure it against (see tools/model-eval.mjs).
 export const MODEL = {
-  version: 5,
+  version: 6,
   baseline: 45,       // average assumed for someone with no record and no provisional average
   scale: 14,          // average points that make about one step in leg odds
   f9Weight: 0.3,      // how much first 9 counts on top of the average
@@ -42,10 +42,44 @@ export const MODEL = {
   oomWeight: 0.6,     // order of merit gap to leg odds, with little history
   oomWithHistory: 0.4, // ...and the share of that left once both have a full record
   winRatePrior: 10,   // matches of 50% added to everyone's record, so a short record barely counts
-  winRateWeight: 0.3, // how far the gap in (adjusted) win rates moves the leg odds
+  winRateWeight: 0.15, // how far the gap in (adjusted) win rates moves the leg odds (halved now the rating covers results too)
   winRateCap: 0.6,    // the most win rate can move them, in the model's steps (about 15 points at evens)
   legCap: 0.85,       // no one rated more than this to win a leg before it starts
+  throwEdge: 0.12,    // extra pull towards whoever throws first in a leg: about 53% between equals (measured 51.6% to 54.6% so far)
+  ratingWeight: 0.3,  // how far the results rating (Glicko) moves the leg odds
+  ratingCap: 0.6,     // the most the rating can move them, in the model's steps
+  sdRef: 27.4,        // a typical spread of visit scores
+  sdWeight: 0.5,      // how much a wider spread (a streakier pair) pulls a leg towards 50/50
 };
+
+// Results rating (Glicko), worked out on the server from every finished
+// match in order, so beating strong players counts for more than beating
+// weak ones. Each rating comes with its uncertainty (rd): someone with few
+// matches has a wide one and their rating counts for less. Anyone without a
+// rating is a new player: 1500, as uncertain as it gets.
+const GQ = Math.log(10) / 400;
+function ratingShift(pv) {
+  const r1 = num(pv.p1_rating, 1500), r2 = num(pv.p2_rating, 1500);
+  const rd = Math.hypot(num(pv.p1_rd, 350), num(pv.p2_rd, 350));
+  const g = 1 / Math.sqrt(1 + 3 * GQ * GQ * rd * rd / (Math.PI * Math.PI));
+  const e = 1 / (1 + 10 ** (-g * (r1 - r2) / 400));
+  return clamp(MODEL.ratingWeight * logit(clamp(e, 0.01, 0.99)), -MODEL.ratingCap, MODEL.ratingCap);
+}
+
+// How streaky the pair is: the spread of their visit scores against a
+// typical one. Two players with the same average but wide spreads trade
+// legs more, so the gap between them counts for a bit less.
+function spreadFactor(pv) {
+  const s1 = num(pv.p1_sd, MODEL.sdRef), s2 = num(pv.p2_sd, MODEL.sdRef);
+  return (Math.sqrt((s1 * s1 + s2 * s2) / 2) / MODEL.sdRef) ** MODEL.sdWeight;
+}
+
+// A leg's chance for player 1 when player `starter` throws first, from the
+// chance with nobody's throw counted (what legChance gives).
+export function legFor(p, starter) {
+  if (starter !== 1 && starter !== 2) return p;
+  return sigmoid(logit(p) + (starter === 1 ? 1 : -1) * MODEL.throwEdge);
+}
 
 // Win rate, pulled towards 50% by winRatePrior matches. 3 from 4 reads as
 // 57%, 15 from 20 as 67%, 60 from 80 as 72%: it counts for more the more
@@ -106,6 +140,9 @@ export function teamPreview(np, oomRows, guests = false) {
         thin: num(x.career?.darts, 0) < MODEL.thinDarts && !Number.isFinite(num(x.prov, NaN)),
         oom: oomScore(oomRows, x.name),
         wr: shrunkRate(x.won, x.played),
+        rating: num(x.rating, 1500),
+        rd: num(x.rd, 350),
+        sd: num(x.sd, MODEL.sdRef),
       };
     });
     const mean = f => rated.reduce((t, r) => t + f(r), 0) / rated.length;
@@ -114,10 +151,14 @@ export function teamPreview(np, oomRows, guests = false) {
       oom: mean(r => r.oom),
       wr: mean(r => r.wr),
       thin: rated.some(r => r.thin),
+      rating: mean(r => r.rating),
+      rd: Math.sqrt(mean(r => r.rd * r.rd)),
+      sd: Math.sqrt(mean(r => r.sd * r.sd)),
     };
   };
   const s1 = side(np.side1), s2 = side(np.side2);
   return { p1: s1.career, p2: s2.career, oom: { p1: s1.oom, p2: s2.oom }, wr: { p1: s1.wr, p2: s2.wr },
+    p1_rating: s1.rating, p1_rd: s1.rd, p2_rating: s2.rating, p2_rd: s2.rd, p1_sd: s1.sd, p2_sd: s2.sd,
     h2h: [], team: true, thin: s1.thin || s2.thin };
 }
 
@@ -137,15 +178,16 @@ export function ability(career, form) {
   return { avg, f9, dbl, strength: avg + (f9 - avg) * MODEL.f9Weight + (dbl - 25) * MODEL.dblWeight };
 }
 
-// Chance player 1 wins a single leg, before it starts. Four things go in:
-// overall ability and recent form (above), the head-to-head (recent meetings
-// counting more), win rate (counting more the more matches played), and the
-// order of merit, which matters most when there's little history. Players
-// with little history are pulled towards 50/50.
+// Chance player 1 wins a single leg, before it starts, not counting who
+// throws first (legFor adds that). What goes in: overall ability and recent
+// form (above), how streaky both players are, the head-to-head (recent
+// meetings counting more), the results rating, win rate (counting more the
+// more matches played), and the order of merit, which matters most when
+// there's little history. Players with little history are pulled towards 50/50.
 export function legChance(pv) {
   const c1 = careerOf(pv, 1), c2 = careerOf(pv, 2);
   const a1 = ability(c1, pv.p1_form), a2 = ability(c2, pv.p2_form);
-  let p = sigmoid((a1.strength - a2.strength) / MODEL.scale);
+  let p = sigmoid((a1.strength - a2.strength) / (MODEL.scale * spreadFactor(pv)));
   const h2h = pv.h2h ?? [];
   if (h2h.length) {
     const now = Date.now();
@@ -161,46 +203,64 @@ export function legChance(pv) {
   }
   const known = Math.min(1, Math.min(num(c1?.darts, 0), num(c2?.darts, 0)) / MODEL.knownDarts);
   p = 0.5 + (p - 0.5) * (0.5 + 0.5 * known);
-  p = sigmoid(logit(p) + winRateShift(pv));
+  p = sigmoid(logit(p) + winRateShift(pv) + ratingShift(pv));
   if (pv.oom) {
     p = sigmoid(logit(p) + (pv.oom.p1 - pv.oom.p2) * MODEL.oomWeight * (1 - (1 - MODEL.oomWithHistory) * known));
   }
   return clamp(p, 1 - MODEL.legCap, MODEL.legCap);
 }
 
-// Chance of being first to `a` more legs before the other gets `b`, winning
-// each leg with chance p.
-function race(a, b, p, memo = new Map()) {
+// Chance of being first to `a` more legs (or sets) before the other gets `b`,
+// when player `next` throws first in the next one and the throw alternates
+// after that. pl[1] and pl[2] are player 1's chance of each, by who starts it.
+function race(a, b, pl, next, memo = new Map()) {
   if (!(a > 0)) return 1;   // also catches a missing number
   if (!(b > 0)) return 0;
-  const k = a * 100 + b;
-  if (!memo.has(k)) memo.set(k, p * race(a - 1, b, p, memo) + (1 - p) * race(a, b - 1, p, memo));
+  const k = (a * 100 + b) * 3 + next;
+  if (!memo.has(k)) {
+    const p = pl[next], o = 3 - next;
+    memo.set(k, p * race(a - 1, b, pl, o, memo) + (1 - p) * race(a, b - 1, pl, o, memo));
+  }
   return memo.get(k);
 }
 
-// From the current leg's chance to the whole match, for legs or set play.
-function fromLeg(cur, pLeg, m) {
+// From the current leg to the whole match, for legs or set play. The throw
+// alternates leg by leg; in set play each set starts with the other player
+// from the last, and the legs inside it alternate from there (as the site
+// sets them up). `first` is who threw first in the match: when it isn't
+// known yet (before the bull off) both ways are worked out and averaged.
+// `cur` is the current leg's chance, or null to take it from the starter.
+function fromLeg(cur, pLeg, m, first) {
+  if (first !== 1 && first !== 2) return (fromLeg(cur, pLeg, m, 1) + fromLeg(cur, pLeg, m, 2)) / 2;
+  const pl = { 1: legFor(pLeg, 1), 2: legFor(pLeg, 2) };
   const L = Math.max(1, Number(m.legs_to_win) || 1);
-  const need1 = L - (m.p1_legs ?? 0);
-  const need2 = L - (m.p2_legs ?? 0);
-  const setNow = cur * race(need1 - 1, need2, pLeg) + (1 - cur) * race(need1, need2 - 1, pLeg);
+  const l1 = m.p1_legs ?? 0, l2 = m.p2_legs ?? 0;
+  const sets = (m.p1_sets ?? 0) + (m.p2_sets ?? 0);
+  const setStarter = !m.sets_to_win || sets % 2 === 0 ? first : 3 - first;
+  const now = (l1 + l2) % 2 === 0 ? setStarter : 3 - setStarter;
+  const c = cur ?? pl[now];
+  const setNow = c * race(L - l1 - 1, L - l2, pl, 3 - now) + (1 - c) * race(L - l1, L - l2 - 1, pl, 3 - now);
   if (!m.sets_to_win) return setNow;
-  const pSet = race(L, L, pLeg);
+  const ps = { 1: race(L, L, pl, 1), 2: race(L, L, pl, 2) };
   const s1 = m.sets_to_win - (m.p1_sets ?? 0);
   const s2 = m.sets_to_win - (m.p2_sets ?? 0);
-  return setNow * race(s1 - 1, s2, pSet) + (1 - setNow) * race(s1, s2 - 1, pSet);
+  const nextSet = 3 - setStarter;
+  return setNow * race(s1 - 1, s2, ps, nextSet) + (1 - setNow) * race(s1, s2 - 1, ps, nextSet);
 }
 
-// GuinnessBet: chance player 1 wins the match, before it starts.
+// GuinnessBet: chance player 1 wins the match, before it starts. Who throws
+// first isn't known until the bull off, so it's worked out both ways.
 export function matchChance(pv, m) {
   const pLeg = legChance(pv);
-  return clamp(fromLeg(pLeg, pLeg, { ...m, p1_legs: 0, p2_legs: 0, p1_sets: 0, p2_sets: 0 }), 0.04, 0.96);
+  return clamp(fromLeg(null, pLeg, { ...m, p1_legs: 0, p2_legs: 0, p1_sets: 0, p2_sets: 0 }, null), 0.04, 0.96);
 }
 
 // Chance player 1 wins from a given number of legs (and sets) each, between
-// legs, when they win each leg with chance pLeg. Used by the team match chart.
-export function chanceFromScore(pLeg, m) {
-  return fromLeg(pLeg, pLeg, m);
+// legs, when they win each leg with chance pLeg (before the throw is
+// counted). `first` is who threw first in the game, if known. Used by the
+// team match chart.
+export function chanceFromScore(pLeg, m, first = null) {
+  return fromLeg(null, pLeg, m, first);
 }
 
 // A chance as shown on screen, to one decimal place. Until the match is over
@@ -238,7 +298,8 @@ function liveLeg(rem1, rem2, turn, a1, a2) {
 
 // Live chance player 1 wins the match.
 //   pv:   career figures from match_preview (with .oom when loaded)
-//   m:    the match row (legs, sets, p1_rem / p2_rem, turn)
+//   m:    the match row (legs, sets, p1_rem / p2_rem, turn), plus .first:
+//         who threw first in leg 1, when known
 //   form: optional { p1: {darts, scored}, p2: {...} } for this match, which
 //         shifts each player's average towards how they're throwing tonight
 export function liveChance(pv, m, form) {
@@ -264,5 +325,5 @@ export function liveChance(pv, m, form) {
   // Only a hair off 0 and 1, so the maths never divides by zero. A match
   // that's all but over can show 99.9%; only the finish itself is 100%.
   const cur = clamp(sigmoid(logit(clamp(raw, 0.0001, 0.9999)) + shift), 0.0001, 0.9999);
-  return clamp(fromLeg(cur, pLeg, m), 0.001, 0.999);
+  return clamp(fromLeg(cur, pLeg, m, m.first ?? null), 0.001, 0.999);
 }

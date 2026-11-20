@@ -4,7 +4,7 @@
 // the admin page makes it, then every knockout match. A player's chance is
 // the share of those run-throughs they win.
 
-import { legChance, liveChance, MODEL } from './winprob.js';
+import { legChance, legFor, liveChance, MODEL } from './winprob.js';
 import { standings, buildBracket } from './fixtures.js';
 
 const RUNS = 3000;
@@ -27,7 +27,7 @@ export function outrightPrice(p) {
   return best;
 }
 
-// figures: [{ id, name, career, form, prov }] from tournament_odds_data
+// figures: [{ id, name, career, form, prov, played, won, rating, rd, sd }] from tournament_odds_data
 // oom: player id -> order of merit score (winprob oomScore)
 // t: the tournament row; entrants: tournament_players rows; matches: all rows
 export function outrightOdds({ figures, oom, t, entrants, matches }) {
@@ -38,6 +38,8 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
     oom: { p1: oom.get(a) ?? 0.3, p2: oom.get(b) ?? 0.3 },
     p1_won: fig.get(a)?.won, p1_played: fig.get(a)?.played,
     p2_won: fig.get(b)?.won, p2_played: fig.get(b)?.played,
+    p1_rating: fig.get(a)?.rating, p1_rd: fig.get(a)?.rd, p1_sd: fig.get(a)?.sd,
+    p2_rating: fig.get(b)?.rating, p2_rd: fig.get(b)?.rd, p2_sd: fig.get(b)?.sd,
   });
   const legMemo = new Map();
   const leg = (a, b) => {
@@ -46,10 +48,14 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
     return legMemo.get(k);
   };
   // A match played out from its current legs: returns [winner side, p1 legs, p2 legs].
+  // Who threw first isn't known here, so it's a coin flip (as the bull off
+  // roughly is), and the throw alternates leg by leg from there.
   const playLegs = (a, b, l1, l2, toWin) => {
     const p = leg(a, b);
+    const pl = { 1: legFor(p, 1), 2: legFor(p, 2) };
     let x = l1, y = l2;
-    while (x < toWin && y < toWin) { if (Math.random() < p) x++; else y++; }
+    let s = Math.random() < 0.5 ? 1 : 2;
+    while (x < toWin && y < toWin) { if (Math.random() < pl[s]) x++; else y++; s = 3 - s; }
     return [x >= toWin ? 1 : 2, x, y];
   };
 
