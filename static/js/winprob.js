@@ -27,7 +27,7 @@ export function oomScores(rows, name1, name2) {
 // Every number the model uses, in one place, so it can be retuned once there
 // are enough results to measure it against (see tools/model-eval.mjs).
 export const MODEL = {
-  version: 6,
+  version: 7,
   baseline: 45,       // average assumed for someone with no record and no provisional average
   scale: 14,          // average points that make about one step in leg odds
   f9Weight: 0.3,      // how much first 9 counts on top of the average
@@ -44,10 +44,11 @@ export const MODEL = {
   winRatePrior: 10,   // matches of 50% added to everyone's record, so a short record barely counts
   winRateWeight: 0.15, // how far the gap in (adjusted) win rates moves the leg odds (halved now the rating covers results too)
   winRateCap: 0.6,    // the most win rate can move them, in the model's steps (about 15 points at evens)
-  legCap: 0.85,       // no one rated more than this to win a leg before it starts
+  legCap: 0.8,        // no one rated more than this to win a leg before it starts
+  thinPull: 0.75,     // with no record, every input counts this much (rising to fully at knownDarts darts)
   throwEdge: 0.12,    // extra pull towards whoever throws first in a leg: about 53% between equals (measured 51.6% to 54.6% so far)
-  ratingWeight: 0.3,  // how far the results rating (Glicko) moves the leg odds
-  ratingCap: 0.6,     // the most the rating can move them, in the model's steps
+  ratingWeight: 0.15, // how far the results rating (Glicko) moves the leg odds
+  ratingCap: 0.3,     // the most the rating can move them, in the model's steps
   sdRef: 27.4,        // a typical spread of visit scores
   sdWeight: 0.5,      // how much a wider spread (a streakier pair) pulls a leg towards 50/50
 };
@@ -202,11 +203,19 @@ export function legChance(pv) {
     p = p * (1 - w) + share * w;
   }
   const known = Math.min(1, Math.min(num(c1?.darts, 0), num(c2?.darts, 0)) / MODEL.knownDarts);
-  p = 0.5 + (p - 0.5) * (0.5 + 0.5 * known);
-  p = sigmoid(logit(p) + winRateShift(pv) + ratingShift(pv));
-  if (pv.oom) {
-    p = sigmoid(logit(p) + (pv.oom.p1 - pv.oom.p2) * MODEL.oomWeight * (1 - (1 - MODEL.oomWithHistory) * known));
+  let x = logit(p) + winRateShift(pv) + ratingShift(pv);
+  // Order of merit. No points usually means new, and new players have
+  // tended to be weaker, so it counts against them. But not when there's a
+  // better guide to their level: a provisional average, or a rating from a
+  // seed or results.
+  const vague = n => !(pv.oom[`p${n}`] >= 0.4) && (Number.isFinite(num(pv[`p${n}_prov`], NaN)) || num(pv[`p${n}_rd`], 350) < 340);
+  if (pv.oom && !vague(1) && !vague(2)) {
+    x += (pv.oom.p1 - pv.oom.p2) * MODEL.oomWeight * (1 - (1 - MODEL.oomWithHistory) * known);
   }
+  // Everything together is pulled towards 50/50 when either player has
+  // little record: by a quarter with none, not at all once both have a full one.
+  x *= MODEL.thinPull + (1 - MODEL.thinPull) * known;
+  p = sigmoid(x);
   return clamp(p, 1 - MODEL.legCap, MODEL.legCap);
 }
 
