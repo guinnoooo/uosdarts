@@ -10,8 +10,11 @@
 --      in it, and everyone else gets a bye through it.
 -- If the draw has byes but none can be used (their next matches have
 -- started), there's no space and the player can't be added.
+-- With no opponent given (p_opponent null), one is picked at random in that
+-- order: a random usable bye first, otherwise a random player from a free
+-- first-round match.
 
-create or replace function public.admin_add_late_player(p_tournament uuid, p_player uuid, p_opponent uuid)
+create or replace function public.admin_add_late_player(p_tournament uuid, p_player uuid, p_opponent uuid default null)
 returns text
 language plpgsql security definer set search_path = public as $$
 declare
@@ -35,10 +38,33 @@ begin
   if not exists (select 1 from matches where tournament_id = p_tournament and stage = 'knockout') then
     raise exception 'Draw the fixtures first';
   end if;
-  if p_player is null or p_opponent is null or p_player = p_opponent then raise exception 'Pick the new player and who they play'; end if;
+  if p_player is null then raise exception 'Pick the new player'; end if;
   if exists (select 1 from tournament_players where tournament_id = p_tournament and player_id = p_player) then
     raise exception 'They are already in this tournament';
   end if;
+
+  if p_opponent is null then
+    select coalesce(x.player1_id, x.player2_id) into p_opponent
+      from matches x join matches nx on nx.id = x.next_match_id
+     where x.tournament_id = p_tournament and x.stage = 'knockout' and x.round = 1 and x.status = 'complete'
+       and (x.player1_id is null) <> (x.player2_id is null)
+       and nx.status = 'pending' and nx.board is null and nx.called_at is null and nx.scorer_id is null
+     order by random() limit 1;
+    if p_opponent is null and not exists (
+         select 1 from matches where tournament_id = p_tournament and stage = 'knockout' and round = 1
+            and (player1_id is null) <> (player2_id is null)) then
+      select pl into p_opponent
+        from matches x, unnest(array[x.player1_id, x.player2_id]) pl
+       where x.tournament_id = p_tournament and x.stage = 'knockout' and x.round = 1
+         and x.player1_id is not null and x.player2_id is not null
+         and x.status = 'pending' and x.board is null and x.called_at is null and x.scorer_id is null
+       order by random() limit 1;
+    end if;
+    if p_opponent is null then
+      raise exception 'No space: every first-round match and every bye''s next match has already been called or started';
+    end if;
+  end if;
+  if p_player = p_opponent then raise exception 'Pick a different player to play them'; end if;
 
   -- 1. Reopen a bye.
   select * into b from matches
