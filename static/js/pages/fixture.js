@@ -65,7 +65,7 @@ async function loadChart() {
   const [fp, oom, legs] = await Promise.all([
     sb.rpc('fixture_preview', { p_tournament: id }),
     sb.rpc('oom_table'),
-    sb.from('legs').select('match_id, leg_no, winner').in('match_id', ids).order('leg_no'),
+    sb.from('legs').select('match_id, leg_no, winner, starter').in('match_id', ids).order('leg_no'),
   ]);
   if (fp.error || legs.error) return;
   S.legChance = new Map();
@@ -75,7 +75,9 @@ async function loadChart() {
     return [g.id, pv ? matchChance(pv, g) : 0.5];
   }));
   S.legs = new Map();
+  S.first = new Map();   // game id -> who threw first in it
   for (const l of legs.data ?? []) {
+    if (l.leg_no === 1 && l.starter) S.first.set(l.match_id, l.starter);
     if (!l.winner) continue;
     if (!S.legs.has(l.match_id)) S.legs.set(l.match_id, []);
     S.legs.get(l.match_id).push(l.winner);
@@ -122,7 +124,7 @@ function chartPoints() {
     legs.forEach((w, k) => {
       if (w === 1) x1++; else x2++;
       const over = x1 >= L || x2 >= L || k === legs.length - 1;
-      const gameP = over ? (isHomeWin(g) ? 1 : 0) : chanceFromScore(pLeg, { legs_to_win: L, p1_legs: x1, p2_legs: x2 });
+      const gameP = over ? (isHomeWin(g) ? 1 : 0) : chanceFromScore(pLeg, { legs_to_win: L, p1_legs: x1, p2_legs: x2 }, S.first.get(g.id));
       const p = isDec ? gameP : homeChance(regular, fixed, { id: g.id, p: gameP }, decPre);
       pts.push({ x: gi + (k + 1) / steps, p, label: `${g.game_label ?? 'Game'} leg ${k + 1} (${x1}–${x2}) · Overall ${h + (over && isHomeWin(g) ? 1 : 0)}–${a + (over && !isHomeWin(g) ? 1 : 0)}` });
     });
