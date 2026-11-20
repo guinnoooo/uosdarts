@@ -816,6 +816,7 @@ label.chk {
    changing never pushes the scoreboard and keypad down. */
 .m-head-right { display: flex; align-items: center; gap: .6rem; flex: none; }
 .m-head .watchers { color: var(--live); text-transform: none; letter-spacing: 0; font-size: .8rem; white-space: nowrap; }
+.m-head .watchers.peak { color: var(--muted); }
 /* While scoring the info line is held to one line, so a board number or
    anything else added mid-match can't make it wrap and shift the keypad. */
 html.scoring .m-info { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
