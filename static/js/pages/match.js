@@ -200,7 +200,8 @@ function playerPanel(n, d) {
   const st = playerStats(S.visits, S.legs, n);
   const rem = d.rem[n];
   const co = d.turn === n ? checkout(rem) : null;
-  const legDarts = d.legVisits.filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
+  // Darts this leg, or in the whole match once it's over.
+  const legDarts = (m.status === 'complete' ? S.visits : d.legVisits).filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
   // Side by side, so the score each player has left can be as big as possible.
   return `<div class="pp${d.turn === n ? ' on' : ''}${winnerSide(m) === n ? ' won' : ''}">
     <div class="pp-top">
@@ -208,8 +209,10 @@ function playerPanel(n, d) {
       ${m.sets_to_win ? `<span class="pp-sets" title="Sets won">${n === 1 ? m.p1_sets : m.p2_sets}</span>` : ''}
       <span class="pp-legs" title="${m.sets_to_win ? 'Legs won in this set' : 'Legs won'}">${n === 1 ? m.p1_legs : m.p2_legs}</span>
     </div>
-    <div class="pp-rem">${m.status === 'pending' ? m.start_score : rem}</div>
-    <div class="pp-co">${co ? co.join(' ') : '&nbsp;'}</div>
+    <div class="pp-rem">${m.status === 'pending' ? m.start_score
+      : m.status === 'complete' ? (m.sets_to_win ? (n === 1 ? m.p1_sets : m.p2_sets) : (n === 1 ? m.p1_legs : m.p2_legs))
+      : rem}</div>
+    <div class="pp-co">${m.status === 'complete' ? (m.sets_to_win ? 'Sets' : 'Legs') : co ? co.join(' ') : '&nbsp;'}</div>
     <div class="pp-stats">Avg ${st.avg ? st.avg.toFixed(1) : '–'} · ${legDarts} darts</div>
   </div>`;
 }
@@ -673,8 +676,23 @@ function previewBlock() {
 // Everyone watching any match in a tournament shares one presence channel and
 // says which match they're on. The count only includes people on this match,
 // and not whoever is scoring it.
+// Once the match is over it shows the most who watched at once instead.
 function watchersText() {
+  const m = S.match;
+  if (m?.status === 'complete') {
+    const peak = m.peak_viewers ?? 0;
+    return peak ? `Peak ${peak} watching` : '';
+  }
   return S.watchers ? `${S.watchers} watching` : '';
+}
+
+// When the count goes past the match's record, the new record is saved.
+// Only a higher number is ever kept, and only while the match is on.
+function notePeak() {
+  const m = S.match;
+  if (!m || m.status === 'complete' || !S.watchers || S.watchers <= (m.peak_viewers ?? 0)) return;
+  m.peak_viewers = S.watchers;
+  sb.rpc('note_viewers', { p_match: id, p_count: S.watchers }).then(() => {}, () => {});
 }
 
 function watch() {
@@ -687,6 +705,7 @@ function watch() {
       .filter(metas => metas.some(x => x.match === id && !x.scorer)).length;
     const el = document.getElementById('watchers');
     if (el) el.textContent = watchersText();
+    notePeak();
   });
   // Also fires after a reconnect (a phone waking up), when presence has to be sent again.
   // Joining is spread over a couple of seconds so a crowd opening the same
@@ -871,7 +890,7 @@ function render() {
           : hubKind() ? `<a class="back-link" href="/fixture/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`
           : `<a class="back-link" href="/tournament/?id=${m.tournament_id}"><span aria-hidden="true">‹</span> Back to ${esc(m.tournament?.name)}</a>`}
         <div class="m-head-right">
-          <span id="watchers" class="watchers">${watchersText()}</span>
+          <span id="watchers" class="watchers${m.status === 'complete' ? ' peak' : ''}">${watchersText()}</span>
           <button data-act="share" class="share-btn">Share</button>
         </div>
       </div>
