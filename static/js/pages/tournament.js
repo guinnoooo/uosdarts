@@ -100,11 +100,10 @@ function oddsSection() {
   if (list.length < 2) return '';
   const shown = S.oddsAll ? list : list.slice(0, 5);
   const thin = shown.some(x => x.thin);
-  const pctText = p => (p < 0.001 ? '<0.1' : (Math.round(p * 1000) / 10).toFixed(1));
   return `<section class="outright"><h2>Live odds to win the tournament${thin ? '<sup class="odds-star">*</sup>' : ''}</h2>
     <table class="outright-list"><tbody>${shown.map((x, i) => `<tr>
       <td class="muted">${i + 1}</td><td class="l">${esc(x.name)}</td>
-      <td class="muted">${pctText(x.p)}%</td><td><b>${outrightPrice(x.p)}</b></td></tr>`).join('')}</tbody></table>
+      <td><b>${outrightPrice(x.p)}</b></td></tr>`).join('')}</tbody></table>
     ${list.length > 5 ? `<button data-act="odds-toggle" class="link">${S.oddsAll ? 'Show top 5' : `Show all ${list.length}`}</button>` : ''}
     ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players</p>' : ''}
   </section>`;
@@ -117,12 +116,15 @@ function withNames(row) {
 }
 
 // Updating the row in place avoids refetching every match in the tournament
-// each time a dart is thrown.
+// each time a dart is thrown. The odds only move when a leg, set or match
+// finishes, not with every visit.
+const scoreKey = m => [m.status, m.p1_legs, m.p2_legs, m.p1_sets, m.p2_sets, m.winner_id].join('|');
 function applyMatchRow(row) {
   const i = S.matches.findIndex(m => m.id === row.id);
   if (i === -1) return false;
+  const before = scoreKey(S.matches[i]);
   S.matches[i] = withNames({ ...S.matches[i], ...row });
-  scheduleOdds();
+  if (scoreKey(S.matches[i]) !== before) scheduleOdds();
   return true;
 }
 
