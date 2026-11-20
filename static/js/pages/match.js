@@ -221,10 +221,9 @@ function finalBoard() {
   const sets = !!m.sets_to_win;
   const side = n => {
     const st = playerStats(S.visits, S.legs, n);
-    const darts = S.visits.filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
     return `<div class="fb-side${w === n ? ' won' : ''}">
       <span class="fb-name">${esc(nameOf(n))}</span>
-      <span class="fb-stats">Avg ${st.avg ? st.avg.toFixed(1) : '–'} · ${darts} darts</span>
+      <span class="fb-stats">Avg ${st.avg ? st.avg.toFixed(1) : '–'}</span>
     </div>`;
   };
   return `<div class="final-board">
@@ -839,12 +838,9 @@ function actionZone(d) {
   const m = S.match;
   const ready = hasPlayers(m);
 
+  // The final board above already shows the score and who won.
   if (m.status === 'complete') {
-    const w = winnerSide(m) ?? (m.p1_legs > m.p2_legs ? 1 : 2);
-    const [hi, lo] = m.sets_to_win ? [Math.max(m.p1_sets, m.p2_sets), Math.min(m.p1_sets, m.p2_sets)]
-      : [Math.max(m.p1_legs, m.p2_legs), Math.min(m.p1_legs, m.p2_legs)];
-    return `<div class="banner">${esc(nameOf(w))} wins ${hi}–${lo}${m.sets_to_win ? ' in sets' : ''}</div>
-      ${isScorer() ? '<div class="center"><button data-act="undo">Undo last visit</button></div>' : ''}`;
+    return isScorer() ? '<div class="center"><button data-act="undo">Undo last visit</button></div>' : '';
   }
   if (isRemote()) {
     const z = remoteZone(d);
