@@ -4,7 +4,7 @@
 // the admin page makes it, then every knockout match. A player's chance is
 // the share of those run-throughs they win.
 
-import { legChance, legFor, liveChance, MODEL } from './winprob.js';
+import { legChance, legFor, chanceFromScore, MODEL } from './winprob.js';
 import { standings, buildBracket } from './fixtures.js';
 
 const RUNS = 3000;
@@ -100,10 +100,13 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
     return champion;
   }
 
-  // A live match's chance comes from the score as it stands, and doesn't
-  // change between run-throughs.
+  // A live match's chance comes from the legs (and sets) won so far, not
+  // the scores left in the current leg, so it only moves when a leg ends.
+  // It doesn't change between run-throughs.
   for (const m of matches) {
-    if (m.status === 'live' && m.player1_id && m.player2_id) m._live = liveChance(pv(m.player1_id, m.player2_id), m);
+    if (m.status === 'live' && m.player1_id && m.player2_id) {
+      m._live = chanceFromScore(legChance(pv(m.player1_id, m.player2_id)), { ...m, legs_to_win: m.legs_to_win ?? t.knockout_legs_to_win });
+    }
   }
 
   const labels = [...new Set(entrants.map(e => e.group_label).filter(Boolean))].sort();
