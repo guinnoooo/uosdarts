@@ -200,8 +200,7 @@ function playerPanel(n, d) {
   const st = playerStats(S.visits, S.legs, n);
   const rem = d.rem[n];
   const co = d.turn === n ? checkout(rem) : null;
-  // Darts this leg, or in the whole match once it's over.
-  const legDarts = (m.status === 'complete' ? S.visits : d.legVisits).filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
+  const legDarts = d.legVisits.filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
   // Side by side, so the score each player has left can be as big as possible.
   return `<div class="pp${d.turn === n ? ' on' : ''}${winnerSide(m) === n ? ' won' : ''}">
     <div class="pp-top">
@@ -209,11 +208,32 @@ function playerPanel(n, d) {
       ${m.sets_to_win ? `<span class="pp-sets" title="Sets won">${n === 1 ? m.p1_sets : m.p2_sets}</span>` : ''}
       <span class="pp-legs" title="${m.sets_to_win ? 'Legs won in this set' : 'Legs won'}">${n === 1 ? m.p1_legs : m.p2_legs}</span>
     </div>
-    <div class="pp-rem">${m.status === 'pending' ? m.start_score
-      : m.status === 'complete' ? (m.sets_to_win ? (n === 1 ? m.p1_sets : m.p2_sets) : (n === 1 ? m.p1_legs : m.p2_legs))
-      : rem}</div>
-    <div class="pp-co">${m.status === 'complete' ? (m.sets_to_win ? 'Sets' : 'Legs') : co ? co.join(' ') : '&nbsp;'}</div>
+    <div class="pp-rem">${m.status === 'pending' ? m.start_score : rem}</div>
+    <div class="pp-co">${co ? co.join(' ') : '&nbsp;'}</div>
     <div class="pp-stats">Avg ${st.avg ? st.avg.toFixed(1) : '–'} · ${legDarts} darts</div>
+  </div>`;
+}
+
+// A finished match: one final score across the middle, so it can't be
+// mistaken for what each player had left.
+function finalBoard() {
+  const m = S.match, w = winnerSide(m);
+  const sets = !!m.sets_to_win;
+  const side = n => {
+    const st = playerStats(S.visits, S.legs, n);
+    const darts = S.visits.filter(v => v.player === n).reduce((a, v) => a + v.darts, 0);
+    return `<div class="fb-side${w === n ? ' won' : ''}">
+      <span class="fb-name">${esc(nameOf(n))}</span>
+      <span class="fb-stats">Avg ${st.avg ? st.avg.toFixed(1) : '–'} · ${darts} darts</span>
+    </div>`;
+  };
+  return `<div class="final-board">
+    ${side(1)}
+    <div class="fb-score">
+      <span class="fb-big">${sets ? m.p1_sets : m.p1_legs}<i>–</i>${sets ? m.p2_sets : m.p2_legs}</span>
+      <span class="fb-label">Full time · ${sets ? 'sets' : 'legs'}</span>
+    </div>
+    ${side(2)}
   </div>`;
 }
 
@@ -896,7 +916,7 @@ function render() {
       </div>
       <span class="m-info">${esc(matchLabel(m, S.koRounds))} · ${formatText(m)}${m.board ? ` · Board ${esc(m.board)}` : ''}${m.tournament?.dart_limit ? ` · ${m.tournament.dart_limit} dart limit` : ''}</span>
     </div>
-    <div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>
+    ${m.status === 'complete' ? finalBoard() : `<div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>`}
     ${actionZone(d)}
     ${m.status === 'pending' ? previewBlock() : ''}`;
   // Whoever set up a friendly can delete it until it's finished. It sits
