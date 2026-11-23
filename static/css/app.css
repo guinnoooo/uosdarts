@@ -1026,3 +1026,7 @@ a.back-link.plain { display: inline-block; margin-bottom: .6rem; font-size: .9re
 .fr-review { border-top: 1px solid var(--line, #2a2a2a); padding: .8rem 0; }
 .fr-review:first-of-type { border-top: 0; }
 .fr-head { display: flex; justify-content: space-between; gap: .6rem; flex-wrap: wrap; margin-bottom: .4rem; }
+
+/* A delete button on its own, outside a .row.danger */
+button.danger { border-color: #4a2a26; color: #c98279; }
+button.danger:hover { border-color: var(--live); color: #e8a79e; }
