@@ -42,6 +42,7 @@ async function loadInner() {
   S.friendliesOn = (await sb.rpc('friendlies_enabled')).data ?? false;
   S.hubsOn = (await sb.rpc('hub_enabled', { p_kind: 'uduk' })).data ?? false;
   S.friendlies = check(await sb.rpc('super_list_friendlies')) ?? [];
+  S.openFriendlies = check(await sb.rpc('super_list_open_friendlies')) ?? [];
   S.seeds = new Map((check(await sb.from('player_seeds').select('player_id, rating')) ?? [])
     .map(r => [r.player_id, Number(r.rating)]));
   if (S.sel) {
@@ -243,13 +244,15 @@ function reviewPanel() {
       <div class="row">
         <button data-frcount="${f.tournament_id}" class="primary">Played properly, count it</button>
         <button data-frskip="${f.tournament_id}">Don't count</button>
+        <button data-frdelete="${f.match_id}" class="danger">Delete</button>
       </div>
     </div>`;
   const doneRow = f => `<tr>
       <td><a href="/match/?id=${f.match_id}">${esc(f.p1_name)} ${score(f)} ${esc(f.p2_name)}</a> <span class="muted small">${when(f)}</span></td>
       <td>${f.counted ? `Counted${[f.counted_p1_id, f.counted_p2_id].some(Boolean)
         ? `: ${[f.counted_p1_id, f.counted_p2_id].map(nameOf).filter(Boolean).map(esc).join(', ')}` : ''}` : 'Not counted'}</td>
-      <td><button data-frreset="${f.tournament_id}">Undo</button></td>
+      <td><button data-frreset="${f.tournament_id}">Undo</button>
+        <button data-frdelete="${f.match_id}" class="danger">Delete</button></td>
     </tr>`;
   return `<section class="panel">
     <h2>Friendlies to check (${todo.length})</h2>
@@ -259,6 +262,24 @@ function reviewPanel() {
     ${todo.length ? todo.map(row).join('') : '<p class="muted">Nothing to check.</p>'}
     ${done.length ? `<p><button data-act="toggle-reviewed" class="link">${S.showReviewed ? 'Hide' : 'Show'} checked friendlies (${done.length})</button></p>
       ${S.showReviewed ? `<table class="points-list"><tbody>${done.map(doneRow).join('')}</tbody></table>` : ''}` : ''}
+  </section>
+  ${openFriendliesPanel()}`;
+}
+
+// Friendlies that haven't finished: being played now, or set up and left.
+function openFriendliesPanel() {
+  const list = S.openFriendlies ?? [];
+  if (!list.length) return '';
+  const score = f => f.sets_to_win ? `${f.p1_sets}–${f.p2_sets} sets` : `${f.p1_legs}–${f.p2_legs}`;
+  const when = f => new Date(f.updated).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return `<section class="panel">
+    <h2>Unfinished friendlies (${list.length})</h2>
+    <p class="muted small">Being played now, or set up and never finished. Deleting one removes it and everything scored in it.</p>
+    <table class="points-list"><tbody>${list.map(f => `<tr>
+      <td><a href="/match/?id=${f.match_id}">${esc(f.p1_name)} ${score(f)} ${esc(f.p2_name)}</a>
+        <span class="muted small">${f.status === 'live' ? 'live' : 'not started'} · last change ${when(f)} · ${f.visits} visits${f.remote ? ' · remote' : ''}</span></td>
+      <td><button data-frdelete="${f.match_id}" class="danger">Delete</button></td>
+    </tr>`).join('')}</tbody></table>
   </section>`;
 }
 
@@ -346,6 +367,14 @@ app.addEventListener('click', async e => {
   if (el.dataset.delpts) {
     await run(async () => check(await sb.rpc('super_delete_points', { p_id: Number(el.dataset.delpts) })),
       'Entry removed');
+    return;
+  }
+  if (el.dataset.frdelete) {
+    const id = el.dataset.frdelete;
+    const f = [...S.friendlies, ...(S.openFriendlies ?? [])].find(x => x.match_id === id);
+    const label = f ? `${f.p1_name} v ${f.p2_name}` : 'this friendly';
+    if (!confirm(`Delete ${label}? This removes the match and everything scored in it, and can't be undone.`)) return;
+    await run(async () => check(await sb.rpc('delete_friendly', { p_match: id })), 'Friendly deleted');
     return;
   }
   if (el.dataset.frcount || el.dataset.frskip || el.dataset.frreset) {
