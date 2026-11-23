@@ -13,9 +13,15 @@
 --      Now a loser who is already down to mark an unfinished game isn't
 --      queued again: that game counts as their turn.
 --
---   2. Among the queued losers, the one who lost on the board being called
---      is now picked first, so the loser stays at their board and marks
---      the next game there. Otherwise it's the oldest loss, as before.
+--   2. A loser now marks the next game on the board they lost on whenever
+--      possible, ahead of anyone who's been waiting longer:
+--        - When a board is called, the player who lost the last game on
+--          that board is picked first, then anyone else who lost there,
+--          then the oldest loss anywhere, as before.
+--        - Free boards whose last loser is waiting are filled before other
+--          free boards, so another board can't take that loser first.
+--      Early on, when every board is busy, each board that frees up hands
+--      its game straight to the player who just lost on it.
 --
 -- If there are more games than losers, the rest is unchanged: first-round
 -- byes who haven't marked yet, then anyone free at random.
@@ -26,6 +32,18 @@
 
 drop function if exists public.pick_referee(uuid, uuid);
 
+-- Who lost the last finished game on a board (null if nobody has yet).
+create or replace function public.board_last_loser(p_tournament uuid, p_board text) returns uuid
+language sql stable security definer set search_path = public as $$
+  select case when f.winner_id = f.player1_id then f.player2_id else f.player1_id end
+    from matches f
+   where p_board is not null
+     and f.tournament_id = p_tournament and f.board = p_board and f.status = 'complete'
+     and f.player1_id is not null and f.player2_id is not null and f.winner_id is not null
+   order by coalesce(f.finished_at, f.called_at) desc nulls last
+   limit 1;
+$$;
+
 create or replace function public.pick_referee(p_tournament uuid, p_match uuid, p_board text default null)
 returns uuid
 language plpgsql security definer set search_path = public as $$
@@ -35,15 +53,16 @@ declare
 begin
   select * into m from matches where id = p_match;
 
-  -- 1. A free loser: whoever lost on this board first, then whoever lost
-  --    longest ago.
+  -- 1. A free loser: whoever lost the last game on this board, then anyone
+  --    else who lost on it, then whoever lost longest ago.
   select q.player_id into pick
     from ref_queue q
    where q.tournament_id = p_tournament
      and q.player_id not in (coalesce(m.player1_id, '00000000-0000-0000-0000-000000000000'),
                              coalesce(m.player2_id, '00000000-0000-0000-0000-000000000000'))
      and not player_busy(p_tournament, q.player_id)
-   order by exists (
+   order by q.player_id is not distinct from board_last_loser(p_tournament, p_board) desc,
+            exists (
               select 1 from matches f
                where f.tournament_id = p_tournament and p_board is not null and f.board = p_board
                  and f.status = 'complete' and f.winner_id is not null
@@ -87,7 +106,8 @@ begin
   return pick;   -- may be null if everyone is busy
 end $$;
 
--- Same as migration 025, but tells pick_referee which board it's for.
+-- Same as migration 025, but fills boards with a waiting loser first and
+-- tells pick_referee which board it's for.
 create or replace function public.auto_board_calls(p_tournament uuid) returns void
 language plpgsql security definer set search_path = public as $$
 declare
@@ -102,7 +122,16 @@ begin
   -- One run at a time per tournament, so two results at once can't double-book a board.
   perform pg_advisory_xact_lock(hashtext('boards:' || p_tournament::text));
 
-  foreach b in array t.boards loop
+  -- Boards whose last loser is waiting to mark go first, so that loser
+  -- marks there rather than being taken by another free board.
+  for b in
+    select u.board
+      from unnest(t.boards) with ordinality u(board, ord)
+     order by exists (select 1 from ref_queue q
+                       where q.tournament_id = p_tournament
+                         and q.player_id = board_last_loser(p_tournament, u.board)) desc,
+              u.ord
+  loop
     continue when exists (
       select 1 from matches
        where tournament_id = p_tournament and board = b
@@ -174,6 +203,7 @@ begin
   return null;
 end $$;
 
+revoke execute on function public.board_last_loser(uuid, text)   from public, anon, authenticated;
 revoke execute on function public.pick_referee(uuid, uuid, text) from public, anon, authenticated;
 revoke execute on function public.auto_board_calls(uuid)         from public, anon, authenticated;
 revoke execute on function public.matches_boards_changed()       from public, anon, authenticated;
