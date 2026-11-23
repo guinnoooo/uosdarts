@@ -7,9 +7,20 @@ const NAME_KEY = 'uosdarts:chatname';
 const savedName = () => { try { return localStorage.getItem(NAME_KEY) ?? ''; } catch { return ''; } };
 const saveName = n => { try { localStorage.setItem(NAME_KEY, n); } catch { /* private mode */ } };
 
+// Switch to turn the chat off everywhere without removing it. Set back to
+// true to bring it back exactly as it was.
+export const CHAT_ENABLED = false;
+
 // Chat is behind a password. Once entered, it stays unlocked for this
 // browser until the super admin changes it.
 export async function mountChat(host, matchId) {
+  if (!CHAT_ENABLED) {
+    host.innerHTML = `<section class="chat">
+      <h2>Chat</h2>
+      <p class="muted">The chat feature is temporarily disabled.</p>
+    </section>`;
+    return;
+  }
   const { data: { session } } = await sb.auth.getSession();
   const ok = session ? (await sb.rpc('chat_ok')).data === true : false;
   if (ok) { openChat(host, matchId); return; }
