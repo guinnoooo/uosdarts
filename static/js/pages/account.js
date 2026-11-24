@@ -3,7 +3,7 @@
 // database makes it then), and it's what the chat and betting need.
 
 import { sb, esc, toast, qs } from '../db.js';
-import { loadAccount, fmtTokens, statusText, cancelButton, cashOut } from '../betting.js';
+import { loadAccount, fmtTokens, betCard, cashOut } from '../betting.js';
 
 const app = document.getElementById('app');
 const next = qs('next');
@@ -78,12 +78,7 @@ function accountHtml(a, bets, email) {
       <button data-act="logout">Log out</button>
     </section>`;
   }
-  const list = bets.length ? `<table class="bets-list"><tbody>${bets.map(b => `<tr>
-      <td class="l"><b>${esc(b.selection)}</b> at ${esc(b.price)}
-        <span class="muted small">${esc(b.market)}${b.market.includes(b.tournament) ? '' : ` · ${esc(b.tournament)}`} · ${when(b.placed_at)}</span></td>
-      <td>${fmtTokens(b.stake)}</td>
-      <td class="bet-${b.status}">${statusText(b)} ${cancelButton(b)}</td>
-    </tr>`).join('')}</tbody></table>`
+  const list = bets.length ? `<div class="betcards">${bets.map(b => betCard(b)).join('')}</div>`
     : '<p class="muted">No bets yet.</p>';
   if (a.can_bet === false) {
     return `${backLink()}<section class="panel account-box">

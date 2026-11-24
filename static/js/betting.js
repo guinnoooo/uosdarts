@@ -95,15 +95,42 @@ export async function cashOut(btn) {
   return false;
 }
 
+// One bet as a ticket. Built to look good in a screenshot: what was backed,
+// the odds, the stake and the return, the result, and the site's name.
+const dayTime = d => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+export function betCard(b, { context = null } = {}) {
+  const st = b.status;
+  const badge = STATUS[st] ?? st;
+  const [label, value] = st === 'won' ? ['Paid', b.payout]
+    : st === 'cashed_out' ? ['Cashed out', b.payout]
+    : st === 'void' || st === 'cancelled' ? ['Returned', b.stake]
+    : st === 'lost' ? ['Returns', 0]
+    : ['To return', b.returns];
+  const ctx = context ?? ([b.market, b.tournament && !String(b.market ?? '').includes(b.tournament) ? b.tournament : null].filter(Boolean).join(' · ')
+    || document.title.split(' · ')[0].trim());
+  const actions = cancelButton(b);
+  return `<article class="betcard betcard-${esc(st)}">
+    <header class="betcard-top">
+      <span class="betcard-ctx">${esc(ctx || 'Bet')}</span>
+      <span class="betcard-badge">${esc(badge)}</span>
+    </header>
+    <div class="betcard-sel"><span>${esc(b.selection)}</span><span class="betcard-odds">${esc(b.price)}</span></div>
+    <div class="betcard-nums">
+      <div><span>Stake</span><b>${fmtTokens(b.stake)}</b></div>
+      <div><span>${label}</span><b>${fmtTokens(value)}</b></div>
+    </div>
+    <footer class="betcard-foot"><span>${b.placed_at ? dayTime(b.placed_at) : ''}</span><span class="betcard-brand">uosdarts.com</span></footer>
+    ${actions ? `<div class="betcard-actions">${actions}</div>` : ''}
+  </article>`;
+}
+
 export function myBetsHtml(list) {
   if (!list?.length) return '';
   const net = betsNet(list);
   const open = list.some(b => b.status === 'open');
   const result = net === null || open ? ''
     : `<p class="bets-net ${net >= 0 ? 'bet-won' : 'bet-lost'}">${net >= 0 ? `You won ${fmtTokens(net)}` : `You lost ${fmtTokens(-net)}`} tokens</p>`;
-  return `<div class="my-bets"><h3>Your bets</h3>${result}<ul>${list.map(b => `<li>
-      <span><b>${fmtTokens(b.stake)}</b> on ${esc(b.selection)} at ${esc(b.price)}</span>
-      <span class="muted small">${statusText(b)}</span> ${cancelButton(b)}</li>`).join('')}</ul></div>`;
+  return `<div class="my-bets"><h3>Your bets</h3>${result}<div class="betcards">${list.map(b => betCard(b)).join('')}</div></div>`;
 }
 
 async function placeBet(slip) {

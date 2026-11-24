@@ -73,55 +73,34 @@ export function opponentRecords(H) {
   return [...by.values()].filter(x => x.played > 1);
 }
 
-// Everything one player has won or been part of, for their profile.
+// The titles one player has won, for their profile. National titles and
+// the Dartsity record already show as stars, so they're left out here, and
+// so are committee roles.
 export function honoursFor(H, slug) {
   const mine = name => H.slugOf(name) === slug;
   const titles = new Map();          // event -> [season]
   const add = (k, season) => { const a = titles.get(k) ?? []; a.push(season); titles.set(k, a); };
-  const roles = [];
   const awards = [];
-  let ds = { played: 0, won: 0, titles: 0, captain: [] };
-
   for (const s of H.seasons) {
-    for (const e of s.internal ?? []) {
-      if (people(e.winner).some(mine)) add(e.event, s.season);
-    }
-    for (const t of s.trophies ?? []) {
-      if ((t.winners ?? []).some(mine)) add(t.title, s.season);
-    }
-    for (const c of s.committee ?? []) {
-      if (mine(c.name) && /president|captain/i.test(c.role) && !/vice|dartselona|football|b team|c team/i.test(c.role)) {
-        roles.push(`${c.role} ${s.season}`);
-      }
-    }
+    for (const e of s.internal ?? []) if (people(e.winner).some(mine)) add(e.event, s.season);
+    for (const t of s.trophies ?? []) if (t.kind === 'individual' && (t.winners ?? []).some(mine)) add(t.title, s.season);
     for (const a of s.awards ?? []) {
-      if (/player of the year|fresher/i.test(a.award) && people(a.name).some(mine)) awards.push(`${a.award} ${s.season}`);
-    }
-    const v = s.varsity;
-    if (v) {
-      if (v.captain && mine(v.captain)) ds.captain.push(s.season);
-      for (const mt of v.matches ?? []) {
-        if (!people(mt.us).some(mine)) continue;
-        const r = matchResult(mt);
-        if (r) { ds.played++; if (r === 'W') ds.won++; }
-        if (v.result === 'won') ds.titles++;
+      if (/player of the year|fresher|most improved/i.test(a.award) && !/least/i.test(a.award) && people(a.name).some(mine)) {
+        awards.push(`${a.award} ${s.season}`);
       }
     }
   }
-  return { titles: [...titles.entries()], roles, awards, dartsity: ds };
+  return { titles: [...titles.entries()], awards };
 }
 
 export function honoursHtml(h, esc) {
   const parts = [];
-  if (h.dartsity.played) {
-    parts.push(`<li><b>Dartsity</b> ${h.dartsity.won}–${h.dartsity.played - h.dartsity.won} in matches`
-      + `${h.dartsity.titles ? `, ${h.dartsity.titles} title${h.dartsity.titles === 1 ? '' : 's'}` : ''}`
-      + `${h.dartsity.captain.length ? `, captain ${h.dartsity.captain.join(', ')}` : ''}</li>`);
-  }
   for (const [event, seasons] of h.titles) {
     parts.push(`<li><b>${esc(event)}</b>${seasons.length > 1 ? ` ×${seasons.length}` : ''} <span class="muted">${seasons.map(esc).join(', ')}</span></li>`);
   }
-  for (const x of [...h.roles, ...h.awards]) parts.push(`<li>${esc(x)}</li>`);
+  for (const x of h.awards) parts.push(`<li>${esc(x)}</li>`);
   if (!parts.length) return '';
-  return `<p class="honours-head">Honours</p><ul class="honours">${parts.join('')}</ul>`;
+  const n = h.titles.reduce((t, [, s]) => t + s.length, 0);
+  return `<details class="honours-box"><summary class="honours-head">Honours <span class="muted">${n ? `${n} title${n === 1 ? '' : 's'}` : ''}${n && h.awards.length ? ' · ' : ''}${h.awards.length ? `${h.awards.length} award${h.awards.length === 1 ? '' : 's'}` : ''}</span></summary>`
+    + `<ul class="honours">${parts.join('')}</ul></details>`;
 }

@@ -376,7 +376,7 @@ function fantasyPanel() {
     <p class="muted small">Budget £50.0m for six. A blank price can't be picked.</p>
     <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">Player</th><th>Suggested (£m)</th><th>Price (£m)</th><th>In teams</th></tr></thead>
     <tbody>${list.map(r => `<tr>
-      <td class="l">${esc(r.name)}</td>
+      <td class="l">${esc(r.name)}${r.price == null ? ' <span class="small muted">needs a price</span>' : ''}</td>
       <td class="fut-sugg">${r.suggested ?? ''}</td>
       <td><input class="fut-price" data-fx-price="${r.player_id}" data-orig="${r.price ?? ''}" data-sugg="${r.suggested ?? ''}" value="${r.price ?? ''}" inputmode="decimal" placeholder="off"></td>
       <td class="small">${r.picked || ''}</td></tr>`).join('')}</tbody></table></div>
