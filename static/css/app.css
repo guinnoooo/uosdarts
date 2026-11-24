@@ -1184,3 +1184,4 @@ button.chat-who:hover { text-decoration: underline; }
 }
 #fx-pq { width: 100%; }
 #fx-picker .fx-dialog-head button:focus:not(:focus-visible) { outline: none; box-shadow: none; border-color: transparent; }
+.fx-market th, .fx-market td { padding-left: .2rem; padding-right: .2rem; }
