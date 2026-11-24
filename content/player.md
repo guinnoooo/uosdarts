@@ -1,0 +1,4 @@
+---
+title: "Player"
+layout: "player"
+---

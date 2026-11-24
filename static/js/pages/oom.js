@@ -85,6 +85,7 @@ function modalHtml(p) {
         </div>
       </div>
       <div class="player-modal-honours" data-honours-for="${slug}"></div>
+      <a class="player-modal-full" href="/player/?p=${slug}">Full profile ›</a>
     </div>
   </dialog>`;
 }

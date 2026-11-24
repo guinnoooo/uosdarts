@@ -299,14 +299,32 @@ function reviewPanel() {
 function accountsPanel() {
   const list = S.accounts ?? [];
   const q = (S.accQ ?? '').toLowerCase();
-  const shown = q ? list.filter(a => `${a.display_name} ${a.email}`.toLowerCase().includes(q)) : list;
+  const shown = q ? list.filter(a => `${a.display_name} ${a.email} ${a.player_name ?? ''}`.toLowerCase().includes(q)) : list;
+  const linked = new Set(list.map(a => a.player_id).filter(Boolean));
+  // An unlinked account whose name matches a player gets a one-tap suggestion.
+  const guess = a => a.player_id ? null
+    : S.players.find(p => !linked.has(p.id) && p.name.toLowerCase() === String(a.display_name ?? '').trim().toLowerCase());
+  const linkCell = a => {
+    if (S.linkFor === a.user_id) {
+      return `<span class="row" style="flex-wrap:wrap">
+        <select data-linkpick="${a.user_id}"><option value="">Not linked</option>${S.players.filter(p => p.id === a.player_id || !linked.has(p.id))
+          .map(p => `<option value="${p.id}"${p.id === a.player_id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+        <button data-linksave="${a.user_id}" class="primary">Save</button><button data-linkfor="">Cancel</button></span>`;
+    }
+    const g = guess(a);
+    return `<span class="small">${a.player_id ? `Player: <a href="/player/?p=${esc(S.players.find(p => p.id === a.player_id)?.slug ?? '')}">${esc(a.player_name)}</a>` : '<span class="muted">No player linked</span>'}
+      <button class="link" data-linkfor="${a.user_id}">${a.player_id ? 'Change' : 'Link'}</button>
+      ${g ? `<button class="link" data-linkquick="${a.user_id}" data-player="${g.id}">Link to ${esc(g.name)}?</button>` : ''}</span>`;
+  };
   return `<section class="panel">
     <h2>Accounts (${list.length})</h2>
-    <p class="muted small">Blocked accounts can't chat or bet.</p>
+    <p class="muted small">Blocked accounts can't chat or bet. Link an account to the player it belongs to, ready for emailing results later.
+      ${list.filter(a => a.player_id).length} of ${list.length} linked.</p>
     ${list.length > 8 ? `<input id="acc-q" placeholder="Search name or email" value="${esc(S.accQ ?? '')}">` : ''}
     ${shown.length ? `<table class="points-list"><tbody>${shown.map(a => `<tr>
       <td><b>${esc(a.display_name)}</b>${a.banned ? ' <span class="error small">blocked</span>' : ''}
-        <span class="muted small" style="display:block">${esc(a.email ?? '')} · ${Number(a.tokens).toLocaleString('en-GB')} tokens · ${a.bets} bets · ${a.messages} messages</span></td>
+        <span class="muted small" style="display:block">${esc(a.email ?? '')} · ${Number(a.tokens).toLocaleString('en-GB')} tokens · ${a.bets} bets · ${a.messages} messages</span>
+        <span style="display:block">${linkCell(a)}</span></td>
       <td class="row" style="justify-content:flex-end;flex-wrap:wrap">
         <input type="number" step="100" placeholder="± tokens" data-acctok="${a.user_id}" style="width:7rem">
         <button data-accadj="${a.user_id}">Give</button>
@@ -647,6 +665,18 @@ app.addEventListener('click', async e => {
     const banned = el.dataset.banned !== 'true';
     await run(async () => check(await sb.rpc('super_set_banned', { p_user: el.dataset.accban, p_banned: banned })),
       banned ? 'Account blocked' : 'Account unblocked');
+    return;
+  }
+  if (el.dataset.linkfor !== undefined) {
+    S.linkFor = el.dataset.linkfor || null;
+    render();
+    return;
+  }
+  if (el.dataset.linksave || el.dataset.linkquick) {
+    const u = el.dataset.linksave || el.dataset.linkquick;
+    const pid = el.dataset.linkquick ? el.dataset.player : (app.querySelector(`[data-linkpick="${u}"]`)?.value || null);
+    S.linkFor = null;
+    await run(async () => check(await sb.rpc('super_link_account', { p_user: u, p_player: pid })), pid ? 'Linked' : 'Unlinked');
     return;
   }
   if (el.dataset.accbets) {

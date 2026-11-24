@@ -1289,3 +1289,49 @@ button.chat-who:hover { text-decoration: underline; }
 .bets-group > summary::-webkit-details-marker { display: none; }
 .bets-group > summary .bets-head::after { content: '▸'; margin-left: auto; color: var(--text-3); }
 .bets-group[open] > summary .bets-head::after { content: '▾'; }
+
+/* fantasy chips */
+.fx-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin-top: 1rem; }
+.fx-chip { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; padding: .6rem .65rem; border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg); background: var(--surface-2); min-width: 0; }
+.fx-chip b { font-size: .9rem; }
+.fx-chip .small { line-height: 1.25; }
+.fx-chip > :last-child { margin-top: auto; }
+.fx-chip.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.fx-chip.on b, .fx-chip.on .small { color: var(--accent); }
+.fx-chip.used { opacity: .55; }
+.fx-chip-tag { color: var(--accent); font-weight: 600; }
+@media (max-width: 420px) { .fx-chips { gap: .35rem; } .fx-chip { padding: .5rem; } .fx-chip b { font-size: .82rem; } }
+
+/* player page */
+.pp-head { display: flex; gap: 1rem; align-items: center; }
+.pp-head h1 { margin: 0; font-size: 1.6rem; }
+.pp-photo { width: 96px; height: 96px; border-radius: var(--r-lg); object-fit: cover; flex: none; background: var(--surface-2); }
+.pp-nick { margin: .1rem 0 .3rem; font-style: italic; color: var(--text-2); }
+.pp-awards { display: flex; flex-wrap: wrap; gap: .4rem .8rem; margin-top: .3rem; }
+.pp-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.pp-tile { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-lg); padding: .55rem .65rem; }
+.pp-tile span { display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); }
+.pp-tile b { font-family: var(--mono); font-size: 1.2rem; }
+.pp-tile small { display: block; color: var(--text-3); font-size: .72rem; }
+.pp-chart { margin: 0; }
+.pp-chart svg { width: 100%; height: auto; display: block; }
+.pp-grid { stroke: var(--line); stroke-width: 1; }
+.pp-ref { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 4 4; }
+.pp-axis { fill: var(--text-3); font-size: 11px; font-family: var(--mono); }
+.pp-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pp-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; pointer-events: none; }
+.pp-hit { fill: transparent; cursor: pointer; }
+.pp-pt.on .pp-dot, .pp-pt:hover .pp-dot { r: 6.5; }
+.pp-pt:focus { outline: none; }
+.pp-tip { margin-top: .4rem; min-height: 1.3em; }
+.pp-scroll { overflow-x: auto; }
+.pp-events th, .pp-events td:not(.l) { white-space: nowrap; }
+.pp-events { font-size: .9rem; }
+.pp-events th, .pp-events td { padding-left: .25rem; padding-right: .25rem; }
+.pp-res { display: inline-block; width: 1.5rem; text-align: center; border-radius: var(--r); font-weight: 700; font-size: .8rem; padding: .1rem 0; }
+.pp-res.w { background: rgba(138, 211, 174, .15); color: var(--good); }
+.pp-res.l { background: rgba(255, 90, 90, .12); color: var(--live); }
+.pp-matches td:first-child { width: 2rem; }
+@media (max-width: 420px) { .pp-photo { width: 72px; height: 72px; } .pp-head h1 { font-size: 1.3rem; } .pp-tile b { font-size: 1.05rem; } }
+.player-modal-full { display: inline-block; margin-top: .8rem; font-weight: 600; }

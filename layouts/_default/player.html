@@ -1,0 +1,12 @@
+{{ define "main" }}
+<div class="wrap app-wrap">
+  <div id="app" data-history="{{ partial "history-json.html" . }}" data-season="{{ site.Params.season }}"><p class="muted">Loading…</p></div>
+</div>
+{{/* What the profiles carried before live scoring: 180s, 100+ checkouts and
+     sheet legs from earlier seasons, nicknames and national titles. */}}
+<script type="application/json" id="yaml-players">{{ site.Data.players | jsonify }}</script>
+{{ end }}
+
+{{ define "scripts" }}
+<script type="module" src="{{ "js/pages/player.js" | relURL }}?v={{ now.Unix }}"></script>
+{{ end }}

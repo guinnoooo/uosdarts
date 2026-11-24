@@ -28,6 +28,13 @@ const photo = (slug, name, cls = 'fx-photo') => slug
 // Prices in millions, the fantasy football way: 14.0 shows as £14.0m.
 const money = n => { const v = Number(n ?? 0); return `${v < 0 ? '−' : ''}£${Math.abs(v).toFixed(1)}m`; };
 const when = d => new Date(d).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+// Three chips, each once a season, one a week.
+const CHIPS = [
+  ['triple_captain', 'Triple Captain', 'Captain scores x3'],
+  ['bench_boost', 'Bench Boost', 'Bench scores too'],
+  ['wildcard', 'Wildcard', 'Free changes this week'],
+];
+const CHIP_NAME = Object.fromEntries(CHIPS.map(([k, n]) => [k, n]));
 const gwLabel = d => `w/c ${new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
 const byId = id => S.market.find(p => p.id === id);
 
@@ -52,8 +59,9 @@ async function load() {
   S.board = board.data ?? [];
   S.account = acc;
   if (acc) {
-    const { data } = await sb.rpc('fantasy_my_team');
+    const [{ data }, chips] = await Promise.all([sb.rpc('fantasy_my_team'), sb.rpc('fantasy_my_chips')]);
     S.team = data;
+    S.chips = chips.data ?? {};
     S.name = data?.name ?? acc.display_name ?? '';
     const sq = data?.squad ?? [];
     S.squad = [1, 2, 3, 4, 5, 6].map(n => sq.find(x => x.slot === n)?.player_id ?? null);
@@ -90,7 +98,9 @@ function squadHtml() {
   if (!t?.next_gw) return `<section class="panel"><div class="fx-head"><h2>Your team</h2>${scoringButton}</div><p class="muted">No PC or major coming up.</p></section>`;
   const left = bank();
   const ch = changes();
-  const hit = Math.max(0, ch - 1) * t.hit;
+  const chips = S.chips ?? {};
+  const onNow = Object.keys(chips).find(k => chips[k] === t.next_gw);
+  const hit = onNow === 'wildcard' ? 0 : Math.max(0, ch - 1) * t.hit;
   const slot = (id, i) => {
     const p = byId(id);
     const role = ROLES[i];
@@ -116,8 +126,16 @@ function squadHtml() {
     ${S.pick !== null && S.squad[S.pick] ? `<p class="small fx-hint">Tap a role to move ${esc(byId(S.squad[S.pick])?.name ?? 'them')}.</p>` : ''}
     <ol class="fx-squad">${S.squad.map(slot).join('')}</ol>
     <p class="small"><b class="${left < 0 ? 'error' : ''}">${money(left)}</b> in the bank
-      ${t.first_squad ? '' : ` · ${ch} change${ch === 1 ? '' : 's'}${hit ? `, <span class="error">−${hit} points</span>` : ' (1 free)'}`}</p>
+      ${t.first_squad ? '' : ` · ${ch} change${ch === 1 ? '' : 's'}${onNow === 'wildcard' ? ' (free, Wildcard)' : hit ? `, <span class="error">−${hit} points</span>` : ' (1 free)'}`}</p>
     <button class="primary" data-act="save">Save team</button>
+    ${S.team?.name ? `<div class="fx-chips">${CHIPS.map(([k, name, note]) => {
+      const used = chips[k];
+      const active = used && used === t.next_gw;
+      const state = active ? `<button class="link" data-chip-cancel="${k}">Cancel</button>`
+        : used ? `<span class="muted small">Used ${esc(gwLabel(used))}</span>`
+        : `<button class="small-pick odds-pick" data-chip-play="${k}"${onNow ? ' disabled' : ''}>Play</button>`;
+      return `<div class="fx-chip${active ? ' on' : ''}${used && !active ? ' used' : ''}"><b>${name}</b><span class="muted small">${active ? 'On this week' : note}</span>${state}</div>`;
+    }).join('')}</div>` : ''}
   </section>`;
 }
 
@@ -156,12 +174,12 @@ function historyHtml() {
 
 function teamWeekHtml(w) {
   const det = d => d ? Object.entries(d).filter(([, v]) => v).map(([k, v]) => `${v} ${k}`).join(', ') : '';
-  return `<details class="fx-week"><summary><b>${gwLabel(w.gw)}</b> · ${w.total} points${w.hits ? ` (−${w.hits} for changes)` : ''}</summary>
+  return `<details class="fx-week"><summary><b>${gwLabel(w.gw)}</b> · ${w.total} points${w.hits ? ` (−${w.hits} for changes)` : ''}${w.chip ? ` · <span class="fx-chip-tag">${esc(CHIP_NAME[w.chip] ?? w.chip)}</span>` : ''}</summary>
     <ul class="fx-week-list">${w.starters.map(s => `<li>${photo(s.slug, s.name, 'fx-thumb')}
       <span><span class="muted small">${esc(s.role)}</span> ${esc(s.name)}: <b>${s.points}</b>
       <span class="muted small" style="display:block">${s.played ? esc(det(s.detail)) : 'didn\'t play'}${s.europa ? ` · Europa: ${s.europa} (${esc(det(s.europa_detail))})` : ''}</span></span></li>`).join('')}
       ${w.bench_name ? `<li class="muted">${photo(w.bench_slug, w.bench_name, 'fx-thumb')}<span>Bench: ${esc(w.bench_name)},
-        ${w.bench_came_on ? `came on as ${esc(w.bench_role)}, <b>${w.bench_points}</b>` : 'not needed'}</span></li>` : ''}</ul>
+        ${w.bench_came_on ? `came on as ${esc(w.bench_role)}, <b>${w.bench_points}</b>` : w.bench_boost ? `Bench Boost, <b>${w.bench_boost}</b>` : 'not needed'}</span></li>` : ''}</ul>
   </details>`;
 }
 
@@ -202,6 +220,13 @@ const scoringHtml = () => `<dialog id="fx-scoring" class="fx-dialog">
     <li>Teams lock when the week's first PC or major starts.</li>
     <li>One free change a week, then ${S.team?.hit ?? 8} points per change.</li>
     <li>Prices move a little each week with form.</li>
+  </ul>
+  <h3>Chips</h3>
+  <ul class="small fx-rules">
+    <li><b>Triple Captain</b>: your captain scores x3 instead of x2.</li>
+    <li><b>Bench Boost</b>: your bench player's points count as well, if all five starters play.</li>
+    <li><b>Wildcard</b>: make as many changes as you like that week without losing points.</li>
+    <li>Each chip can be used once a season, and only one a week. You can cancel a chip until the deadline.</li>
   </ul>
 </dialog>`;
 
@@ -358,10 +383,24 @@ app.addEventListener('click', async e => {
     render();
     return;
   }
+  if (b.dataset.chipPlay || b.dataset.chipCancel) {
+    const k = b.dataset.chipPlay || b.dataset.chipCancel;
+    const play = !!b.dataset.chipPlay;
+    if (play && !confirm(`Play ${CHIP_NAME[k]} this week? You can cancel it until the deadline.`)) return;
+    b.disabled = true;
+    const { error } = await sb.rpc(play ? 'fantasy_play_chip' : 'fantasy_cancel_chip', { p_chip: k });
+    b.disabled = false;
+    if (error) { toast(error.message); return; }
+    toast(play ? `${CHIP_NAME[k]} on for this week` : `${CHIP_NAME[k]} cancelled`, false);
+    await load();
+    render();
+    return;
+  }
   if (b.dataset.act === 'save') {
     if (S.squad.some(x => !x)) { toast('Fill all five roles and the bench'); return; }
     const ch = changes();
-    if (ch > 1 && !confirm(`${ch} changes costs ${(ch - 1) * S.team.hit} points. Save?`)) return;
+    const wild = (S.chips ?? {}).wildcard === S.team?.next_gw;
+    if (ch > 1 && !wild && !confirm(`${ch} changes costs ${(ch - 1) * S.team.hit} points. Save?`)) return;
     b.disabled = true;
     const { data, error } = await sb.rpc('fantasy_save', { p_name: S.name, p_players: S.squad });
     b.disabled = false;
