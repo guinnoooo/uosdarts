@@ -1166,3 +1166,21 @@ button.chat-who:hover { text-decoration: underline; }
 .fx-pick-row b { text-align: right; }
 .fx-pick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fx-slot:not(.empty) .fx-who, .fx-slot:not(.empty) > .fx-photo { cursor: pointer; }
+
+/* Phones: inputs at 16px so iOS doesn't zoom in when one is tapped. */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: 16px; }
+}
+/* Phones: the player picker fills the screen above the keyboard, search box
+   at the top and the list scrolling underneath it. */
+@media (max-width: 640px) {
+  #fx-picker {
+    width: 100%; max-width: none; margin: 0; inset: 0 auto auto 0;
+    height: var(--vvh, 100dvh); max-height: none; border: 0; border-radius: 0;
+    padding: .8rem 1rem calc(.8rem + env(safe-area-inset-bottom));
+  }
+  #fx-picker .fx-pick-list { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .fx-pick-row { padding: .7rem .2rem; }
+}
+#fx-pq { width: 100%; }
+#fx-picker .fx-dialog-head button:focus:not(:focus-visible) { outline: none; box-shadow: none; border-color: transparent; }
