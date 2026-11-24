@@ -65,10 +65,35 @@ export async function myBetsOn({ matchId = null, tournamentId = null }) {
   return error ? [] : data ?? [];
 }
 
-const STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cancelled: 'Cancelled' };
-export const statusText = b => `${STATUS[b.status] ?? b.status}${b.status === 'won' ? ` +${fmtTokens(b.payout)}`
+const STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cancelled: 'Cancelled', cashed_out: 'Cashed out' };
+const hhmm = d => new Date(d).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+export const statusText = b => `${STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtTokens(b.payout)}`
   : b.status === 'open' ? ` · to win ${fmtTokens(b.returns)}` : ''}`;
-export const cancelButton = b => (b.can_cancel ? `<button class="link" data-cancelbet="${b.id}">Cancel</button>` : '');
+// Futures: free to cancel for 24 hours, then cash out at the current price less a fee.
+export const cancelButton = b => (b.can_cancel
+  ? `<button class="link" data-cancelbet="${b.id}">Cancel${b.free_cancel_until ? ` (free until ${hhmm(b.free_cancel_until)})` : ''}</button>`
+  : b.cash_out != null ? `<button class="link cash-out" data-cashout="${b.id}" data-value="${b.cash_out}">Cash out ${fmtTokens(b.cash_out)}</button>` : '');
+
+// Cash out a futures bet at the value shown. If the price has moved, the
+// new value is offered instead. Returns true once it's done.
+export async function cashOut(btn) {
+  let value = Number(btn.dataset.value);
+  if (!confirm(`Cash out for ${fmtTokens(value)} tokens? This includes a 10% fee and can't be undone.`)) return false;
+  btn.disabled = true;
+  for (let tries = 0; tries < 2; tries++) {
+    const { data, error } = await sb.rpc('cash_out_bet', { p_bet: Number(btn.dataset.cashout), p_value: value });
+    if (error) { toast(error.message); btn.disabled = false; return false; }
+    if (!data?.changed) {
+      if (ACCOUNT && data?.tokens != null) ACCOUNT.tokens = data.tokens;
+      toast(`Cashed out for ${fmtTokens(data.value)} tokens`, false);
+      return true;
+    }
+    value = Number(data.value);
+    if (!confirm(`The price has moved. Cash out for ${fmtTokens(value)} tokens instead?`)) { btn.disabled = false; return true; }
+  }
+  btn.disabled = false;
+  return false;
+}
 
 export function myBetsHtml(list) {
   if (!list?.length) return '';
@@ -138,6 +163,11 @@ export async function slipEvent(e, ctx) {
     s.stake = stakeBox.value;
     const ret = stakeBox.closest('.slip')?.querySelector('[data-slip-ret]');
     if (ret) ret.textContent = fmtTokens(returnsFor(s.stake, s.price));
+    return true;
+  }
+  const co = e.target.closest?.('[data-cashout]');
+  if (co && e.type === 'click') {
+    if (await cashOut(co)) { await Promise.all([loadAccount(true), ctx.changed?.()]); ctx.render(); }
     return true;
   }
   const cancel = e.target.closest?.('[data-cancelbet]');

@@ -3,7 +3,7 @@
 // database makes it then), and it's what the chat and betting need.
 
 import { sb, esc, toast, qs } from '../db.js';
-import { loadAccount, fmtTokens, statusText, cancelButton } from '../betting.js';
+import { loadAccount, fmtTokens, statusText, cancelButton, cashOut } from '../betting.js';
 
 const app = document.getElementById('app');
 const next = qs('next');
@@ -121,6 +121,8 @@ async function render() {
 }
 
 app.addEventListener('click', async e => {
+  const co = e.target.closest('[data-cashout]');
+  if (co) { if (await cashOut(co)) render(); return; }
   const c = e.target.closest('[data-cancelbet]');
   if (c) {
     if (!confirm('Cancel this bet?')) return;

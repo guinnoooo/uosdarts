@@ -290,14 +290,14 @@ function accountsPanel() {
   </section>`;
 }
 
-const BET_STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cancelled: 'Cancelled' };
+const BET_STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cancelled: 'Cancelled', cashed_out: 'Cashed out' };
 const fmtN = n => Number(n ?? 0).toLocaleString('en-GB');
 const shortWhen = d => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 // Every bet one account has placed, newest first, with the net result.
 function accountBetsHtml(list) {
   if (!list.length) return '<p class="muted small">No bets.</p>';
-  const settled = list.filter(b => b.status === 'won' || b.status === 'lost');
+  const settled = list.filter(b => ['won', 'lost', 'cashed_out'].includes(b.status));
   const net = settled.reduce((t, b) => t + Number(b.payout) - Number(b.stake), 0);
   const open = list.filter(b => b.status === 'open');
   return `<div class="acc-bets">
@@ -306,7 +306,7 @@ function accountBetsHtml(list) {
       <td class="l"><b>${esc(b.selection)}</b> at ${esc(b.price)}
         <span class="muted small">${esc(b.market)}${b.event && !b.market.includes(b.event) ? ` · ${esc(b.event)}` : ''} · ${shortWhen(b.placed_at)}</span></td>
       <td>${fmtN(b.stake)}</td>
-      <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}</td>
+      <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}</td>
     </tr>`).join('')}</tbody></table></div>`;
 }
 

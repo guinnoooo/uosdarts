@@ -1075,7 +1075,7 @@ button.danger:hover { border-color: var(--live); color: #e8a79e; }
 .lb-table tr.me td { color: var(--accent-soft); }
 .lb-play { display: block; }
 .bets-list .muted.small { display: block; margin-top: .15rem; }
-.bet-won { color: #8ad3ae; }
+.bet-won, .bet-cashed_out { color: #8ad3ae; }
 .bet-lost { color: var(--text-2); }
 .bet-void { color: var(--text-2); font-style: italic; }
 .chat-as { margin: .3rem 0; }
@@ -1115,3 +1115,4 @@ button.chat-who:hover { text-decoration: underline; }
 .fut-scroll { overflow-x: auto; }
 .fut-scroll table { min-width: 34rem; }
 .fut-market + .fut-market { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.link.cash-out { color: var(--accent-soft); }
