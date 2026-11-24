@@ -12,7 +12,7 @@
 // (see .github/workflows/deploy-functions.yml), so they always match the site.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { MODEL, oomScore } from './winprob.js';
+import { MODEL, oomScore, matchChance } from './winprob.js';
 import { previewFor, matchPrices, decimalOf } from './prices.js';
 import { outrightOdds, outrightPrice } from './outright.js';
 
@@ -42,6 +42,10 @@ Deno.serve(async req => {
   const db = createClient(URL_, SERVICE, { auth: { persistSession: false } });
 
   try {
+    // Pre-match chances for fantasy darts (who was the underdog), worked out
+    // from the snapshot taken as each match started. Anyone can ask; it
+    // only ever fills in what's missing.
+    if (body.kind === 'prematch') return reply(await fillPrematch(db));
     if (body.kind !== 'match' && body.kind !== 'outright') return reply({ error: 'Bad request' }, 400);
     // Who's asking (not needed for a quote) and the price, worked out side by side.
     const auth = req.headers.get('Authorization') ?? '';
@@ -125,4 +129,17 @@ async function priceOutright(db: any, tournamentId: string, playerId: string) {
     market: `${t.data.name}: winner`,
     price: outrightPrice(row.p),
   };
+}
+
+async function fillPrematch(db: any) {
+  const { data, error } = await db.rpc('prematch_missing', { p_limit: 500 });
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []).map((s: any) => ({
+    match_id: s.match_id, p1_win: matchChance(s.features, s.features), model_version: MODEL.version,
+  }));
+  if (rows.length) {
+    const { error: e } = await db.from('match_odds').upsert(rows, { onConflict: 'match_id', ignoreDuplicates: true });
+    if (e) throw new Error(e.message);
+  }
+  return { filled: rows.length };
 }
