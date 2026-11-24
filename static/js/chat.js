@@ -28,7 +28,7 @@ export async function mountChat(host, matchId) {
   const next = encodeURIComponent(location.pathname + location.search);
   host.innerHTML = `<section class="chat">
     <h2>Chat</h2>
-    <p class="muted small"><a href="/account/?next=${next}">Log in or sign up</a> to see and join the chat.</p>
+    <p class="muted small"><a href="/account/?next=${next}">Log in</a> to join the chat.</p>
   </section>`;
 }
 
@@ -37,7 +37,7 @@ async function openChat(host, matchId, acc) {
   host.innerHTML = `<section class="chat">
     <h2>Chat</h2>
     <div class="chat-list" aria-live="polite"><p class="muted small">Loading…</p></div>
-    ${acc.banned ? '<p class="muted small">Your account can\'t post in the chat.</p>' : `<form class="chat-form" autocomplete="off">
+    ${acc.banned ? '<p class="muted small">Blocked from the chat.</p>' : `<form class="chat-form" autocomplete="off">
       <input name="name" class="chat-name" maxlength="30" placeholder="Name to show" value="${esc(savedName() || acc.display_name)}">
       <div class="chat-send">
         <input name="body" maxlength="280" placeholder="Say something…" required>

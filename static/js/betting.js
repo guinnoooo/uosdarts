@@ -35,9 +35,9 @@ export function slipHtml(slip) {
   let body;
   if (a === undefined) body = '<p class="muted small">Loading…</p>';
   else if (!a) {
-    body = `<p class="small"><a href="${loginLink()}">Log in or sign up</a> to bet with tokens. Everyone starts with 10,000.</p>`;
+    body = `<p class="small"><a href="${loginLink()}">Log in</a> to bet.</p>`;
   } else if (a.banned) {
-    body = '<p class="small">Your account can\'t place bets.</p>';
+    body = '<p class="small">Blocked from betting.</p>';
   } else if (a.can_bet === false) {
     body = '<p class="small">Admins can\'t bet.</p>';
   } else {
@@ -108,11 +108,11 @@ export async function slipEvent(e, ctx) {
   }
   const cancel = e.target.closest?.('[data-cancelbet]');
   if (cancel && e.type === 'click') {
-    if (!confirm('Cancel this bet and get your tokens back?')) return true;
+    if (!confirm('Cancel this bet?')) return true;
     cancel.disabled = true;
     const { error } = await sb.rpc('cancel_bet', { p_bet: Number(cancel.dataset.cancelbet) });
     if (error) { toast(error.message); cancel.disabled = false; return true; }
-    toast('Bet cancelled. Your tokens are back.', false);
+    toast('Bet cancelled', false);
     await loadAccount(true);
     await ctx.changed?.();
     ctx.render();
@@ -130,7 +130,7 @@ export async function slipEvent(e, ctx) {
     const r = await placeBet({ ...s, stake });
     if (r?.changed) {
       s.price = r.price;
-      s.note = `The price has moved to ${r.price}.`;
+      s.note = `Price moved to ${r.price}.`;
       ctx.render();
       return true;
     }

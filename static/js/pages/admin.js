@@ -749,7 +749,6 @@ function accountsSection() {
         <span class="muted small" style="display:block">${esc(a.email ?? '')}</span></td>
       <td class="muted small">${a.confirmed && !a.is_admin ? `${Number(a.tokens).toLocaleString('en-GB')} tokens · ${a.bets} bets · ` : ''}${a.confirmed ? `${a.messages} message${a.messages === 1 ? '' : 's'} · ` : ''}joined ${day(a.created_at)}</td>
     </tr>`).join('')}</tbody></table>` : '<p class="muted">Nobody yet.</p>'}
-    ${S.role === 'super' ? '<p class="muted small">Block accounts or give tokens on the <a href="/super/">super admin page</a>.</p>' : ''}
   </details>`;
 }
 
