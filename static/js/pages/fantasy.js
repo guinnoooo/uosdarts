@@ -312,7 +312,8 @@ app.addEventListener('click', async e => {
   if (b.dataset.view) {
     const u = b.dataset.view;
     if (S.open === u) { S.open = null; S.view = null; render(); return; }
-    const gw = S.curGw;
+    // Before the first deadline only a super admin gets an answer back.
+    const gw = S.curGw ?? S.team?.next_gw;
     if (!gw) { toast('Teams are shown once the first week starts'); return; }
     const { data, error } = await sb.rpc('fantasy_team_view', { p_user: u, p_gw: gw });
     if (error) { toast(error.message); return; }
