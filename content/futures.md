@@ -1,0 +1,4 @@
+---
+title: "Futures"
+layout: "futures"
+---

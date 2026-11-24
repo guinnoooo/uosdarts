@@ -1104,3 +1104,14 @@ button.chat-who:hover { text-decoration: underline; }
 .accounts-section #acc-q { margin: .6rem 0; width: 100%; }
 .bets-net { margin: .2rem 0 .3rem; font-weight: 600; }
 .m-top .my-bets, #m-top .my-bets { margin-top: 1rem; }
+
+/* Futures */
+.futures-list td:first-child { width: auto; }
+.futures-admin td { vertical-align: middle; }
+.futures-admin input.fut-price { width: 5.5rem; }
+.futures-admin .fut-sugg { color: var(--text-2); }
+.futures-admin .fut-changed { border-color: var(--accent); }
+.acc-bets { margin: .4rem 0 .8rem; }
+.fut-scroll { overflow-x: auto; }
+.fut-scroll table { min-width: 34rem; }
+.fut-market + .fut-market { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
