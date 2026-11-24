@@ -3,7 +3,7 @@ import { standings } from '../fixtures.js';
 import { matchCard, setWatching } from '../ui.js';
 import { oomScore } from '../winprob.js';
 import { outrightOdds, outrightPrice } from '../outright.js';
-import { loadAccount, slipHtml, slipEvent } from '../betting.js';
+import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml } from '../betting.js';
 
 const app = document.getElementById('app');
 const id = qs('id');
@@ -54,6 +54,10 @@ async function loadInner() {
   S.matches = m.data;
   S.players = new Map(e.data.map(x => [x.player_id, x.players]));
   await loadOdds();
+  if (S.myBets === undefined && S.odds?.length) {
+    S.myBets = [];
+    loadAccount().then(a => (a ? refreshBets().then(() => render()) : null)).catch(() => {});
+  }
   render();
 }
 
@@ -113,6 +117,7 @@ function oddsSection() {
   return `<section class="outright"><h2>${bet ? 'Odds' : 'Live odds'} to win the tournament${thin ? '<sup class="odds-star">*</sup>' : ''}</h2>
     ${bet && !S.slip ? '<p class="muted small">Tap a price to bet tokens on it. Betting closes when the first match starts.</p>' : ''}
     ${bet ? slipHtml(S.slip) : ''}
+    ${myBetsHtml(S.myBets)}
     <table class="outright-list"><tbody>${shown.map((x, i) => `<tr>
       <td class="muted">${i + 1}</td><td class="l">${esc(x.name)}</td>
       <td>${price(x)}</td></tr>`).join('')}</tbody></table>
@@ -329,7 +334,8 @@ function render() {
   }
 }
 
-const slipCtx = { slip: () => S.slip, set: v => { S.slip = v; }, render: () => render() };
+const refreshBets = async () => { S.myBets = await myBetsOn({ tournamentId: id }); };
+const slipCtx = { slip: () => S.slip, set: v => { S.slip = v; }, render: () => render(), changed: refreshBets };
 app.addEventListener('input', e => { slipEvent(e, slipCtx); });
 app.addEventListener('click', async e => {
   if (e.target.closest('[data-act="odds-toggle"]')) { S.oddsAll = !S.oddsAll; render(); return; }

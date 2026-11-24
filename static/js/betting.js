@@ -56,6 +56,25 @@ export function slipHtml(slip) {
   </div>`;
 }
 
+// The signed-in user's bets on one match (or one tournament's outright).
+export async function myBetsOn({ matchId = null, tournamentId = null }) {
+  if (!ACCOUNT) return [];
+  const { data, error } = await sb.rpc('my_bets_on', { p_match: matchId, p_tournament: tournamentId });
+  return error ? [] : data ?? [];
+}
+
+const STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cancelled: 'Cancelled' };
+export const statusText = b => `${STATUS[b.status] ?? b.status}${b.status === 'won' ? ` +${fmtTokens(b.payout)}`
+  : b.status === 'open' ? ` · to win ${fmtTokens(b.returns)}` : ''}`;
+export const cancelButton = b => (b.can_cancel ? `<button class="link" data-cancelbet="${b.id}">Cancel</button>` : '');
+
+export function myBetsHtml(list) {
+  if (!list?.length) return '';
+  return `<div class="my-bets"><h3>Your bets</h3><ul>${list.map(b => `<li>
+      <span><b>${fmtTokens(b.stake)}</b> on ${esc(b.selection)} at ${esc(b.price)}</span>
+      <span class="muted small">${statusText(b)}</span> ${cancelButton(b)}</li>`).join('')}</ul></div>`;
+}
+
 async function placeBet(slip) {
   const body = {
     kind: slip.kind, price: slip.price, stake: Number(slip.stake),
@@ -71,8 +90,10 @@ async function placeBet(slip) {
   return data;
 }
 
-// Handles clicks and typing inside a slip. Returns true if the event was a
-// slip's. ctx: { slip: () => current slip, set: s => store it, render: () => redraw }.
+// Handles clicks and typing inside a slip, and Cancel on a bet. Returns true
+// if the event was one of those. ctx: { slip: () => current slip,
+// set: s => store it, render: () => redraw, changed: async () => after a bet
+// is placed or cancelled }.
 export async function slipEvent(e, ctx) {
   const stakeBox = e.target.closest?.('[data-slip-stake]');
   if (stakeBox && e.type === 'input') {
@@ -81,6 +102,18 @@ export async function slipEvent(e, ctx) {
     s.stake = stakeBox.value;
     const ret = stakeBox.closest('.slip')?.querySelector('[data-slip-ret]');
     if (ret) ret.textContent = fmtTokens(returnsFor(s.stake, s.price));
+    return true;
+  }
+  const cancel = e.target.closest?.('[data-cancelbet]');
+  if (cancel && e.type === 'click') {
+    if (!confirm('Cancel this bet and get your tokens back?')) return true;
+    cancel.disabled = true;
+    const { error } = await sb.rpc('cancel_bet', { p_bet: Number(cancel.dataset.cancelbet) });
+    if (error) { toast(error.message); cancel.disabled = false; return true; }
+    toast('Bet cancelled. Your tokens are back.', false);
+    await loadAccount(true);
+    await ctx.changed?.();
+    ctx.render();
     return true;
   }
   const btn = e.target.closest?.('[data-slip]');
@@ -102,6 +135,7 @@ export async function slipEvent(e, ctx) {
     toast(`Bet placed: ${fmtTokens(stake)} on ${s.selection} at ${s.price}. Returns ${fmtTokens(returnsFor(stake, s.price))}.`, false);
     ctx.set(null);
     await loadAccount(true);
+    await ctx.changed?.();
     ctx.render();
   } catch (err) {
     toast(err.message);

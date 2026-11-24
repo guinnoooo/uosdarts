@@ -3,7 +3,7 @@
 // database makes it then), and it's what the chat and betting need.
 
 import { sb, esc, toast, qs } from '../db.js';
-import { loadAccount, fmtTokens } from '../betting.js';
+import { loadAccount, fmtTokens, statusText, cancelButton } from '../betting.js';
 
 const app = document.getElementById('app');
 const next = qs('next');
@@ -75,7 +75,6 @@ function recoverHtml() {
   </section>`;
 }
 
-const STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded' };
 
 function accountHtml(a, bets, email) {
   if (!a) {
@@ -91,8 +90,7 @@ function accountHtml(a, bets, email) {
       <td class="l"><b>${esc(b.selection)}</b> at ${esc(b.price)}
         <span class="muted small">${esc(b.market)}${b.market.includes(b.tournament) ? '' : ` · ${esc(b.tournament)}`} · ${when(b.placed_at)}</span></td>
       <td>${fmtTokens(b.stake)}</td>
-      <td class="bet-${b.status}">${STATUS[b.status]}${b.status === 'won' ? ` +${fmtTokens(b.payout)}`
-        : b.status === 'open' ? ` <span class="muted small">to win ${fmtTokens(b.returns)}</span>` : ''}</td>
+      <td class="bet-${b.status}">${statusText(b)} ${cancelButton(b)}</td>
     </tr>`).join('')}</tbody></table>`
     : '<p class="muted">No bets yet. Tap a GuinnessBet price on an upcoming match to place one.</p>';
   return `${backLink()}<section class="panel account-box">
@@ -124,6 +122,16 @@ async function render() {
 }
 
 app.addEventListener('click', async e => {
+  const c = e.target.closest('[data-cancelbet]');
+  if (c) {
+    if (!confirm('Cancel this bet and get your tokens back?')) return;
+    c.disabled = true;
+    const { error } = await sb.rpc('cancel_bet', { p_bet: Number(c.dataset.cancelbet) });
+    if (error) { toast(error.message); c.disabled = false; return; }
+    toast('Bet cancelled. Your tokens are back.', false);
+    render();
+    return;
+  }
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const act = b.dataset.act;
