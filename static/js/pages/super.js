@@ -45,6 +45,7 @@ async function loadInner() {
   S.openFriendlies = check(await sb.rpc('super_list_open_friendlies')) ?? [];
   S.accounts = check(await sb.rpc('super_list_accounts')) ?? [];
   S.futures = check(await sb.rpc('super_futures')) ?? [];
+  S.fantasy = check(await sb.rpc('super_fantasy_prices')) ?? [];
   if (S.accBetsFor) S.accBets = check(await sb.rpc('super_account_bets', { p_user: S.accBetsFor })) ?? [];
   S.seeds = new Map((check(await sb.from('player_seeds').select('player_id, rating')) ?? [])
     .map(r => [r.player_id, Number(r.rating)]));
@@ -319,6 +320,33 @@ const localInput = d => {
   return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
 
+// Fantasy prices. Nobody can be picked until they have one.
+function fantasyPanel() {
+  const list = S.fantasy ?? [];
+  const listed = new Set(list.map(r => r.player_id));
+  const addable = S.players.filter(p => !listed.has(p.id));
+  return `<section class="panel futures-admin" data-fx>
+    <h2>Fantasy prices</h2>
+    <p class="muted small">Budget is 50.0 for six players. Prices move by up to 0.2 a week with form after that.
+      Clear a price to stop a player being picked (anyone who already has them keeps them).</p>
+    <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">Player</th><th>Suggested</th><th>Price</th><th>In teams</th></tr></thead>
+    <tbody>${list.map(r => `<tr>
+      <td class="l">${esc(r.name)}</td>
+      <td class="fut-sugg">${r.suggested ?? ''}</td>
+      <td><input class="fut-price" data-fx-price="${r.player_id}" data-orig="${r.price ?? ''}" data-sugg="${r.suggested ?? ''}" value="${r.price ?? ''}" inputmode="decimal" placeholder="off"></td>
+      <td class="small">${r.picked || ''}</td></tr>`).join('')}</tbody></table></div>
+    <div class="row">
+      <button data-fxsugg="1">Fill empty prices with suggestions</button>
+      <button class="primary" data-fxsave="1">Save prices</button>
+    </div>
+    <div class="row">
+      <select data-fx-add><option value="">Add a player…</option>${addable.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+      <input type="number" step="0.5" min="1" max="30" data-fx-addprice placeholder="Price" style="width:6rem">
+      <button data-fxadd="1">Add</button>
+    </div>
+  </section>`;
+}
+
 function futuresPanel() {
   const list = S.futures ?? [];
   if (!list.length) return '';
@@ -436,7 +464,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${futuresPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${futuresPanel()}${fantasyPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
@@ -491,6 +519,7 @@ app.addEventListener('click', async e => {
     return;
   }
   if (await futuresClick(el)) return;
+  if (await fantasyClick(el)) return;
   if (el.dataset.accadj) {
     const box = app.querySelector(`[data-acctok="${el.dataset.accadj}"]`);
     const n = Math.trunc(Number(box?.value));
@@ -642,6 +671,38 @@ app.addEventListener('click', async e => {
   }
 });
 
+async function fantasyClick(el) {
+  const box = el.closest('[data-fx]');
+  if (!box) return false;
+  if (el.dataset.fxsugg) {
+    let n = 0;
+    box.querySelectorAll('[data-fx-price]').forEach(i => {
+      if (!i.value.trim() && i.dataset.sugg) { i.value = i.dataset.sugg; i.classList.add('fut-changed'); n++; }
+    });
+    toast(n ? `Filled ${n}. Check them, then Save prices.` : 'Nothing empty to fill', !n);
+    return true;
+  }
+  if (el.dataset.fxsave) {
+    const prices = {};
+    box.querySelectorAll('[data-fx-price]').forEach(i => {
+      const v = i.value.trim();
+      if (Number(v || NaN) !== Number(i.dataset.orig || NaN) && !(v === '' && i.dataset.orig === '')) prices[i.dataset.fxPrice] = v === '' ? null : Number(v);
+    });
+    if (!Object.keys(prices).length) { toast('No prices changed'); return true; }
+    await run(async () => check(await sb.rpc('super_fantasy_set_prices', { p_prices: prices })),
+      `${Object.keys(prices).length} price${Object.keys(prices).length === 1 ? '' : 's'} saved`);
+    return true;
+  }
+  if (el.dataset.fxadd) {
+    const pid = box.querySelector('[data-fx-add]').value;
+    const v = Number(box.querySelector('[data-fx-addprice]').value);
+    if (!pid || !v) { toast('Pick a player and give them a price'); return true; }
+    await run(async () => check(await sb.rpc('super_fantasy_set_prices', { p_prices: { [pid]: v } })), 'Added');
+    return true;
+  }
+  return false;
+}
+
 async function futuresClick(el) {
   const box = el.closest('[data-fm]');
   if (!box) return false;
@@ -706,6 +767,10 @@ async function futuresClick(el) {
 }
 
 app.addEventListener('input', e => {
+  if (e.target.dataset?.fxPrice !== undefined) {
+    e.target.classList.toggle('fut-changed', e.target.value.trim() !== e.target.dataset.orig);
+    return;
+  }
   if (e.target.dataset?.fsPrice !== undefined) {
     e.target.classList.toggle('fut-changed', e.target.value.trim() !== e.target.dataset.orig);
     return;
