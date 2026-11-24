@@ -72,7 +72,11 @@ export const cancelButton = b => (b.can_cancel ? `<button class="link" data-canc
 
 export function myBetsHtml(list) {
   if (!list?.length) return '';
-  return `<div class="my-bets"><h3>Your bets</h3><ul>${list.map(b => `<li>
+  const net = betsNet(list);
+  const open = list.some(b => b.status === 'open');
+  const result = net === null || open ? ''
+    : `<p class="bets-net ${net >= 0 ? 'bet-won' : 'bet-lost'}">${net >= 0 ? `You won ${fmtTokens(net)}` : `You lost ${fmtTokens(-net)}`} tokens</p>`;
+  return `<div class="my-bets"><h3>Your bets</h3>${result}<ul>${list.map(b => `<li>
       <span><b>${fmtTokens(b.stake)}</b> on ${esc(b.selection)} at ${esc(b.price)}</span>
       <span class="muted small">${statusText(b)}</span> ${cancelButton(b)}</li>`).join('')}</ul></div>`;
 }
@@ -90,6 +94,29 @@ async function placeBet(slip) {
     throw new Error(msg);
   }
   return data;
+}
+
+// Asks the server for the price as soon as a slip opens. It wakes the
+// betting server up (the first request after a quiet spell is the slow one)
+// and catches a moved price before the person presses Place.
+export async function quoteSlip(slip, ctx) {
+  const body = { kind: slip.kind, quote: true,
+    ...(slip.kind === 'match' ? { match_id: slip.match_id, side: slip.side } : { tournament_id: slip.tournament_id, player_id: slip.player_id }) };
+  try {
+    const { data } = await sb.functions.invoke('place-bet', { body });
+    if (data?.price && ctx.slip() === slip && data.price !== slip.price) {
+      slip.price = data.price;
+      slip.note = `Price moved to ${data.price}.`;
+      ctx.render();
+    }
+  } catch { /* the bet itself will check again */ }
+}
+
+// The result of someone's bets on a finished match: tokens back minus staked.
+export function betsNet(list) {
+  const settled = (list ?? []).filter(b => b.status === 'won' || b.status === 'lost');
+  if (!settled.length) return null;
+  return settled.reduce((t, b) => t + Number(b.payout) - Number(b.stake), 0);
 }
 
 // Handles clicks and typing inside a slip, and Cancel on a bet. Returns true
@@ -113,8 +140,7 @@ export async function slipEvent(e, ctx) {
     const { error } = await sb.rpc('cancel_bet', { p_bet: Number(cancel.dataset.cancelbet) });
     if (error) { toast(error.message); cancel.disabled = false; return true; }
     toast('Bet cancelled', false);
-    await loadAccount(true);
-    await ctx.changed?.();
+    await Promise.all([loadAccount(true), ctx.changed?.()]);
     ctx.render();
     return true;
   }
@@ -136,7 +162,9 @@ export async function slipEvent(e, ctx) {
     }
     toast(`Bet placed: ${fmtTokens(stake)} on ${s.selection} at ${s.price}. Returns ${fmtTokens(returnsFor(stake, s.price))}.`, false);
     ctx.set(null);
-    await loadAccount(true);
+    // The reply carries the new balance, so only the bet list needs fetching.
+    if (ACCOUNT && r?.tokens != null) ACCOUNT.tokens = r.tokens;
+    ctx.render();
     await ctx.changed?.();
     ctx.render();
   } catch (err) {

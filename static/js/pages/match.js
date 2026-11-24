@@ -4,7 +4,7 @@ import {
 import { mountChat } from '../chat.js';
 import { oomScores, matchChance, liveChance, pctPair, isThin, teamPreview } from '../winprob.js';
 import { bookPrices } from '../prices.js';
-import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml } from '../betting.js';
+import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml, quoteSlip } from '../betting.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -67,9 +67,11 @@ async function loadInner() {
       if (S.preview && !S.preview.unavailable) S.preview.h2h = np.data?.h2h ?? [];
     }
   }
-  // Your own bets on it, for an upcoming match you could bet on.
-  if (S.match.status === 'pending' && S.myBets === undefined) {
-    S.myBets = [];
+  // Your own bets on it: fetched once, and again when the match starts or
+  // finishes (to show the result).
+  if (S.betsFor !== S.match.status) {
+    S.betsFor = S.match.status;
+    if (S.myBets === undefined) S.myBets = [];
     loadAccount().then(a => (a ? refreshBets().then(render) : null)).catch(() => {});
   }
   render();
@@ -611,6 +613,7 @@ function openSlip(side) {
   S.slip = { kind: 'match', match_id: id, side, selection: nameOf(side), price: S.prices[side - 1], stake: S.slip?.stake ?? 100 };
   loadAccount().then(render, render);
   render();
+  quoteSlip(S.slip, betCtx);
 }
 
 const winRate = (won, played) => (played ? `${Math.round((won / played) * 100)}%` : null);
@@ -907,7 +910,7 @@ function render() {
     </div>
     ${m.status === 'complete' ? finalBoard() : `<div class="scoreboard">${playerPanel(1, d)}${playerPanel(2, d)}</div>`}
     ${actionZone(d)}
-    ${m.status === 'pending' ? previewBlock() : ''}`;
+    ${m.status === 'pending' ? previewBlock() : myBetsHtml(S.myBets)}`;
   // Whoever set up a friendly can delete it until it's finished. It sits
   // under the chat, out of the way of the scoring buttons.
   const canDelete = isFriendly() && m.status !== 'complete' && (isRemote() ? mySeat() === 1 : isScorer());

@@ -42,20 +42,17 @@ Deno.serve(async req => {
   const db = createClient(URL_, SERVICE, { auth: { persistSession: false } });
 
   try {
-    let bet: Record<string, unknown>;
-    if (body.kind === 'match') {
-      bet = await priceMatch(db, String(body.match_id), Number(body.side));
-    } else if (body.kind === 'outright') {
-      bet = await priceOutright(db, String(body.tournament_id), String(body.player_id));
-    } else {
-      return reply({ error: 'Bad request' }, 400);
-    }
+    if (body.kind !== 'match' && body.kind !== 'outright') return reply({ error: 'Bad request' }, 400);
+    // Who's asking (not needed for a quote) and the price, worked out side by side.
+    const auth = req.headers.get('Authorization') ?? '';
+    const who = body.quote ? Promise.resolve(null)
+      : createClient(URL_, ANON, { global: { headers: { Authorization: auth } } }).auth.getUser().then(r => r.data.user, () => null);
+    const pricing = body.kind === 'match'
+      ? priceMatch(db, String(body.match_id), Number(body.side))
+      : priceOutright(db, String(body.tournament_id), String(body.player_id));
+    const [user, bet] = await Promise.all([who, pricing]) as [any, Record<string, unknown>];
     // A quote: the current price, nothing placed, no login needed.
     if (body.quote) return reply({ price: bet.price, version: MODEL.version });
-
-    const auth = req.headers.get('Authorization') ?? '';
-    const asUser = createClient(URL_, ANON, { global: { headers: { Authorization: auth } } });
-    const { data: { user } } = await asUser.auth.getUser();
     if (!user || user.is_anonymous) return reply({ error: 'Log in to bet' }, 401);
 
     if (bet.price !== shown) return reply({ changed: true, price: bet.price });
@@ -75,21 +72,23 @@ Deno.serve(async req => {
 
 async function priceMatch(db: any, matchId: string, side: number) {
   if (side !== 1 && side !== 2) throw new Error('Pick a side');
-  const { data: m, error } = await db.from('matches').select(MATCH_SELECT).eq('id', matchId).single();
-  if (error || !m) throw new Error('Match not found');
-  const { data: why } = await db.rpc('match_bet_block', { p_match: matchId });
-  if (why) throw new Error(why);
+  // Everything at once: the match, whether it's open, the order of merit and
+  // both kinds of preview (only the one that fits is used).
+  const [mr, block, oom, pr, nr] = await Promise.all([
+    db.from('matches').select(MATCH_SELECT).eq('id', matchId).single(),
+    db.rpc('match_bet_block', { p_match: matchId }),
+    db.rpc('oom_table'),
+    db.rpc('match_preview', { p_match: matchId }),
+    db.rpc('names_preview', { p_match: matchId }),
+  ]);
+  const m = mr.data;
+  if (mr.error || !m) throw new Error('Match not found');
+  if (block.data) throw new Error(block.data);
 
   const name1 = m.p1?.name ?? m.p1_name, name2 = m.p2?.name ?? m.p2_name;
-  const oom = await db.rpc('oom_table');
-  let preview = null, names = null;
-  if (m.player1_id && m.player2_id) {
-    const r = await db.rpc('match_preview', { p_match: matchId });
-    preview = r.error ? null : r.data;
-  } else {
-    const r = await db.rpc('names_preview', { p_match: matchId });
-    names = r.error ? null : r.data;
-  }
+  const linked = m.player1_id && m.player2_id;
+  const preview = linked && !pr.error ? pr.data : null;
+  const names = !linked && !nr.error ? nr.data : null;
   const pv = previewFor(m, { preview, names, oomRows: oom.data ?? [], name1, name2 });
   if (!pv) throw new Error('Odds not available for this fixture');
   const prices = matchPrices(pv, m);
@@ -102,15 +101,15 @@ async function priceMatch(db: any, matchId: string, side: number) {
 }
 
 async function priceOutright(db: any, tournamentId: string, playerId: string) {
-  const { data: why } = await db.rpc('outright_bet_block', { p_tournament: tournamentId });
-  if (why) throw new Error(why);
-  const [t, e, m, fig, oom] = await Promise.all([
+  const [block, t, e, m, fig, oom] = await Promise.all([
+    db.rpc('outright_bet_block', { p_tournament: tournamentId }),
     db.from('tournaments').select('*').eq('id', tournamentId).single(),
     db.from('tournament_players').select('*, players(id,name)').eq('tournament_id', tournamentId),
     db.from('matches').select(MATCH_SELECT).eq('tournament_id', tournamentId).order('stage').order('round').order('slot'),
     db.rpc('tournament_odds_data', { p_tournament: tournamentId }),
     db.rpc('oom_table'),
   ]);
+  if (block.data) throw new Error(block.data);
   if (t.error || e.error || m.error || fig.error) throw new Error('Tournament not found');
   const entrants = e.data ?? [];
   const odds = outrightOdds({

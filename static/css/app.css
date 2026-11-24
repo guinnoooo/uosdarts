@@ -1102,3 +1102,5 @@ button.chat-who:hover { text-decoration: underline; }
 .accounts-section summary h2::after { content: ' ▸'; color: var(--text-3); }
 .accounts-section[open] summary h2::after { content: ' ▾'; }
 .accounts-section #acc-q { margin: .6rem 0; width: 100%; }
+.bets-net { margin: .2rem 0 .3rem; font-weight: 600; }
+.m-top .my-bets, #m-top .my-bets { margin-top: 1rem; }
