@@ -6,7 +6,7 @@ import { sb, esc, toast } from '../db.js';
 import { loadAccount } from '../betting.js';
 
 const app = document.getElementById('app');
-const S = { team: null, market: [], board: [], squad: [null, null, null, null, null, null], name: '', q: '', view: null, open: null, pick: null };
+const S = { team: null, market: [], board: [], squad: [null, null, null, null, null, null], name: '', q: '', view: null, open: null, pick: null, sort: 'price', dir: -1 };
 
 // The five roles, then the bench. Slot order matters: it's what's saved.
 const ROLES = [
@@ -115,13 +115,21 @@ function marketHtml() {
   // Pick % only arrives once at least 5 teams exist.
   const showPick = S.market.some(p => p.picked != null);
   const q = S.q.toLowerCase();
-  const list = q ? S.market.filter(p => p.name.toLowerCase().includes(q)) : S.market;
+  const key = S.sort === 'picked' && !showPick ? 'price' : S.sort;
+  const val = p => key === 'name' ? p.name : Number(p[key] ?? 0);
+  const list = (q ? S.market.filter(p => p.name.toLowerCase().includes(q)) : [...S.market]).sort((a, b) => {
+    const x = val(a), y = val(b);
+    const c = key === 'name' ? x.localeCompare(y) : x - y;
+    return c * S.dir || a.name.localeCompare(b.name);
+  });
   const inSquad = new Set(S.squad.filter(Boolean));
   const full = S.squad.every(Boolean);
+  // Tap a heading to sort by it, tap again to flip the order.
+  const th = (k, label, cls = '', title = '') => `<th class="${cls}"${title ? ` title="${title}"` : ''}><button class="fx-sort${key === k ? ' on' : ''}" data-sort="${k}">${label}${key === k ? (S.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
   return `<section class="panel">
     <h2>Players</h2>
     <input id="fx-q" placeholder="Search players" value="${esc(S.q)}" autocomplete="off">
-    ${S.market.length ? `<table class="lb-table fx-market"><thead><tr><th class="l">Player</th><th>Price</th><th>Pts</th>${showPick ? '<th title="Share of teams that have them">Pick</th>' : ''}<th></th></tr></thead>
+    ${S.market.length ? `<table class="lb-table fx-market"><thead><tr>${th('name', 'Player', 'l')}${th('price', 'Price')}${th('season', 'Pts')}${showPick ? th('picked', 'Pick', '', 'Share of teams that have them') : ''}<th></th></tr></thead>
     <tbody>${list.map(p => `<tr>
       <td class="l"><span class="fx-name">${photo(p.slug, p.name, 'fx-thumb')}${esc(p.name)}</span></td><td>${money(p.price)}</td><td title="Season points (last week ${p.last})">${p.season}</td>${showPick ? `<td>${p.picked}%</td>` : ''}
       <td>${S.account && S.team?.next_gw ? (inSquad.has(p.id) ? '<span class="muted small">In</span>'
@@ -150,12 +158,12 @@ function teamWeekHtml(w) {
 function boardHtml() {
   return `<section class="panel">
     <h2>Leaderboard</h2>
-    ${S.board.length ? `<table class="lb-table"><thead><tr><th></th><th class="l">Team</th><th>Points</th></tr></thead>
+    ${S.board.length ? `<div class="fx-board-scroll"><table class="lb-table"><thead><tr><th></th><th class="l">Team</th><th>Points</th></tr></thead>
       <tbody>${S.board.map((r, i) => `<tr class="${r.me ? 'me' : ''}">
         <td class="muted">${i + 1}</td>
         <td class="l"><button class="link" data-view="${r.user_id}">${esc(r.name)}</button><span class="muted small lb-play">${esc(r.manager)}</span></td>
         <td><b>${r.total}</b></td></tr>
-        ${S.open === r.user_id && S.view ? `<tr><td colspan="3">${teamWeekHtml(S.view)}</td></tr>` : ''}`).join('')}</tbody></table>`
+        ${S.open === r.user_id && S.view ? `<tr><td colspan="3">${teamWeekHtml(S.view)}</td></tr>` : ''}`).join('')}</tbody></table></div>`
       : '<p class="muted">No teams yet.</p>'}
   </section>`;
 }
@@ -194,6 +202,17 @@ function render() {
       <input id="fx-pq" type="search" placeholder="Search players" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="search">
       <div class="fx-pick-list"></div>
     </dialog>`;
+  fitBoard();
+}
+
+// The leaderboard box is exactly as tall as the top ten; the rest scroll.
+function fitBoard() {
+  const box = app.querySelector('.fx-board-scroll');
+  if (!box) return;
+  const rows = box.querySelectorAll('tbody > tr');
+  if (rows.length <= 10) { box.style.maxHeight = 'none'; return; }
+  const top = box.getBoundingClientRect().top;
+  box.style.maxHeight = `${Math.ceil(rows[9].getBoundingClientRect().bottom - top) + 1}px`;
 }
 
 app.addEventListener('input', e => {
@@ -265,6 +284,14 @@ app.addEventListener('keydown', e => {
 });
 
 app.addEventListener('click', async e => {
+  const sortBtn = e.target.closest('[data-sort]');
+  if (sortBtn) {
+    const k = sortBtn.dataset.sort;
+    if (S.sort === k) S.dir = -S.dir;
+    else { S.sort = k; S.dir = k === 'name' ? 1 : -1; }
+    render();
+    return;
+  }
   // Picking a role: tap Move on a player, then tap the role they should go to.
   const li = e.target.closest('[data-slot]');
   const b = e.target.closest('button');
