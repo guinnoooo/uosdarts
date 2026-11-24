@@ -57,7 +57,7 @@ function trophiesTab() {
     const list = all.filter(t => t.kind === kind).reverse();
     if (!list.length) return '';
     return `<h3>${title}</h3><ul class="hist-trophies">${list.map(t => `<li>
-      <span class="hist-cup" aria-hidden="true">🏆</span>
+      <span class="hist-cup" aria-hidden="true"></span>
       <div><b>${esc(t.title)}</b> <span class="muted">${esc(t.season)}</span>
         ${t.winners?.length ? `<div class="small">${t.winners.map(n => who(n) + (t.captain === n ? ' (c)' : '')).join(', ')}</div>` : ''}
         ${t.detail ? `<div class="small muted">${esc(t.detail)}</div>` : ''}</div></li>`).join('')}</ul>`;
@@ -66,7 +66,7 @@ function trophiesTab() {
   return `<section class="panel">
     <h2>Trophy cabinet</h2>
     <h3>Dartsity</h3>
-    <p><span class="hist-cup" aria-hidden="true">🏆</span> <b>${dartsity.length} titles</b> <span class="muted small">${dartsity.map(esc).join(', ')}</span></p>
+    <p><span class="hist-cup" aria-hidden="true"></span> <b>${dartsity.length} titles</b> <span class="muted small">${dartsity.map(esc).join(', ')}</span></p>
     ${group('team', 'Team')}
     ${group('individual', 'Individual')}
     ${group('society', 'Society')}
@@ -95,7 +95,6 @@ function recordsTab() {
   return `<section class="panel">
     <h2>Dartsity records</h2>
     <ul class="hist-facts">
-      ${biggest ? `<li>Biggest win <b>${esc(biggest.varsity.score)}</b> <span class="muted">${esc(biggest.season)}</span></li>` : ''}
       ${crowd ? `<li>Biggest crowd <b>${esc(crowd.varsity.attendance)}</b> <span class="muted">${esc(crowd.varsity.venue ?? '')} ${esc(crowd.season)}</span></li>` : ''}
     </ul>
     <h3>Most appearances</h3>
@@ -103,10 +102,6 @@ function recordsTab() {
       r => `<td class="small muted">${r.won}–${r.lost}</td>`])}
     ${unbeaten.length ? `<h3>Never beaten <span class="muted small">(2+ matches)</span></h3>
     ${table(unbeaten, [r => `<td class="l">${who(r.name)}</td>`, r => `<td>${r.won}–0</td>`])}` : ''}
-    <h3>Hallam players we keep meeting</h3>
-    ${table(opp, [r => `<td class="l">${esc(r.name)}</td>`, r => `<td>${r.theyWon}–${r.played - r.theyWon}</td>`,
-      r => `<td class="small muted">${r.beaten.length ? `beat ${r.beaten.map(esc).join(', ')}` : ''}${r.beaten.length && r.lostTo.length ? '; ' : ''}${r.lostTo.length ? `lost to ${r.lostTo.map(esc).join(', ')}` : ''}</td>`])}
-    <p class="small muted">Their record against us, wins first.</p>
     <h3>Captains</h3>
     ${table(caps, [r => `<td class="l">${esc(r.season)}</td>`, r => `<td class="l">${who(r.varsity.captain)}</td>`,
       r => `<td class="small hist-${esc(r.varsity.result)}">${{ won: 'Won', lost: 'Lost', cancelled: 'Cancelled' }[r.varsity.result]}${r.varsity.score ? ` ${esc(r.varsity.score)}` : ''}</td>`])}
