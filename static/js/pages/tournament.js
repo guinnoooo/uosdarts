@@ -3,7 +3,7 @@ import { standings } from '../fixtures.js';
 import { matchCard, setWatching } from '../ui.js';
 import { oomScore } from '../winprob.js';
 import { outrightOdds, outrightPrice } from '../outright.js';
-import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml } from '../betting.js';
+import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml, quoteSlip } from '../betting.js';
 
 const app = document.getElementById('app');
 const id = qs('id');
@@ -54,8 +54,10 @@ async function loadInner() {
   S.matches = m.data;
   S.players = new Map(e.data.map(x => [x.player_id, x.players]));
   await loadOdds();
-  if (S.myBets === undefined && S.odds?.length) {
-    S.myBets = [];
+  // Your outright bets: fetched once, and again when the tournament finishes.
+  if (S.betsFor !== S.t.status) {
+    S.betsFor = S.t.status;
+    if (S.myBets === undefined) S.myBets = [];
     loadAccount().then(a => (a ? refreshBets().then(() => render()) : null)).catch(() => {});
   }
   render();
@@ -325,6 +327,7 @@ function render() {
       ${S.parent ? `<p class="muted small">For players knocked out of <a href="/tournament/?id=${S.parent.id}">${esc(S.parent.name)}</a> before the last 16.</p>` : ''}
       ${S.europa && S.t.status !== 'upcoming' ? `<p class="muted small">Out before the last 16? You're in <a href="/tournament/?id=${S.europa.id}">${esc(S.europa.name)}</a>.</p>` : ''}
     </div>
+    ${S.tab === 'matches' && (S.odds?.length ?? 0) >= 2 ? '' : myBetsHtml(S.myBets)}
     ${tabs()}
     <div class="tab-body">${body}</div>`;
   if (keepX) {
@@ -345,6 +348,7 @@ app.addEventListener('click', async e => {
     S.slip = { kind: 'outright', tournament_id: id, player_id: x.id, selection: x.name, price: outrightPrice(x.p), stake: S.slip?.stake ?? 100 };
     loadAccount().then(() => render(), () => render());
     render();
+    quoteSlip(S.slip, slipCtx);
     return;
   }
   if (await slipEvent(e, slipCtx)) return;
