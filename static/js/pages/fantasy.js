@@ -10,12 +10,12 @@ const S = { team: null, market: [], board: [], squad: [null, null, null, null, n
 
 // The five roles, then the bench. Slot order matters: it's what's saved.
 const ROLES = [
-  { name: 'Captain', note: 'All points double' },
-  { name: 'Power Scorer', note: 'Triple points for 180s and 140+ visits' },
-  { name: 'Big Finisher', note: 'Triple points for 100+ checkouts' },
-  { name: 'Dark Horse', note: 'Triple win points for beating someone they were the underdog against' },
-  { name: 'Tricky Player', note: 'Triple win points for winning with a lower average than their opponent' },
-  { name: 'Bench', note: 'Comes on in the role of the first starter who doesn\'t play' },
+  { name: 'Captain', note: 'Double points' },
+  { name: 'Power Scorer', note: 'Triple for 180s and 140+' },
+  { name: 'Big Finisher', note: 'Triple for 100+ checkouts' },
+  { name: 'Dark Horse', note: 'Triple for upset wins' },
+  { name: 'Tricky Player', note: 'Triple for wins on a lower average' },
+  { name: 'Bench', note: 'Covers a starter who doesn\'t play' },
 ];
 
 // The OoM photo, or their initials if there isn't one.
@@ -59,8 +59,8 @@ const changes = () => {
 
 function squadHtml() {
   const t = S.team;
-  if (!S.account) return `<section class="panel"><h2>Your team</h2><p><a href="/account/?next=/fantasy/">Log in</a> to pick a team.</p></section>`;
-  if (!t?.next_gw) return `<section class="panel"><h2>Your team</h2><p class="muted">No PC or major coming up to pick a team for.</p></section>`;
+  if (!S.account) return `<section class="panel"><div class="fx-head"><h2>Your team</h2>${scoringButton}</div><p><a href="/account/?next=/fantasy/">Log in</a> to pick a team.</p></section>`;
+  if (!t?.next_gw) return `<section class="panel"><div class="fx-head"><h2>Your team</h2>${scoringButton}</div><p class="muted">No PC or major coming up to pick a team for.</p></section>`;
   const left = Number(t.budget) - cost();
   const ch = changes();
   const hit = Math.max(0, ch - 1) * t.hit;
@@ -83,10 +83,10 @@ function squadHtml() {
       </span></li>`;
   };
   return `<section class="panel">
-    <h2>Your team</h2>
+    <div class="fx-head"><h2>Your team</h2>${scoringButton}</div>
     <label>Team name <input id="fx-name" maxlength="30" value="${esc(S.name)}"></label>
-    <p class="small">Picking for ${gwLabel(t.next_gw)}. Locks ${when(t.locks_at)}.</p>
-    ${S.pick !== null && S.squad[S.pick] ? `<p class="small fx-hint">Tap the role to move ${esc(byId(S.squad[S.pick])?.name ?? 'them')} into. Anyone already there swaps over.</p>` : ''}
+    <p class="small muted">Locks ${when(t.locks_at)}</p>
+    ${S.pick !== null && S.squad[S.pick] ? `<p class="small fx-hint">Tap a role to move ${esc(byId(S.squad[S.pick])?.name ?? 'them')} there.</p>` : ''}
     <ol class="fx-squad">${S.squad.map(slot).join('')}</ol>
     <p class="small"><b class="${left < 0 ? 'error' : ''}">${money(left)}</b> left of ${money(t.budget)}
       ${t.first_squad ? '' : ` · ${ch} change${ch === 1 ? '' : 's'}${hit ? `, <span class="error">−${hit} points</span>` : ' (1 free)'}`}</p>
@@ -141,17 +141,48 @@ function boardHtml() {
   </section>`;
 }
 
-const RULES = `<section class="panel"><h2>How it works</h2><ul class="small fx-rules">
-  <li>Pick a player for each of the five roles and one for the bench, within the budget.</li>
-  <li>Every PC and major in a week counts. Your team locks when the week's first one starts.</li>
-  <li>If a starter doesn't play that week, your bench player comes on in their role.</li>
-  <li>One free change a week. Each extra change costs 4 points.</li>
-  <li>Points per match: 2 for a win, 1 per leg won, 1 per 140+ visit, 3 per 180, 5 per 100+ checkout, 1 for a 50+ average (2 for 60+). Winning an event is worth 10, runner-up 5.</li>
-  <li>Roles: the Captain's points all count double. The Power Scorer gets triple for 180s and 140+ visits, the Big Finisher triple for 100+ checkouts, the Dark Horse triple win points for beating someone the odds had as favourite, and the Tricky Player triple win points for winning with a lower average.</li>
-  <li>Prices move a little each week with form.</li></ul></section>`;
+const scoringButton = '<button class="link" data-act="scoring">Explain the scoring</button>';
+
+// What scores what, in a window over the page.
+const SCORING = `<dialog id="fx-scoring" class="fx-dialog">
+  <div class="fx-dialog-head"><h2>Scoring</h2><button class="link" data-act="close-scoring" aria-label="Close">✕</button></div>
+  <table class="fx-points"><tbody>
+    <tr><td>Match won</td><td>2</td></tr>
+    <tr><td>Leg won</td><td>1</td></tr>
+    <tr><td>140+</td><td>1</td></tr>
+    <tr><td>180</td><td>3</td></tr>
+    <tr><td>100+ checkout</td><td>5</td></tr>
+    <tr><td>Winning the event</td><td>10</td></tr>
+    <tr><th colspan="2">Match average</th></tr>
+    <tr><td>50+</td><td>1</td></tr>
+    <tr><td>60+</td><td>2</td></tr>
+    <tr><td>70+</td><td>4</td></tr>
+    <tr><td>80+</td><td>6</td></tr>
+    <tr><th colspan="2">Legs won in</th></tr>
+    <tr><td>19 to 21 darts</td><td>2</td></tr>
+    <tr><td>16 to 18 darts</td><td>4</td></tr>
+    <tr><td>15 darts or fewer</td><td>8</td></tr>
+  </tbody></table>
+  <p class="small muted">Averages score the highest band reached, once per match.</p>
+  <h3>Roles</h3>
+  <ul class="small fx-rules">
+    <li><b>Captain</b>: all their points double.</li>
+    <li><b>Power Scorer</b>: 180s and 140+ score triple.</li>
+    <li><b>Big Finisher</b>: 100+ checkouts score triple.</li>
+    <li><b>Dark Horse</b>: match wins score triple when they were the underdog in the odds.</li>
+    <li><b>Tricky Player</b>: match wins score triple when they averaged less than their opponent.</li>
+    <li><b>Bench</b>: plays the role of the first starter who doesn't play that week.</li>
+  </ul>
+  <h3>Rules</h3>
+  <ul class="small fx-rules">
+    <li>Every PC and major counts. Teams lock when the week's first one starts.</li>
+    <li>One free change a week, then 4 points per change.</li>
+    <li>Prices move a little each week with form.</li>
+  </ul>
+</dialog>`;
 
 function render() {
-  app.innerHTML = `${squadHtml()}${historyHtml()}${boardHtml()}${marketHtml()}${RULES}`;
+  app.innerHTML = `${squadHtml()}${historyHtml()}${boardHtml()}${marketHtml()}${SCORING}`;
 }
 
 app.addEventListener('input', e => {
@@ -181,6 +212,8 @@ app.addEventListener('click', async e => {
     return;
   }
   if (!b) return;
+  if (b.dataset.act === 'scoring') { app.querySelector('#fx-scoring')?.showModal(); return; }
+  if (b.dataset.act === 'close-scoring') { b.closest('dialog')?.close(); return; }
   if (b.dataset.add) {
     const i = S.pick !== null && !S.squad[S.pick] ? S.pick : S.squad.indexOf(null);
     if (i < 0) { toast('Your squad is full. Remove someone first.'); return; }

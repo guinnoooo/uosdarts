@@ -1149,3 +1149,11 @@ button.chat-who:hover { text-decoration: underline; }
 .folded > .fold-head { margin-bottom: 0; }
 .fx-market td:last-child { width: 1%; white-space: nowrap; }
 .fx-market .fx-name { min-width: 0; }
+.fx-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.fx-dialog { max-width: 26rem; width: calc(100% - 2rem); border: 1px solid var(--line); border-radius: 12px; background: var(--bg, #111); color: var(--text); padding: 1rem 1.2rem; }
+.fx-dialog::backdrop { background: rgba(0, 0, 0, .6); }
+.fx-dialog-head { display: flex; justify-content: space-between; align-items: center; }
+.fx-points { width: 100%; border-collapse: collapse; margin: .4rem 0; }
+.fx-points td { padding: .3rem 0; border-bottom: 1px solid var(--line); }
+.fx-points td:last-child { text-align: right; font-weight: 600; }
+.fx-points th { text-align: left; padding: .7rem 0 .2rem; color: var(--text-2); font-weight: 500; font-size: .85rem; }
