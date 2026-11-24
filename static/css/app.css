@@ -685,7 +685,11 @@ label.chk {
 @media (max-width: 560px) {
   .nav-full { display: none; }
   .nav-short { display: inline; }
-  .site-nav { gap: 16px; }
+  /* Too many links for one line on a phone: let them wrap onto a second
+     centred row instead of running off the side of the screen. */
+  .header-inner { gap: 8px; padding: 10px 12px; }
+  .site-nav { width: 100%; flex-wrap: wrap; justify-content: center; gap: 6px 16px; }
+  .nav-link { font-size: .9rem; }
 }
 .settings-block > details > summary {
   display: flex; align-items: center; gap: .5rem;
