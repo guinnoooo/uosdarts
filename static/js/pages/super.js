@@ -328,8 +328,7 @@ function fantasyPanel() {
   const addable = S.players.filter(p => !listed.has(p.id));
   return `<section class="panel futures-admin" data-fx>
     <h2>Fantasy prices</h2>
-    <p class="muted small">Budget is 50.0 for six players. Prices move by up to 0.2 a week with form after that.
-      Clear a price to stop a player being picked (anyone who already has them keeps them).</p>
+    <p class="muted small">Budget 50.0 for six. A blank price can't be picked.</p>
     <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">Player</th><th>Suggested</th><th>Price</th><th>In teams</th></tr></thead>
     <tbody>${list.map(r => `<tr>
       <td class="l">${esc(r.name)}</td>
@@ -354,7 +353,7 @@ function fantasyScoringPanel() {
   const list = S.fxScoring ?? [];
   return `<section class="panel futures-admin" data-fxs>
     <h2>Fantasy scoring</h2>
-    <p class="muted small">Changing a value rescores every week, past ones included.</p>
+    <p class="muted small">Changes rescore every week, past ones too.</p>
     <table class="points-list"><tbody>${list.map(r => `<tr>
       <td class="l">${esc(r.label)}</td>
       <td><input class="fut-price" type="number" step="1" data-fxs-pts="${esc(r.key)}" data-orig="${r.points}" value="${r.points}"></td>
@@ -368,8 +367,7 @@ function futuresPanel() {
   if (!list.length) return '';
   return `<section class="panel futures-admin">
     <h2>Futures</h2>
-    <p class="muted small">Draft markets are hidden from everyone else. Only selections with a price show on the
-      <a href="/futures/">futures page</a>. Prices are fixed odds: changing one doesn't move bets already placed.</p>
+    <p class="muted small">Drafts are hidden. A blank price isn't shown.</p>
     ${list.map(futureMarketHtml).join('')}
   </section>`;
 }
@@ -737,7 +735,7 @@ async function fantasyScoringClick(el) {
     if (i.value.trim() !== '' && Number(i.value) !== Number(i.dataset.orig)) pts[i.dataset.fxsPts] = Math.round(Number(i.value));
   });
   if (!Object.keys(pts).length) { toast('Nothing changed'); return true; }
-  if (!confirm('Change the scoring? Every week is rescored with the new values, past ones included.')) return true;
+  if (!confirm('Save the scoring? Every week is rescored.')) return true;
   await run(async () => check(await sb.rpc('super_fantasy_set_scoring', { p_points: pts })), 'Scoring saved');
   return true;
 }
@@ -802,7 +800,7 @@ async function futuresClick(el) {
     const status = q('[data-fm-status]').value;
     const closes = q('[data-fm-closes]').value;
     if (status === 'open' && market?.status !== 'open'
-      && !confirm(`Open "${market?.title}"? Everyone will be able to see it and bet on the priced selections.`)) return true;
+      && !confirm(`Open "${market?.title}" for betting?`)) return true;
     await run(async () => check(await sb.rpc('super_future_market', {
       p_market: mid, p_title: q('[data-fm-title]').value, p_rules: q('[data-fm-rules]').value,
       p_status: status, p_closes_at: closes ? new Date(closes).toISOString() : null,
@@ -814,7 +812,7 @@ async function futuresClick(el) {
     const r = q(`[data-fs-res="${sid}"]`).value || null;
     const sel = market?.selections.find(x => x.id === sid);
     const what = r ? { won: 'a winner', lost: 'a loser', void: 'void (stakes back)' }[r] : 'unsettled (bets back to open)';
-    if (!confirm(`Settle ${sel?.name ?? 'this'} as ${what}? ${sel?.bets ?? 0} bets are affected.`)) return true;
+    if (!confirm(`Settle ${sel?.name ?? 'this'} as ${what}? (${sel?.bets ?? 0} bets)`)) return true;
     await run(async () => check(await sb.rpc('super_future_settle', { p_selection: sid, p_result: r })), 'Settled');
     return true;
   }
@@ -830,7 +828,7 @@ async function futuresClick(el) {
   }
   if (el.dataset.futrest) {
     const left = market?.selections.filter(x => !x.result).length ?? 0;
-    if (!confirm(`Settle all ${left} unsettled selections in "${market?.title}" as lost and mark the market settled? Set the winners (and any voids) first.`)) return true;
+    if (!confirm(`Settle the other ${left} in "${market?.title}" as lost? Set winners and voids first.`)) return true;
     await run(async () => check(await sb.rpc('super_future_settle_rest', { p_market: mid })), 'Market settled');
     return true;
   }

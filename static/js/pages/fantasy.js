@@ -33,8 +33,7 @@ const byId = id => S.market.find(p => p.id === id);
 async function load() {
   // Fills in who was the underdog for any finished match that still needs it
   // (for the Dark Horse role). Quick, and harmless if it fails.
-  await Promise.race([sb.functions.invoke('place-bet', { body: { kind: 'prematch' } }).catch(() => null),
-    new Promise(r => setTimeout(r, 4000))]);
+  if (!S.asked) { S.asked = true; sb.functions.invoke('place-bet', { body: { kind: 'prematch' } }).catch(() => null); }
   const [acc, market, board, gws, pts] = await Promise.all([loadAccount(), sb.rpc('fantasy_market'), sb.rpc('fantasy_leaderboard'), sb.rpc('fantasy_gws'), sb.rpc('fantasy_scoring_list')]);
   S.points = pts.data ?? [];
   S.market = market.data ?? [];
@@ -61,7 +60,7 @@ const changes = () => {
 function squadHtml() {
   const t = S.team;
   if (!S.account) return `<section class="panel"><div class="fx-head"><h2>Your team</h2>${scoringButton}</div><p><a href="/account/?next=/fantasy/">Log in</a> to pick a team.</p></section>`;
-  if (!t?.next_gw) return `<section class="panel"><div class="fx-head"><h2>Your team</h2>${scoringButton}</div><p class="muted">No PC or major coming up to pick a team for.</p></section>`;
+  if (!t?.next_gw) return `<section class="panel"><div class="fx-head"><h2>Your team</h2>${scoringButton}</div><p class="muted">No PC or major coming up.</p></section>`;
   const left = Number(t.budget) - cost();
   const ch = changes();
   const hit = Math.max(0, ch - 1) * t.hit;
@@ -72,7 +71,7 @@ function squadHtml() {
     const head = `<span class="fx-role"><b>${role.name}</b><span class="muted small">${role.note}</span></span>`;
     if (!id) {
       return `<li class="fx-slot empty${sel}${i === 5 ? ' bench' : ''}" data-slot="${i}">${photo(null, '+', 'fx-photo')}${head}
-        <span class="muted small">${S.pick !== null && S.squad[S.pick] && S.pick !== i ? 'Move here' : S.pick === i ? 'Next player added goes here' : 'Empty'}</span></li>`;
+        <span class="muted small">${S.pick !== null && S.squad[S.pick] && S.pick !== i ? 'Move here' : 'Empty'}</span></li>`;
     }
     return `<li class="fx-slot${sel}${i === 5 ? ' bench' : ''}" data-slot="${i}">
       ${photo(p?.slug, p?.name)}
@@ -87,7 +86,7 @@ function squadHtml() {
     <div class="fx-head"><h2>Your team</h2>${scoringButton}</div>
     <label>Team name <input id="fx-name" maxlength="30" value="${esc(S.name)}"></label>
     <p class="small muted">Locks ${when(t.locks_at)}</p>
-    ${S.pick !== null && S.squad[S.pick] ? `<p class="small fx-hint">Tap a role to move ${esc(byId(S.squad[S.pick])?.name ?? 'them')} there.</p>` : ''}
+    ${S.pick !== null && S.squad[S.pick] ? `<p class="small fx-hint">Tap a role to move ${esc(byId(S.squad[S.pick])?.name ?? 'them')}.</p>` : ''}
     <ol class="fx-squad">${S.squad.map(slot).join('')}</ol>
     <p class="small"><b class="${left < 0 ? 'error' : ''}">${money(left)}</b> left of ${money(t.budget)}
       ${t.first_squad ? '' : ` · ${ch} change${ch === 1 ? '' : 's'}${hit ? `, <span class="error">−${hit} points</span>` : ' (1 free)'}`}</p>
@@ -149,9 +148,9 @@ const scoringButton = '<button class="link" data-act="scoring">Explain the scori
 // database, where a super admin sets them.
 const scoringHtml = () => `<dialog id="fx-scoring" class="fx-dialog">
   <div class="fx-dialog-head"><h2>Scoring</h2><button class="link" data-act="close-scoring" aria-label="Close">✕</button></div>
-  <p class="small muted">Every PC and major counts. Europa matches only count for your Europa Specialist.</p>
+  <p class="small muted">PCs and majors count. Europa matches only count for your Europa Specialist.</p>
   <table class="fx-points"><tbody>${S.points.map(x => `<tr><td>${esc(x.label)}</td><td>${x.points}</td></tr>`).join('')}</tbody></table>
-  <p class="small muted">Averages score the highest band reached, once per match.</p>
+  <p class="small muted">Averages: highest band only, per match.</p>
   <h3>Roles</h3>
   <ul class="small fx-rules">
     <li><b>Captain</b>: all their points double.</li>
@@ -204,7 +203,7 @@ app.addEventListener('click', async e => {
   if (b.dataset.act === 'close-scoring') { b.closest('dialog')?.close(); return; }
   if (b.dataset.add) {
     const i = S.pick !== null && !S.squad[S.pick] ? S.pick : S.squad.indexOf(null);
-    if (i < 0) { toast('Your squad is full. Remove someone first.'); return; }
+    if (i < 0) { toast('Squad full'); return; }
     S.squad[i] = b.dataset.add;
     S.pick = null;
     render();
@@ -236,12 +235,12 @@ app.addEventListener('click', async e => {
   if (b.dataset.act === 'save') {
     if (S.squad.some(x => !x)) { toast('Fill all five roles and the bench'); return; }
     const ch = changes();
-    if (ch > 1 && !confirm(`That's ${ch} changes. Each one after the first costs ${S.team.hit} points. Save anyway?`)) return;
+    if (ch > 1 && !confirm(`${ch} changes costs ${(ch - 1) * S.team.hit} points. Save?`)) return;
     b.disabled = true;
     const { data, error } = await sb.rpc('fantasy_save', { p_name: S.name, p_players: S.squad });
     b.disabled = false;
     if (error) { toast(error.message); return; }
-    toast(`Team saved for ${gwLabel(data.gw)}`, false);
+    toast('Team saved', false);
     await load();
     render();
   }
