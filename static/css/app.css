@@ -1160,7 +1160,7 @@ button.chat-who:hover { text-decoration: underline; }
 #fx-picker { max-height: 85vh; display: none; }
 #fx-picker[open] { display: flex; flex-direction: column; gap: .6rem; }
 #fx-picker .fx-pick-list { overflow-y: auto; min-height: 0; flex: 1; }
-.fx-pick-row { display: grid; grid-template-columns: 1.8rem 1fr auto 2.6rem; gap: .6rem; align-items: center; width: 100%; padding: .5rem .2rem; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; text-align: left; cursor: pointer; }
+.fx-pick-row { display: grid; grid-template-columns: 1.8rem 1fr auto 3.6rem; gap: .6rem; align-items: center; width: 100%; padding: .5rem .2rem; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; text-align: left; cursor: pointer; }
 .fx-pick-row:hover:not(.off) { background: var(--surface, #1a1a1a); }
 .fx-pick-row.off { opacity: .45; cursor: default; }
 .fx-pick-row b { text-align: right; }

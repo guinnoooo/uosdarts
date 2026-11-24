@@ -25,7 +25,8 @@ const photo = (slug, name, cls = 'fx-photo') => slug
       onerror="this.onerror=null;this.outerHTML='&lt;span class=&quot;${cls} fx-initials&quot;&gt;${initials(name)}&lt;/span&gt;'">`
   : `<span class="${cls} fx-initials">${initials(name)}</span>`;
 
-const money = n => Number(n ?? 0).toFixed(1);
+// Prices in millions, the fantasy football way: 14.0 shows as £14.0m.
+const money = n => { const v = Number(n ?? 0); return `${v < 0 ? '−' : ''}£${Math.abs(v).toFixed(1)}m`; };
 const when = d => new Date(d).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const gwLabel = d => `w/c ${new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
 const byId = id => S.market.find(p => p.id === id);
