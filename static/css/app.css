@@ -1281,3 +1281,11 @@ button.chat-who:hover { text-decoration: underline; }
 /* fantasy: sortable player list */
 .fx-sort { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
 .fx-sort.on { color: var(--accent); }
+
+/* account: bets split into open, settled and cancelled */
+.bets-head { display: flex; align-items: baseline; gap: .5rem; margin: 1rem 0 .6rem; font-size: 1rem; }
+.bets-head:first-child { margin-top: 0; }
+.bets-group > summary { cursor: pointer; list-style: none; }
+.bets-group > summary::-webkit-details-marker { display: none; }
+.bets-group > summary .bets-head::after { content: '▸'; margin-left: auto; color: var(--text-3); }
+.bets-group[open] > summary .bets-head::after { content: '▾'; }
