@@ -51,18 +51,34 @@ async function load() {
   }
 }
 
-const cost = () => S.squad.reduce((t, id) => t + Number(byId(id)?.price ?? 0), 0);
+// Money works like FPL: kept players stay at what you paid, sold players
+// go back at today's price and new ones are bought at today's price.
+const prevMap = () => new Map((S.team?.previous ?? []).map(x => [x.player_id, x]));
+const bank = () => {
+  const prev = prevMap(), now = new Set(S.squad.filter(Boolean));
+  let b = Number(S.team?.bank_before ?? S.team?.budget ?? 0);
+  for (const [id, x] of prev) if (!now.has(id)) b += Number(x.price);
+  for (const id of now) if (!prev.has(id)) b -= Number(byId(id)?.price ?? 0);
+  return Math.round(b * 10) / 10;
+};
+const sellValue = id => { const x = prevMap().get(id); return Number(x ? x.price : byId(id)?.price ?? 0); };
 const changes = () => {
   if (!S.team || S.team.first_squad) return 0;
-  const prev = new Set(S.team.previous ?? []);
+  const prev = prevMap();
   return S.squad.filter(id => id && !prev.has(id)).length;
 };
+
+function gain(id) {
+  const x = prevMap().get(id);
+  const d = x ? Math.round((Number(x.price) - Number(x.bought)) * 10) / 10 : 0;
+  return d ? ` <span class="small ${d > 0 ? 'fx-up' : 'fx-down'}">(${d > 0 ? '+' : '−'}£${Math.abs(d).toFixed(1)}m)</span>` : '';
+}
 
 function squadHtml() {
   const t = S.team;
   if (!S.account) return `<section class="panel"><div class="fx-head"><h2>Your team</h2>${scoringButton}</div><p><a href="/account/?next=/fantasy/">Log in</a> to pick a team.</p></section>`;
   if (!t?.next_gw) return `<section class="panel"><div class="fx-head"><h2>Your team</h2>${scoringButton}</div><p class="muted">No PC or major coming up.</p></section>`;
-  const left = Number(t.budget) - cost();
+  const left = bank();
   const ch = changes();
   const hit = Math.max(0, ch - 1) * t.hit;
   const slot = (id, i) => {
@@ -77,7 +93,7 @@ function squadHtml() {
     return `<li class="fx-slot${sel}${i === 5 ? ' bench' : ''}" data-slot="${i}">
       ${photo(p?.slug, p?.name)}
       ${head}
-      <span class="fx-who"><b>${esc(p?.name ?? '?')}</b> <span class="muted">${money(p?.price)}</span></span>
+      <span class="fx-who"><b>${esc(p?.name ?? '?')}</b> <span class="muted">${money(p?.price)}${gain(id)}</span></span>
       <span class="fx-slot-btns">
         <button class="link" data-move="${i}">${S.pick === i ? 'Cancel' : 'Move'}</button>
         <button class="link" data-drop="${i}" title="Remove">✕</button>
@@ -89,7 +105,7 @@ function squadHtml() {
     <p class="small muted">Locks ${when(t.locks_at)}</p>
     ${S.pick !== null && S.squad[S.pick] ? `<p class="small fx-hint">Tap a role to move ${esc(byId(S.squad[S.pick])?.name ?? 'them')}.</p>` : ''}
     <ol class="fx-squad">${S.squad.map(slot).join('')}</ol>
-    <p class="small"><b class="${left < 0 ? 'error' : ''}">${money(left)}</b> left of ${money(t.budget)}
+    <p class="small"><b class="${left < 0 ? 'error' : ''}">${money(left)}</b> in the bank
       ${t.first_squad ? '' : ` · ${ch} change${ch === 1 ? '' : 's'}${hit ? `, <span class="error">−${hit} points</span>` : ' (1 free)'}`}</p>
     <button class="primary" data-act="save">Save team</button>
   </section>`;
@@ -201,7 +217,7 @@ function pickerRows() {
   const slot = S.picker;
   const q = (S.pq ?? '').toLowerCase();
   const taken = new Set(S.squad.filter((id, i) => id && i !== slot));
-  const room = Number(S.team?.budget ?? 0) - cost() + Number(byId(S.squad[slot])?.price ?? 0);
+  const room = bank() + (S.squad[slot] ? sellValue(S.squad[slot]) : 0);
   const list = S.market.filter(p => !q || p.name.toLowerCase().includes(q));
   if (!list.length) return '<p class="muted small">No one matches.</p>';
   return list.map(p => {
