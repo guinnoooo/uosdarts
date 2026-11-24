@@ -47,6 +47,8 @@ async function loadInner() {
   S.futures = check(await sb.rpc('super_futures')) ?? [];
   S.fantasy = check(await sb.rpc('super_fantasy_prices')) ?? [];
   S.fxScoring = check(await sb.rpc('fantasy_scoring_list')) ?? [];
+  S.fxTeams = check(await sb.rpc('super_fantasy_teams')) ?? null;
+  S.allBets = check(await sb.rpc('super_all_bets', { p_limit: 500 })) ?? [];
   if (S.accBetsFor) S.accBets = check(await sb.rpc('super_account_bets', { p_user: S.accBetsFor })) ?? [];
   S.seeds = new Map((check(await sb.from('player_seeds').select('player_id, rating')) ?? [])
     .map(r => [r.player_id, Number(r.rating)]));
@@ -296,6 +298,49 @@ const BET_STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', c
 const fmtN = n => Number(n ?? 0).toLocaleString('en-GB');
 const shortWhen = d => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
+// Market, then the match or event it belongs to.
+const betWhat = b => [b.market, b.match, b.event && !b.market.includes(b.event) ? b.event : null].filter(Boolean).map(esc).join(' · ');
+
+// Every bet on the site, newest first. Search by account, player or market.
+function allBetsPanel() {
+  const list = S.allBets ?? [];
+  const q = (S.betQ ?? '').toLowerCase();
+  const shown = q ? list.filter(b => `${b.account} ${b.selection} ${b.market} ${b.event ?? ''} ${b.match ?? ''}`.toLowerCase().includes(q)) : list;
+  const open = shown.filter(b => b.status === 'open');
+  return `<section class="panel">
+    <h2>All bets (${list.length})</h2>
+    ${list.length ? `<input id="bet-q" placeholder="Search account, player or market" value="${esc(S.betQ ?? '')}">
+    <p class="small">${open.length} open · ${fmtN(open.reduce((t, b) => t + Number(b.stake), 0))} staked · ${fmtN(open.reduce((t, b) => t + Number(b.returns), 0))} to pay if all win</p>
+    <table class="bets-list"><tbody>${shown.map(b => `<tr>
+      <td class="l"><b>${esc(b.account)}</b>: ${esc(b.selection)} at ${esc(b.price)}
+        <span class="muted small">${betWhat(b)} · ${shortWhen(b.placed_at)}</span></td>
+      <td>${fmtN(b.stake)}</td>
+      <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}</td>
+    </tr>`).join('') || '<tr><td class="muted">No bets match.</td></tr>'}</tbody></table>` : '<p class="muted">No bets yet.</p>'}
+  </section>`;
+}
+
+// Every fantasy team for the coming week, including ones still hidden from
+// everyone else until the deadline.
+const FX_ROLES = ['Captain', 'Power Scorer', 'Big Finisher', 'Dark Horse', 'Europa Specialist', 'Bench'];
+const fxMoney = n => n == null ? '' : `£${Number(n).toFixed(1)}m`;
+function fantasyTeamsPanel() {
+  const d = S.fxTeams;
+  const teams = d?.teams ?? [];
+  const locked = d?.locks_at && new Date(d.locks_at) <= new Date();
+  return `<section class="panel">
+    <h2>Fantasy teams (${teams.length})</h2>
+    ${d ? `<p class="small muted">Week of ${new Date(d.gw).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${d.locks_at ? ` · ${locked ? 'locked' : 'locks'} ${shortWhen(d.locks_at)}` : ''}</p>` : ''}
+    ${teams.length ? teams.map(t => `<div class="fx-admin-team">
+      <p><b>${esc(t.name)}</b> <span class="muted small">${esc(t.manager)} · ${fxMoney(t.bank)} in the bank${t.changes ? ` · ${t.changes} change${t.changes === 1 ? '' : 's'}` : ''}${t.saved_this_week ? '' : ' · not changed since last week'}</span></p>
+      <table class="points-list"><tbody>${t.squad.map(p => `<tr>
+        <td class="muted small">${FX_ROLES[p.slot - 1] ?? p.slot}</td>
+        <td class="l">${esc(p.name)}</td>
+        <td class="small">${fxMoney(p.paid)}${p.price != null && Number(p.price) !== Number(p.paid) ? ` <span class="muted">(now ${fxMoney(p.price)})</span>` : ''}</td>
+      </tr>`).join('')}</tbody></table></div>`).join('') : '<p class="muted">No teams yet.</p>'}
+  </section>`;
+}
+
 // Every bet one account has placed, newest first, with the net result.
 function accountBetsHtml(list) {
   if (!list.length) return '<p class="muted small">No bets.</p>';
@@ -306,7 +351,7 @@ function accountBetsHtml(list) {
     <p class="small">${list.length} bets · ${settled.length} settled, net ${net >= 0 ? '+' : ''}${fmtN(net)} · ${open.length} open, ${fmtN(open.reduce((t, b) => t + Number(b.stake), 0))} staked</p>
     <table class="bets-list"><tbody>${list.map(b => `<tr>
       <td class="l"><b>${esc(b.selection)}</b> at ${esc(b.price)}
-        <span class="muted small">${esc(b.market)}${b.event && !b.market.includes(b.event) ? ` · ${esc(b.event)}` : ''} · ${shortWhen(b.placed_at)}</span></td>
+        <span class="muted small">${betWhat(b)} · ${shortWhen(b.placed_at)}</span></td>
       <td>${fmtN(b.stake)}</td>
       <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}</td>
     </tr>`).join('')}</tbody></table></div>`;
@@ -478,7 +523,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${futuresPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${allBetsPanel()}${futuresPanel()}${fantasyTeamsPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   applyFolds();
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
@@ -851,6 +896,13 @@ app.addEventListener('input', e => {
   if (e.target.id === 'p-filter') {
     S.filter = e.target.value;
     render();
+  }
+  if (e.target.id === 'bet-q') {
+    S.betQ = e.target.value;
+    render();
+    const box = app.querySelector('#bet-q');
+    box?.focus();
+    box?.setSelectionRange(box.value.length, box.value.length);
   }
   if (e.target.id === 'acc-q') {
     S.accQ = e.target.value;
