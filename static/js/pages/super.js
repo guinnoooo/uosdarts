@@ -37,21 +37,39 @@ async function loadInner() {
     return;
   }
 
-  S.players = check(await sb.from('players').select('*').order('name'));
-  S.admins = check(await sb.rpc('super_list_admins'));
-  S.friendliesOn = (await sb.rpc('friendlies_enabled')).data ?? false;
-  S.hubsOn = (await sb.rpc('hub_enabled', { p_kind: 'uduk' })).data ?? false;
-  S.friendlies = check(await sb.rpc('super_list_friendlies')) ?? [];
-  S.openFriendlies = check(await sb.rpc('super_list_open_friendlies')) ?? [];
-  S.accounts = check(await sb.rpc('super_list_accounts')) ?? [];
-  S.futures = check(await sb.rpc('super_futures')) ?? [];
-  S.fantasy = check(await sb.rpc('super_fantasy_prices')) ?? [];
-  S.fxScoring = check(await sb.rpc('fantasy_scoring_list')) ?? [];
-  S.fxTeams = check(await sb.rpc('super_fantasy_teams')) ?? null;
-  S.allBets = check(await sb.rpc('super_all_bets', { p_limit: 500 })) ?? [];
-  if (S.accBetsFor) S.accBets = check(await sb.rpc('super_account_bets', { p_user: S.accBetsFor })) ?? [];
-  S.seeds = new Map((check(await sb.from('player_seeds').select('player_id, rating')) ?? [])
-    .map(r => [r.player_id, Number(r.rating)]));
+  // Everything the page shows, fetched at once rather than one after another.
+  const rpc = (fn, args) => sb.rpc(fn, args);
+  const [players, admins, friendliesOn, hubsOn, friendlies, openFriendlies, accounts, futures, fantasy,
+    fxScoring, fxTeams, allBets, accBets, seeds] = await Promise.all([
+    sb.from('players').select('*').order('name'),
+    rpc('super_list_admins'),
+    rpc('friendlies_enabled'),
+    rpc('hub_enabled', { p_kind: 'uduk' }),
+    rpc('super_list_friendlies'),
+    rpc('super_list_open_friendlies'),
+    rpc('super_list_accounts'),
+    rpc('super_futures'),
+    rpc('super_fantasy_prices'),
+    rpc('fantasy_scoring_list'),
+    rpc('super_fantasy_teams'),
+    rpc('super_all_bets', { p_limit: 500 }),
+    S.accBetsFor ? rpc('super_account_bets', { p_user: S.accBetsFor }) : Promise.resolve({ data: null }),
+    sb.from('player_seeds').select('player_id, rating'),
+  ]);
+  S.players = check(players);
+  S.admins = check(admins);
+  S.friendliesOn = friendliesOn.data ?? false;
+  S.hubsOn = hubsOn.data ?? false;
+  S.friendlies = check(friendlies) ?? [];
+  S.openFriendlies = check(openFriendlies) ?? [];
+  S.accounts = check(accounts) ?? [];
+  S.futures = check(futures) ?? [];
+  S.fantasy = check(fantasy) ?? [];
+  S.fxScoring = check(fxScoring) ?? [];
+  S.fxTeams = check(fxTeams) ?? null;
+  S.allBets = check(allBets) ?? [];
+  if (S.accBetsFor) S.accBets = check(accBets) ?? [];
+  S.seeds = new Map((check(seeds) ?? []).map(r => [r.player_id, Number(r.rating)]));
   if (S.sel) {
     S.sel = S.players.find(p => p.id === S.sel.id) ?? null;
   }
@@ -60,8 +78,12 @@ async function loadInner() {
 }
 
 async function loadPlayer(id) {
-  S.points = check(await sb.rpc('player_points', { p_player: id, p_season: SEASON }));
-  const u = check(await sb.rpc('player_usage', { p_player: id }));
+  const [points, usage] = await Promise.all([
+    sb.rpc('player_points', { p_player: id, p_season: SEASON }),
+    sb.rpc('player_usage', { p_player: id }),
+  ]);
+  S.points = check(points);
+  const u = check(usage);
   S.usage = Array.isArray(u) ? u[0] : u;
 }
 
@@ -930,25 +952,25 @@ app.addEventListener('input', e => {
     e.target.classList.toggle('fut-changed', e.target.value.trim() !== e.target.dataset.orig);
     return;
   }
-  if (e.target.id === 'p-filter') {
-    S.filter = e.target.value;
-    render();
-  }
-  if (e.target.id === 'bet-q') {
-    S.betQ = e.target.value;
-    render();
-    const box = app.querySelector('#bet-q');
-    box?.focus();
-    box?.setSelectionRange(box.value.length, box.value.length);
-  }
-  if (e.target.id === 'acc-q') {
-    S.accQ = e.target.value;
-    render();
-    const box = app.querySelector('#acc-q');
-    box?.focus();
-    box?.setSelectionRange(box.value.length, box.value.length);
-  }
+  if (e.target.id === 'p-filter') { S.filter = e.target.value; redraw(e.target, playersPanel); }
+  if (e.target.id === 'bet-q') { S.betQ = e.target.value; redraw(e.target, allBetsPanel); }
+  if (e.target.id === 'acc-q') { S.accQ = e.target.value; redraw(e.target, accountsPanel); }
 });
+
+// Typing in a search box redraws only that panel, not the whole page.
+function redraw(input, panel) {
+  const id = input.id;
+  const section = input.closest('section.panel');
+  if (!section) { render(); return; }
+  const tmp = document.createElement('div');
+  tmp.innerHTML = panel();
+  const fresh = tmp.firstElementChild;
+  section.replaceWith(fresh);
+  applyFolds();
+  const box = app.querySelector(`#${id}`);
+  box?.focus();
+  box?.setSelectionRange(box.value.length, box.value.length);
+}
 
 async function load() {
   try {
