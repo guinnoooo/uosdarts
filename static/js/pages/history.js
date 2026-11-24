@@ -101,9 +101,6 @@ function recordsTab() {
     <h3>Most appearances</h3>
     ${table(apps.slice(0, 10), [r => `<td class="l">${who(r.name)}</td>`, r => `<td>${plural(r.seasons.length, 'year')}</td>`,
       r => `<td class="small muted">${r.won}–${r.lost}</td>`])}
-    <h3>Best record <span class="muted small">(3+ matches)</span></h3>
-    ${table(best.slice(0, 10), [r => `<td class="l">${who(r.name)}</td>`, r => `<td>${r.won}–${r.lost}</td>`,
-      r => `<td class="small muted">${Math.round(100 * r.won / r.played)}%</td>`])}
     ${unbeaten.length ? `<h3>Never beaten <span class="muted small">(2+ matches)</span></h3>
     ${table(unbeaten, [r => `<td class="l">${who(r.name)}</td>`, r => `<td>${r.won}–0</td>`])}` : ''}
     <h3>Hallam players we keep meeting</h3>
