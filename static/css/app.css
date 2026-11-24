@@ -1274,3 +1274,10 @@ button.chat-who:hover { text-decoration: underline; }
 .betcard-brand { font-weight: 700; letter-spacing: .04em; color: var(--accent); opacity: .8; }
 .betcard-actions { margin-top: .4rem; text-align: right; }
 .my-bets .betcards { margin-top: .5rem; }
+
+/* fantasy: leaderboard shows about ten teams and scrolls for the rest */
+.fx-board-scroll { max-height: 40rem; overflow-y: auto; -webkit-overflow-scrolling: touch; border-bottom: 1px solid var(--line); }
+.fx-board-scroll thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+/* fantasy: sortable player list */
+.fx-sort { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
+.fx-sort.on { color: var(--accent); }
