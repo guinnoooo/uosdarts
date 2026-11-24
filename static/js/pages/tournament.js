@@ -3,6 +3,7 @@ import { standings } from '../fixtures.js';
 import { matchCard, setWatching } from '../ui.js';
 import { oomScore } from '../winprob.js';
 import { outrightOdds, outrightPrice } from '../outright.js';
+import { loadAccount, slipHtml, slipEvent } from '../betting.js';
 
 const app = document.getElementById('app');
 const id = qs('id');
@@ -95,15 +96,26 @@ function scheduleOdds() {
     Math.max(0, 4000 - (Date.now() - (S.oddsAt ?? 0))));
 }
 
+// Outright bets: open until the first match of the tournament starts.
+const outrightOpen = () => !S.t.is_friendly && S.t.status !== 'complete' && S.matches.length > 0
+  && !S.matches.some(m => m.status === 'live' || (m.status === 'complete' && m.player1_id && m.player2_id));
+
 function oddsSection() {
   const list = S.odds ?? [];
   if (list.length < 2) return '';
   const shown = S.oddsAll ? list : list.slice(0, 5);
   const thin = shown.some(x => x.thin);
-  return `<section class="outright"><h2>Live odds to win the tournament${thin ? '<sup class="odds-star">*</sup>' : ''}</h2>
+  const bet = outrightOpen();
+  if (!bet) S.slip = null;
+  const price = x => bet
+    ? `<button class="odds-pick small-pick${S.slip?.player_id === x.id ? ' on' : ''}" data-obet="${x.id}"><b>${outrightPrice(x.p)}</b></button>`
+    : `<b>${outrightPrice(x.p)}</b>`;
+  return `<section class="outright"><h2>${bet ? 'Odds' : 'Live odds'} to win the tournament${thin ? '<sup class="odds-star">*</sup>' : ''}</h2>
+    ${bet && !S.slip ? '<p class="muted small">Tap a price to bet tokens on it. Betting closes when the first match starts.</p>' : ''}
+    ${bet ? slipHtml(S.slip) : ''}
     <table class="outright-list"><tbody>${shown.map((x, i) => `<tr>
       <td class="muted">${i + 1}</td><td class="l">${esc(x.name)}</td>
-      <td><b>${outrightPrice(x.p)}</b></td></tr>`).join('')}</tbody></table>
+      <td>${price(x)}</td></tr>`).join('')}</tbody></table>
     ${list.length > 5 ? `<button data-act="odds-toggle" class="link">${S.oddsAll ? 'Show top 5' : `Show all ${list.length}`}</button>` : ''}
     ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players</p>' : ''}
   </section>`;
@@ -317,8 +329,20 @@ function render() {
   }
 }
 
-app.addEventListener('click', e => {
+const slipCtx = { slip: () => S.slip, set: v => { S.slip = v; }, render: () => render() };
+app.addEventListener('input', e => { slipEvent(e, slipCtx); });
+app.addEventListener('click', async e => {
   if (e.target.closest('[data-act="odds-toggle"]')) { S.oddsAll = !S.oddsAll; render(); return; }
+  const ob = e.target.closest('[data-obet]');
+  if (ob) {
+    const x = (S.odds ?? []).find(o => o.id === ob.dataset.obet);
+    if (!x) return;
+    S.slip = { kind: 'outright', tournament_id: id, player_id: x.id, selection: x.name, price: outrightPrice(x.p), stake: S.slip?.stake ?? 100 };
+    loadAccount().then(() => render(), () => render());
+    render();
+    return;
+  }
+  if (await slipEvent(e, slipCtx)) return;
   const b = e.target.closest('[data-tab]');
   if (!b) return;
   S.tab = b.dataset.tab;
