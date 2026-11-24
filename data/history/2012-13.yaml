@@ -1,0 +1,43 @@
+# 2012/13. What each field means is explained at the top of data/history_names.yaml.
+season: 2012/13
+committee:
+- role: President
+  name: Steven Organ
+- role: Treasurer
+  name: Tom Hogg
+- role: Secretary
+  name: George Francis
+- role: Social Secretary
+  name: Aaron Hazlehurst
+- role: Inclusions Officer
+  name: Nick Travers
+internal:
+- event: Sheffield Darts League
+  winner: Tom Hogg
+  runner_up: Steven Organ
+  high_checkout: James Douglas (112)
+- event: Champions League
+  winner: Tom Hogg
+  runner_up: Ed Pearce
+- event: Ham Cup
+  winner: Rob Worrall
+  runner_up: Steven Organ
+  third: Jamie Barrington
+  high_checkout: Martin Halton (77)
+- event: Easter Egg Cup
+  winner: Dave Slattery
+  runner_up: Tom Hogg
+  third: Steven Organ
+  high_checkout: Tom Hogg (110)
+  note: Called the Easter Cup that year
+- event: Home Brew Cup
+  winner: Dave Slattery
+  runner_up: Tom Hogg
+  third: James Kearney
+awards:
+- award: Captain's Player of the Year
+  name: Jamie Barrington
+- award: Team's Player of the Year
+  name: Tom Hogg
+- award: Most Improved
+  name: Dave Slattery

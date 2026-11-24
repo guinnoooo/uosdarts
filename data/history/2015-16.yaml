@@ -1,0 +1,103 @@
+# 2015/16. What each field means is explained at the top of data/history_names.yaml.
+season: 2015/16
+committee:
+- role: President
+  name: Tom Hogg
+- role: Secretary
+  name: Ed McCosh
+- role: Treasurer
+  name: Jack Lewis
+- role: Captain
+  name: Jonny Kirk
+- role: Inclusions Officer
+  name: Sarah Denholm
+- role: Social Secretary
+  name: Niall Chester
+- role: Publicity Officer
+  name: Laurence Burford
+- role: Football Captain
+  name: Tom Wright
+internal:
+- event: Specimen Cup
+  winner: Adam Warner
+  runner_up: Max Orange
+- event: Ham Cup
+  winner: Adam Warner
+  runner_up: Steven Organ
+  third: Declan Parsons
+  high_checkout: Max Orange (120)
+- event: Easter Egg Cup
+  winner: Max Orange
+  runner_up: Rob Matthews
+  third: Tom Hogg
+- event: Home Brew Cup
+  winner: Adam Warner
+  runner_up: Danny Hall
+  semis:
+  - Steven Organ
+  - Max Orange
+- event: Spoon Championship
+  winner: Luke Cowling
+- event: Europa League
+  winner: Steven Organ
+  runner_up: Tom Wright
+- event: Champions League
+  winner: Danny Hall
+  runner_up: Tom Hogg
+  note: 4 sets to 3, in a deciding leg
+trophies:
+- title: NUDL Southern Division
+  kind: team
+  detail: Sheffield A won the southern group
+- title: UDUK Team Event Plate
+  kind: team
+  detail: Sheffield A beat Sunderland 4-2 in the final
+varsity:
+  name: Dartsity
+  result: won
+  score: 11-10
+  title: 2
+  venue: The Octagon
+  attendance: 400+
+  captain: Jonny Kirk
+  picks:
+  - Max Orange
+  - Tom Hogg
+  - Danny Hall
+  - Rob Matthews
+  - Ed McCosh
+  qualifiers:
+  - name: Qualifier
+    winner: Brad Clowery
+  note: One point per leg, seven best-of-three matches.
+  matches:
+  - us: Jonny Kirk
+    them: Jack Handley
+    score: 2-1
+  - us: Danny Hall
+    them: Declan Parsons
+    score: 1-2
+  - us: Max Orange
+    them: Jamesey Ennis
+    score: 3-0
+  - us: Tom Hogg
+    them: Alex Hadfield
+    score: 1-2
+  - us: Ed McCosh
+    them: Ben Laurence
+    score: 2-1
+  - us: Rob Matthews
+    them: Bradley Hambleton
+    score: 1-2
+  - us: Brad Clowery
+    them: Peter Newton
+    score: 1-2
+awards:
+- award: Player of the Year
+  name: Max Orange
+- award: Best Newcomer
+  name: Danny Hall
+- award: Best Match
+  name: Sheffield v Sunderland (UDUK Plate final)
+- award: Dan Reid Award
+  name: Dan Reid

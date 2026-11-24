@@ -1,0 +1,124 @@
+# 2016/17. What each field means is explained at the top of data/history_names.yaml.
+season: 2016/17
+committee:
+- role: President
+  name: Ed McCosh
+- role: Secretary
+  name: Jack Lewis
+- role: Treasurer
+  name: Sarah Denholm
+- role: Captain
+  name: Adam Warner
+- role: B Team Captain
+  name: Matt Royle
+- role: Inclusions Officer
+  name: Oli Newall
+- role: Social Secretary
+  name: Jade le Marquand
+- role: Publicity Officer
+  name: Sian Bradley
+- role: Football Captain
+  name: Niall Chester
+internal:
+- event: Doubles Cup
+  winner: Matt Eardley & Ed McCosh
+  runner_up: Adam Warner & Dan Reid
+  third: Jonny Kirk & Declan Parsons
+- event: Ham Cup
+  winner: Rob Matthews
+  runner_up: Max Orange
+  semis:
+  - Danny Hall
+  - Steven Thompson
+- event: Easter Egg Cup
+  winner: Tim Close
+  runner_up: Max Orange
+  semis:
+  - Adam Warner
+  - Danny Hall
+- event: Premier League
+  winner: Adam Warner
+  runner_up: Tim Close
+- event: Spoon Championship
+  winner: Harry Hatter
+- event: Europa League
+  winner: Matt Royle
+  runner_up: Tom Berrington
+  semis:
+  - James Goodall
+  - Ellis Turner
+- event: Champions League
+  winner: Adam Warner
+  runner_up: Max Orange
+  semis:
+  - Ed McCosh
+  - Danny Hall
+- event: Home Brew Cup
+  winner: Adam Warner
+trophies:
+- title: NUDL Plate
+  kind: team
+  detail: Sheffield A beat York 6-1 in the final
+varsity:
+  name: Dartsity
+  result: won
+  score: 5-1
+  title: 3
+  captain: Adam Warner
+  picks:
+  - Danny Hall
+  - Greg Batting
+  - Matt Eardley
+  - Ed McCosh
+  qualifiers:
+  - name: First qualifier
+    winner: Brad Clowery
+    runner_up: Jack Lewis
+  - name: Second qualifier
+    winner: Jonny Kirk
+    runner_up: Matt Royle
+  matches:
+  - us: Jonny Kirk
+    them: Kieran Fitzgibbon
+    score: 2-3
+  - us: Danny Hall
+    them: Charlie Marshall
+    score: 3-1
+  - us: Greg Batting
+    them: Connor Bowler
+    score: 3-0
+  - us: Adam Warner
+    them: Declan Parsons
+    score: 3-1
+  - us: Ed McCosh
+    them: Joe Berry
+    score: 3-0
+  - us: Matt Eardley
+    them: Ben Laurence
+    score: 2-0
+  - us: Brad Clowery
+    them: Curtis Thorpe
+    note: Not played
+  highlights:
+  - Danny Hall 180
+awards:
+- award: President's Player of the Year
+  name: Matt Royle
+- award: A Team Player of the Year
+  name: Danny Hall
+- award: B Team Player of the Year
+  name: Jack Lewis
+- award: Dartselona Player of the Year
+  name: Jonny Kirk
+- award: Player of the Year
+  name: Adam Warner
+- award: Most Improved
+  name: Ellis Turner
+- award: Fresher of the Year
+  name: Greg Batting
+- award: Most Improved Fresher
+  name: Harry Hatter
+- award: Dan Reid Award
+  name: Dan Reid
+- award: Game of the Year
+  name: Max Orange v Adam Warner, Easter Egg Cup

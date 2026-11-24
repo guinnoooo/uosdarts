@@ -1,0 +1,6 @@
+# 2010/11. What each field means is explained at the top of data/history_names.yaml.
+season: 2010/11
+internal:
+- event: November Knockout
+  winner: Bob Mudd
+  runner_up: Martin Halton

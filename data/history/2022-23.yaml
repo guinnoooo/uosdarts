@@ -1,0 +1,157 @@
+# 2022/23. What each field means is explained at the top of data/history_names.yaml.
+season: 2022/23
+committee:
+- role: President
+  name: Jack Quinn
+- role: Vice President
+  name: Cory Van Tongeren
+- role: Captain
+  name: Luke Davies
+- role: Treasurer
+  name: Jack Newton
+- role: Secretary
+  name: Olly Nunn
+- role: Social Secretary
+  name: Dan Booth
+- role: Inclusions Officer
+  name: Joe Burniston
+- role: Dartselona Captain
+  name: Adam Butcher
+internal:
+- event: Pears Pairs Trophy
+  winner: Joe Hopkins & Jack Newton
+  runner_up: Patrick Hopkins & Cory Van Tongeren
+  semis:
+  - Lewis Forrest & Jacob Thompson
+  - Olly Nunn & Elliot Hopkins
+- event: Ham Cup
+  winner: Adam Warner
+  runner_up: Conall Doughty
+  third: Nathan Hennessy
+  fourth: Luke Davies
+  note: Warner checked out 141 in the final
+- event: Premier League
+  winner: Lewis Forrest
+  runner_up: Tom Jepson
+  semis:
+  - Jack Quinn
+  - Jack Lewis
+- event: Easter Egg Cup
+  winner: Jack Newton
+  runner_up: Nathan Hennessy
+  semis:
+  - Nathan O'Keeffe
+  - Zack Sefton
+- event: Players Championship Finals
+  winner: Joe Hopkins
+  runner_up: Jack Newton
+  semis:
+  - Luke Humphreys
+  - Jack Lewis
+trophies:
+- title: National Champions
+  kind: team
+  detail: Beat Durham 9-2, Warwick 6-5 and Lincoln 6-4 in the final at Loughborough
+  winners:
+  - Luke Davies
+  - Jack Quinn
+  - Lewis Forrest
+  - Tom Jepson
+  - Jack Newton
+  - Luke Humphreys
+  captain: Luke Davies
+- title: North Central Division
+  kind: team
+  detail: Sheffield A won the division
+varsity:
+  name: Dartsity
+  result: won
+  score: 4-3
+  title: 7
+  captain: Luke Davies
+  picks:
+  - Jack Quinn
+  - Lewis Forrest
+  - Tom Jepson
+  - Nathan O'Keeffe
+  qualifiers:
+  - name: First qualifier
+    winner: Luke Humphreys
+    runner_up: Tom Oldfield
+    semis:
+    - Adam Butcher
+    - Olly Nunn
+  - name: Second qualifier
+    winner: Tom Oldfield
+    runner_up: Olly Nunn
+    semis:
+    - Jack Newton
+    - Joe Burniston
+  matches:
+  - us: Lewis Forrest
+    them: James Buckby
+    score: 1-3
+  - us: Luke Humphreys
+    them: Deck Ingber
+    score: 0-3
+  - us: Nathan O'Keeffe
+    them: Dereece O'Hara
+    score: 3-0
+  - us: Tom Oldfield
+    them: Morgan Shillito
+    score: 3-2
+  - us: Jack Quinn
+    them: Dom Tofts
+    score: 1-3
+  - us: Luke Davies
+    them: Jamie Flint
+    score: 3-0
+  - us: Tom Jepson
+    them: Oliver Pearce-Burgess
+    score: 3-2
+  highlights:
+  - The first Dartsity to come down to a last-leg decider in the final game.
+  - Tom Jepson won it with a 16-darter, hitting a 180 and checking out 32 in one dart.
+notable:
+- Luke Davies and Nathan Hennessy beat players from Hallam and Trent in an exhibition at the Magna Centre to play Gerwyn Price and Gary Anderson.
+- Adam Warner won Week 8 of the Modus Super Series.
+- Adam Warner won a PDC Tour Card at Q-School, the first uni darts player to turn professional.
+- Uni Arms Academicals won the Franchise League Team Plate, beating Woodbourne Vintage 5-0 in the final.
+- Luke Davies and Jack Lewis won the Franchise League Captains Pairs Cup, and Luke Davies won the Captains Singles Cup.
+awards:
+- award: Man of the Year
+  name: Tom Jepson
+- award: Jobber of the Year
+  name: Olly Nunn
+- award: A Team Player of the Year
+  name: Jack Quinn
+- award: A Team Captain's Player of the Year
+  name: Jack Newton
+- award: B Team Player of the Year
+  name: Damien Reed
+- award: B Team Captain's Player of the Year
+  name: Tom Halliday
+- award: Franny Player of the Year
+  name: Jack Quinn
+- award: Best Fresher
+  name: Aidan Wood
+- award: Most Improved
+  name: Jack Newton
+- award: Least Improved
+  name: Cory Van Tongeren
+- award: Worst Pop Tarts Graft
+  name: Olly Nunn and Adam Butcher
+- award: Biggest Lightweight
+  name: Jack Kelly
+- award: Best Trio
+  name: Damien Reed, Adam Butcher and Jack Stoddard (The Marmalade Sandwich)
+- award: Best (Worst) Karaoke
+  name: Olly Nunn
+- award: Dartselona Player of the Year
+  name: Tom Oldfield
+- award: Moment of the Year
+  name: Tom Jepson winning Dartsity
+- award: Match of the Year
+  name: Tom Jepson v Oliver Pearce-Burgess
+- award: Worst Match of the Year
+  name: Alex Jones v Harvey

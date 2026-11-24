@@ -1,4 +1,4 @@
-// Futures: Ham Cup winner and the Dartsity markets. Prices are set by hand
+// Futures: Ham Cup winner, the Dartsity markets and any Specials. Prices are set by hand
 // on the super admin page, and a bet keeps the price it was placed at.
 
 import { sb, esc } from '../db.js';
@@ -51,13 +51,16 @@ function marketHtml(m) {
       <td class="l">${esc(s.name)}</td><td>${cell(s)}</td></tr>`).join('')}</tbody></table>
     ${list.length > SHOW ? `<button class="link" data-fall="${m.id}">${S.all.has(m.id) ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}`
     : '<p class="muted">No prices yet.</p>'}
-    ${m.open ? '<p class="muted small">Others available on request.</p>' : ''}
+    ${m.open && m.kind !== 'special' ? '<p class="muted small">Others available on request.</p>' : ''}
   </section>`;
 }
 
 function render() {
+  const main = S.markets.filter(m => m.kind !== 'special');
+  const specials = S.markets.filter(m => m.kind === 'special');
   app.innerHTML = S.markets.length
-    ? S.markets.map(marketHtml).join('')
+    ? main.map(marketHtml).join('')
+      + (specials.length ? `<h2 class="futures-group">Specials</h2>${specials.map(marketHtml).join('')}` : '')
     : '<section class="panel"><h2>Futures</h2><p class="muted">No markets open yet.</p></section>';
 }
 

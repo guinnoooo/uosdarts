@@ -1,0 +1,78 @@
+# 2017/18. What each field means is explained at the top of data/history_names.yaml.
+season: 2017/18
+committee:
+- role: President
+  name: Jack Lewis
+- role: Vice President
+  name: Jade le Marquand
+- role: Treasurer
+  name: Tom Hogg
+- role: Treasurer
+  name: Dan Graves
+- role: Secretary and Dartselona Captain
+  name: James Goodall
+- role: A Team Captain
+  name: Danny Hall
+- role: B Team Captain
+  name: Will Pollard
+- role: Inclusions Officer
+  name: Oli Newall
+- role: Social Secretary
+  name: Greg Batting
+- role: Media Officer
+  name: Tim Adams
+internal:
+- event: Ham Cup
+  winner: Adam Warner
+  runner_up: Danny Hall
+  third: Ed McCosh
+  fourth: Tom Hogg
+- event: Premier League
+  winner: Adam Warner
+  runner_up: Tim Close
+varsity:
+  name: Dartsity
+  result: won
+  score: 5-2
+  title: 4
+  captain: Danny Hall
+  picks:
+  - Adam Warner
+  - Conall Doughty
+  - Ritesh Deo
+  - Tom Hogg
+  qualifiers:
+  - name: First qualifier
+    winner: Tim Close
+    runner_up: Matt Royle
+  - name: Second qualifier
+    winner: Luke Cowling
+    runner_up: Tim Adams
+  matches:
+  - us: Conall Doughty
+    them: Will Sturla
+    score: 1-3
+  - us: Tom Hogg
+    them: Joe Berry
+    score: 3-1
+  - us: Tim Close
+    them: Connor Bowler
+    score: 3-2
+  - us:
+    - Matt Royle
+    - Luke Cowling
+    them: Kieran Fitzgibbon & Curtis Thorpe
+    score: 3-0
+    note: Pairs
+  - us: Danny Hall
+    them: Declan Parsons
+    score: 0-3
+  - us: Ritesh Deo
+    them: Eddie Castaldo
+    score: 3-1
+  - us: Adam Warner
+    them: Charlie Marshall
+    score: 3-1
+  highlights:
+  - Matt Royle 180
+  - Connor Bowler (Hallam) 180

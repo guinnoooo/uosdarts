@@ -1,0 +1,7 @@
+{{/* Publishes data/history as one JSON file and returns its URL. Used by the
+     history page and by the honours on the player profiles. The file name
+     carries a hash, so browsers fetch it again only when the history changes. */}}
+{{ $profiles := slice }}{{ range $slug, $_ := site.Data.players }}{{ $profiles = $profiles | append $slug }}{{ end }}
+{{ $data := dict "seasons" site.Data.history "aliases" (site.Data.history_names.aliases | default dict) "profiles" $profiles }}
+{{ $r := resources.FromString "data/history.json" (jsonify $data) | fingerprint }}
+{{ return $r.RelPermalink }}

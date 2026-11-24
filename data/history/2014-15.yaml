@@ -1,0 +1,84 @@
+# 2014/15. What each field means is explained at the top of data/history_names.yaml.
+season: 2014/15
+committee:
+- role: President
+  name: Tom Wright
+- role: Treasurer
+  name: Ellis Turner
+- role: Secretary
+  name: Zoe Pickersgill
+- role: Social Secretary
+  name: Dan Reid
+- role: Inclusions Officer
+  name: Jose Poyan
+- role: Captain
+  name: Max Orange
+- role: Football Captain and Publicity Officer
+  name: Ed McCosh
+internal:
+- event: Specimen Cup
+  winner: Tom Hogg
+  runner_up: Max Orange
+  third: George Francis
+  high_checkout: George Francis (96)
+- event: Ham Cup
+  winner: Steven Organ
+  runner_up: Tom Hogg
+  third: Jack Lewis
+  high_checkout: Jamie Barrington (68)
+- event: Easter Egg Cup
+  winner: Max Orange
+  runner_up: George Francis
+  third: Ed McCosh
+  high_checkout: George Francis (117)
+- event: Home Brew Cup
+  winner: Rob Matthews
+  runner_up: Ed McCosh
+  high_checkout: Rob Matthews (121)
+- event: Sheffield Darts League
+  winner: Max Orange
+  runner_up: Tom Hogg
+  high_checkout: Ed McCosh (130)
+- event: Europa League
+  winner: Matt Royle
+  runner_up: Tom Wright
+- event: Champions League
+  winner: Max Orange
+  runner_up: Jonny Kirk
+  high_checkout: Ed McCosh (119)
+varsity:
+  name: Dartsity
+  result: won
+  score: 8-1
+  title: 1
+  matches:
+  - us: Max Orange
+    them: null
+    won: true
+  - us: James Douglas
+    them: null
+    won: true
+  - us: Tom Wright
+    them: null
+    score: 2-0
+  - us: Jonny Kirk
+    them: null
+    score: 2-0
+  - us: Ed McCosh
+    them: null
+    won: true
+  - us: Steven Organ
+    them: null
+    score: 2-1
+  - us: Rob Matthews
+    them: Tom Taylor
+    won: false
+  - us: Tom Hogg
+    them: null
+    score: 2-0
+  - us: George Francis
+    them: null
+    won: true
+  highlights:
+  - Tom Wright 102 checkout
+  - Tom Hogg 180

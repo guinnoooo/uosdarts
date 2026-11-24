@@ -1,0 +1,161 @@
+# 2024/25. What each field means is explained at the top of data/history_names.yaml.
+season: 2024/25
+committee:
+- role: President
+  name: Adam Butcher
+- role: Vice President
+  name: Oli Graham
+- role: Captain
+  name: Tom Halliday
+- role: Treasurer
+  name: Dan Wells
+- role: Secretary
+  name: Louis Healy
+- role: Social Secretary
+  name: Jack Kelly
+- role: Social Media Secretary
+  name: James Beer
+- role: Inclusions Officer
+  name: Tom Graham
+- role: Dartselona Captain
+  name: Aidan Wood
+internal:
+- event: Pears Pairs Trophy
+  winner: Oli Graham & Aaron Heath
+  runner_up: Matt Watts & Tom Halliday
+  semis:
+  - Lewis Forrest & Dan Wells
+  - Archie Lyonette & Iwan James
+  note: Double-in, randomised pairs
+- event: Ham Cup
+  winner: Lewis Forrest
+  runner_up: Luke Davies
+  third: Matt Watts
+  fourth: Matt Duke
+- event: Premier League
+  winner: Matt Watts
+  runner_up: Jack Quinn
+  semis:
+  - Tom Halliday
+  - James Streatfield
+- event: Easter Egg Cup
+  winner: Matt Watts
+  runner_up: James Streatfield
+  third: Oli Graham
+  fourth: Lewis Forrest
+- event: Players Championship Finals
+  winner: Matt Duke
+  runner_up: James Streatfield
+  semis:
+  - Joe Hopkins
+  - Matt Watts
+trophies:
+- title: Big Weekender Pairs
+  kind: individual
+  winners:
+  - Nathan Hennessy
+  detail: With Dan-O-Mite from Leeds
+varsity:
+  name: Dartsity
+  result: lost
+  score: 2-5
+  venue: The Leadmill
+  attendance: 600+
+  captain: Tom Halliday
+  picks:
+  - Lewis Forrest
+  - Matt Watts
+  - Oli Graham
+  - James Streatfield
+  qualifiers:
+  - name: First qualifier
+    winner: Luke Humphreys
+    runner_up: Ben O'Callaghan
+    semis:
+    - James Henderson
+    - Rufus Eden
+  - name: Second qualifier
+    winner: Ben O'Callaghan
+    runner_up: Aaron Heath
+    semis:
+    - Sam Staveley
+    - Stephen McDonough
+  matches:
+  - us: Matt Watts
+    them: Oliver Pearce-Burgess
+    score: 1-3
+  - us: Luke Humphreys
+    them: Filip Brom
+    score: 1-3
+  - us: Ben O'Callaghan
+    them: Joe Ellett
+    score: 3-0
+  - us: James Streatfield
+    them: Will Ellis
+    score: 2-3
+  - us: Lewis Forrest
+    them: Morgan Shillito
+    score: 2-3
+  - us: Tom Halliday
+    them: James Buckby
+    score: 0-3
+  - us: Oli Graham
+    them: Dom Tofts
+    score: 3-1
+notable:
+- Adam Warner won back his PDC Tour Card at the first attempt at Q-School.
+awards:
+- award: Man of the Year
+  name: Adam Butcher
+- award: Jobber of the Year
+  name: Tom Halliday
+- award: A Team Player of the Year
+  name: Matt Watts
+- award: A Team Captain's Player of the Year
+  name: Oli Graham
+- award: B Team Player of the Year
+  name: Jake O'Neill
+- award: B Team Captain's Player of the Year
+  name: Matt Duke
+- award: C Team Player of the Year
+  name: Adam Butcher
+- award: C Team Captain's Player of the Year
+  name: Louis Healy
+- award: Academicals Player of the Year
+  name: Joe Hopkins
+- award: Academicals Captain's Player of the Year
+  name: Jack Lewis
+- award: Understudies Player of the Year
+  name: Jack Stoddard
+- award: Understudies Captain's Player of the Year
+  name: Oli Graham and Tom Halliday
+- award: Slingers Player of the Year
+  name: James Streatfield
+- award: Slingers Captain's Player of the Year
+  name: Dan Wells
+- award: Best Fresher
+  name: Ben O'Callaghan
+- award: Most Improved
+  name: Ben O'Callaghan
+- award: Least Improved
+  name: Tom Graham
+- award: Worst Pop Tarts Graft
+  name: Dan Wells
+- award: Biggest Lightweight
+  name: Jack Warburton
+- award: Best Trio
+  name: Cian Hughes, Jake O'Neill and Ruben Parker
+- award: Best (Worst) Karaoke
+  name: Louis Healy (You Shook Me All Night Long)
+- award: Dartselona Player of the Year
+  name: James Henderson
+- award: Moment of the Year
+  name: Tying Jack Warburton up
+- award: Match of the Year
+  name: Ben O'Callaghan v Joe Ellett (Dartsity)
+- award: Worst Match of the Year
+  name: Jack Warburton, Toby Williams and Tommy Watson, a 123-dart leg at York away (which they lost)
+- award: James Beer Cutie Pie of the Year
+  name: James Beer
+- award: OPB Cheeky Monkey Award
+  name: Oliver Pearce-Burgess (Hallam)

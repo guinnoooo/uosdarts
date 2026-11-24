@@ -1,0 +1,15 @@
+{{ define "main" }}
+<section class="hero">
+  <div class="wrap">
+    <h1>History</h1>
+    <p class="hero-sub">University of Sheffield Darts Society since 2006</p>
+  </div>
+</section>
+<div class="wrap app-wrap">
+  <div id="app" data-history="{{ partial "history-json.html" . }}"><p class="muted">Loading…</p></div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script type="module" src="{{ "js/pages/history.js" | relURL }}?v={{ now.Unix }}"></script>
+{{ end }}

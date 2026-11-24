@@ -1,0 +1,76 @@
+# 2018/19. What each field means is explained at the top of data/history_names.yaml.
+season: 2018/19
+committee:
+- role: President and Captain
+  name: Conall Doughty
+- role: Vice President
+  name: Tom Wright
+- role: Treasurer
+  name: Jonny Stevens
+- role: Secretary
+  name: Luke Cowling
+- role: Vice Secretary
+  name: Declan Devlin
+- role: Social Secretary
+  name: Stephen Godfrey
+- role: Inclusions Officer
+  name: Brad Clowery
+- role: B Team Captain
+  name: Ste Smith
+- role: Publicity Officer
+  name: Tim Adams
+- role: Dartselona Captain
+  name: Will Pollard
+internal:
+- event: Ham Cup
+  winner: George Francis
+  runner_up: Will Sturla
+  third: Curtis Thorpe
+  fourth: Ritesh Deo
+- event: Easter Egg Cup
+  winner: Tim Close
+  runner_up: Jamie Flint
+- event: Premier League
+  winner: Tim Close
+  runner_up: Adam Warner
+varsity:
+  name: Dartsity
+  result: won
+  score: 4-3
+  title: 5
+  captain: Conall Doughty
+  picks:
+  - Adam Warner
+  - Tim Close
+  - Ritesh Deo
+  - Joe Hopkins
+  qualifiers:
+  - name: First qualifier
+    winner: Tom Hogg
+  - name: Second qualifier
+    winner: Greg Batting
+  matches:
+  - us: Adam Warner
+    them: Dale Dennett
+    score: 3-1
+  - us: Joe Hopkins
+    them: Jamie Flint
+    score: 2-3
+  - us: Tim Close
+    them: Will Sturla
+    score: 3-1
+  - us: Conall Doughty
+    them: Charlie Marshall
+    score: 1-3
+  - us: Tom Hogg
+    them: Ben Laurence
+    score: 3-0
+  - us: Greg Batting
+    them: Curtis Thorpe
+    score: 3-1
+  - us: Ritesh Deo
+    them: Kieran Fitzgibbon
+    score: 2-3
+  highlights:
+  - Adam Warner 180
+  - Greg Batting 180
