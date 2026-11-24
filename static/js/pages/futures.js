@@ -2,10 +2,10 @@
 // on the super admin page, and a bet keeps the price it was placed at.
 
 import { sb, esc } from '../db.js';
-import { loadAccount, account, slipHtml, slipEvent, statusText, cancelButton, fmtTokens } from '../betting.js';
+import { loadAccount, account, slipHtml, slipEvent, betCard } from '../betting.js';
 
 const app = document.getElementById('app');
-const S = { markets: [], bets: [], slip: null, all: new Set() };
+const S = { markets: [], bets: [], slip: null, all: new Set(), open: new Set() };
 const SHOW = 8;
 
 const when = d => new Date(d).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -39,14 +39,24 @@ function marketHtml(m) {
       ? `<button class="odds-pick small-pick${S.slip?.future_id === s.id ? ' on' : ''}" data-fbet="${s.id}"><b>${esc(s.price)}</b></button>`
       : `<b>${esc(s.price)}</b>`;
   };
+  // Markets start folded. The header shows the favourite and your bets so
+  // the page can be scanned without opening each one.
+  const isOpen = S.open.has(m.id) || slipHere;
+  const fav = list.find(x => x.price && !x.result);
+  const head = `<button class="fut-head" data-fopen="${m.id}" aria-expanded="${isOpen}">
+      <span class="fut-title">${esc(m.title)}</span>
+      <span class="fut-sum small muted">${[
+        mine.length ? `<b class="fut-mine">${mine.length} bet${mine.length === 1 ? '' : 's'}</b>` : '',
+        !m.open ? esc(state) : fav ? `${esc(fav.name)} ${esc(fav.price)}` : '',
+      ].filter(Boolean).join(' · ')}</span>
+    </button>`;
+  if (!isOpen) return `<section class="panel outright fut-closed">${head}</section>`;
   return `<section class="panel outright">
-    <h2>${esc(m.title)}</h2>
+    ${head}
     ${m.rules ? `<p class="muted small">${esc(m.rules)}</p>` : ''}
     ${state ? `<p class="small">${esc(state)}</p>` : ''}
     ${slipHere ? slipHtml(S.slip) : ''}
-    ${mine.length ? `<div class="my-bets"><h3>Your bets</h3><ul>${mine.map(b => `<li>
-        <span><b>${fmtTokens(b.stake)}</b> on ${esc(b.selection)} at ${esc(b.price)}</span>
-        <span class="muted small">${statusText(b)}</span> ${cancelButton(b)}</li>`).join('')}</ul></div>` : ''}
+    ${mine.length ? `<div class="my-bets"><h3>Your bets</h3><div class="betcards">${mine.map(b => betCard(b)).join('')}</div></div>` : ''}
     ${list.length ? `<table class="outright-list futures-list"><tbody>${shown.map(s => `<tr>
       <td class="l">${esc(s.name)}</td><td>${cell(s)}</td></tr>`).join('')}</tbody></table>
     ${list.length > SHOW ? `<button class="link" data-fall="${m.id}">${S.all.has(m.id) ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}`
@@ -73,6 +83,13 @@ const ctx = {
 
 app.addEventListener('input', e => { slipEvent(e, ctx); });
 app.addEventListener('click', async e => {
+  const fold = e.target.closest('[data-fopen]');
+  if (fold) {
+    const id = Number(fold.dataset.fopen);
+    if (S.open.has(id)) { S.open.delete(id); if (S.slip?.market === id) S.slip = null; } else S.open.add(id);
+    render();
+    return;
+  }
   const more = e.target.closest('[data-fall]');
   if (more) {
     const id = Number(more.dataset.fall);

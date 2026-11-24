@@ -3,7 +3,7 @@
 // comes from data/history, so a new season is one new file.
 
 import { esc } from '../db.js';
-import { loadHistory, people, matchResult, varsityRecords, opponentRecords } from '../history.js';
+import { loadHistory, people, matchResult, varsityRecords } from '../history.js';
 
 const app = document.getElementById('app');
 const TABS = [['dartsity', 'Dartsity'], ['trophies', 'Trophy cabinet'], ['records', 'Dartsity records'],
@@ -57,7 +57,6 @@ function trophiesTab() {
     const list = all.filter(t => t.kind === kind).reverse();
     if (!list.length) return '';
     return `<h3>${title}</h3><ul class="hist-trophies">${list.map(t => `<li>
-      <span class="hist-cup" aria-hidden="true"></span>
       <div><b>${esc(t.title)}</b> <span class="muted">${esc(t.season)}</span>
         ${t.winners?.length ? `<div class="small">${t.winners.map(n => who(n) + (t.captain === n ? ' (c)' : '')).join(', ')}</div>` : ''}
         ${t.detail ? `<div class="small muted">${esc(t.detail)}</div>` : ''}</div></li>`).join('')}</ul>`;
@@ -66,29 +65,17 @@ function trophiesTab() {
   return `<section class="panel">
     <h2>Trophy cabinet</h2>
     <h3>Dartsity</h3>
-    <p><span class="hist-cup" aria-hidden="true"></span> <b>${dartsity.length} titles</b> <span class="muted small">${dartsity.map(esc).join(', ')}</span></p>
+    <p><b>${dartsity.length} titles</b> <span class="muted small">${dartsity.map(esc).join(', ')}</span></p>
     ${group('team', 'Team')}
     ${group('individual', 'Individual')}
     ${group('society', 'Society')}
-    ${notableHtml()}
   </section>`;
-}
-
-function notableHtml() {
-  const list = H.seasons.flatMap(s => (s.notable ?? []).map(n => ({ n, season: s.season }))).reverse();
-  if (!list.length) return '';
-  return `<h3>Notable moments</h3><ul class="hist-notes">${list.map(x => `<li>${esc(x.n)} <span class="muted small">${esc(x.season)}</span></li>`).join('')}</ul>`;
 }
 
 function recordsTab() {
   const rec = varsityRecords(H);
-  const opp = opponentRecords(H).sort((a, b) => b.played - a.played || b.theyWon - a.theyWon);
   const apps = [...rec].sort((a, b) => b.seasons.length - a.seasons.length || b.won - a.won).filter(x => x.seasons.length > 1);
-  const best = rec.filter(x => x.played >= 3).sort((a, b) => b.won / b.played - a.won / a.played || b.played - a.played);
   const unbeaten = rec.filter(x => x.played >= 2 && !x.lost).sort((a, b) => b.played - a.played);
-  const done = H.seasons.filter(s => s.varsity && s.varsity.result !== 'cancelled' && s.varsity.score);
-  const margin = s => { const [a, b] = s.varsity.score.split('-').map(Number); return a - b; };
-  const biggest = [...done].sort((a, b) => margin(b) - margin(a))[0];
   const crowd = H.seasons.filter(s => s.varsity?.attendance).sort((a, b) => parseInt(b.varsity.attendance, 10) - parseInt(a.varsity.attendance, 10))[0];
   const caps = H.seasons.filter(s => s.varsity?.captain).reverse();
   const table = (rows, cols) => `<table class="points-list"><tbody>${rows.map(r => `<tr>${cols.map(c => c(r)).join('')}</tr>`).join('')}</tbody></table>`;
@@ -144,7 +131,7 @@ function internalTab() {
 }
 
 function yearsTab() {
-  const list = H.seasons.filter(s => s.committee || s.awards || s.notable).reverse();
+  const list = H.seasons.filter(s => s.committee || s.awards).reverse();
   if (!year || !list.some(s => s.season === year)) year = list[0]?.season;
   const s = list.find(x => x.season === year);
   return `<section class="panel">
@@ -154,7 +141,6 @@ function yearsTab() {
       `<tr><td class="l small muted">${esc(c.role)}</td><td class="l">${who(c.name)}</td></tr>`).join('')}</tbody></table>` : ''}
     ${s?.awards ? `<h3>End of year awards</h3><table class="points-list"><tbody>${s.awards.map(a =>
       `<tr><td class="l small muted">${esc(a.award)}</td><td class="l">${esc(a.name)}</td></tr>`).join('')}</tbody></table>` : ''}
-    ${s?.notable ? `<h3>Notable</h3><ul class="hist-notes">${s.notable.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
   </section>`;
 }
 
