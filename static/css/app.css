@@ -1092,3 +1092,9 @@ button.chat-who:hover { text-decoration: underline; }
 .my-bets li .link { margin-left: auto; color: var(--live); }
 .bet-cancelled { color: var(--text-2); font-style: italic; }
 .bets-list .link[data-cancelbet] { color: var(--live); }
+.accounts-section summary { cursor: pointer; list-style: none; }
+.accounts-section summary::-webkit-details-marker { display: none; }
+.accounts-section summary h2 { display: inline; }
+.accounts-section summary h2::after { content: ' ▸'; color: var(--text-3); }
+.accounts-section[open] summary h2::after { content: ' ▾'; }
+.accounts-section #acc-q { margin: .6rem 0; width: 100%; }

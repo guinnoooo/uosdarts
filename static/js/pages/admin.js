@@ -54,6 +54,8 @@ async function signOut() {
 
 async function refresh() {
   S.players = check(await sb.from('players').select('*').order('name'));
+  const acc = await sb.rpc('admin_list_accounts');
+  S.accounts = acc.error ? null : acc.data ?? [];
   await sb.rpc('admin_purge_expired');   // clears anything past its 24 hours
   S.tournaments = check(await sb.from('tournaments')
     .select('*, champion:players!tournaments_champion_id_fkey(id,name)')
@@ -716,12 +718,39 @@ function finishBlock() {
 function render() {
   app.innerHTML = `<div class="admin-head"><h1>Admin</h1>
     <span>${S.role === 'super' ? '<a href="/super/" class="muted small">Super admin</a> · ' : ''}<button data-act="signout" class="link">Sign out</button></span>
-    </div>${manageSection()}${tournamentsSection()}${newTournamentSection()}${snapshotSection()}`;
+    </div>${manageSection()}${tournamentsSection()}${newTournamentSection()}${accountsSection()}${snapshotSection()}`;
   const form = app.querySelector('[data-form="tournament"]');
   if (form) syncFormatFields(form);
   if (S.newPlayer && Date.now() < S.focusNewPlayerUntil) {
     app.querySelector('.new-player [name="nickname"]')?.focus();
   }
+}
+
+// ---------------------------------------------------------------- accounts
+
+// Everyone who has signed up for the chat and betting, newest first, with
+// anyone still waiting on their confirmation email at the bottom. Read
+// only: blocking and tokens are on the super admin page.
+function accountsSection() {
+  const list = S.accounts;
+  if (!list) return '';
+  const q = (S.accQ ?? '').toLowerCase();
+  const shown = q ? list.filter(a => `${a.display_name ?? ''} ${a.email ?? ''}`.toLowerCase().includes(q)) : list;
+  const confirmed = list.filter(a => a.confirmed).length;
+  const day = d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return `<details class="panel accounts-section"${S.accOpen ? ' open' : ''}>
+    <summary><h2>Accounts (${confirmed}${confirmed < list.length ? `, ${list.length - confirmed} not confirmed` : ''})</h2></summary>
+    ${list.length > 8 ? `<input id="acc-q" placeholder="Search name or email" value="${esc(S.accQ ?? '')}">` : ''}
+    ${shown.length ? `<table class="points-list"><tbody>${shown.map(a => `<tr>
+      <td><b>${esc(a.display_name ?? '(no name)')}</b>
+        ${a.is_admin ? ' <span class="muted small">admin</span>' : ''}
+        ${a.banned ? ' <span class="error small">blocked</span>' : ''}
+        ${a.confirmed ? '' : ' <span class="muted small">not confirmed</span>'}
+        <span class="muted small" style="display:block">${esc(a.email ?? '')}</span></td>
+      <td class="muted small">${a.confirmed && !a.is_admin ? `${Number(a.tokens).toLocaleString('en-GB')} tokens · ${a.bets} bets · ` : ''}${a.confirmed ? `${a.messages} message${a.messages === 1 ? '' : 's'} · ` : ''}joined ${day(a.created_at)}</td>
+    </tr>`).join('')}</tbody></table>` : '<p class="muted">Nobody yet.</p>'}
+    ${S.role === 'super' ? '<p class="muted small">Block accounts or give tokens on the <a href="/super/">super admin page</a>.</p>' : ''}
+  </details>`;
 }
 
 // ---------------------------------------------------------------- entrants
@@ -886,6 +915,15 @@ async function run(fn, okMsg) {
 }
 
 app.addEventListener('input', e => {
+  if (e.target.id === 'acc-q') {
+    // Filter the rows in place, so typing isn't interrupted by a redraw.
+    S.accQ = e.target.value;
+    const q = S.accQ.trim().toLowerCase();
+    e.target.closest('details').querySelectorAll('tbody tr').forEach(tr => {
+      tr.hidden = !!q && !tr.textContent.toLowerCase().includes(q);
+    });
+    return;
+  }
   if (e.target.id !== 'all-players-filter') return;
   S.playerFilter = e.target.value;
   const q = S.playerFilter.trim().toLowerCase();
@@ -1200,6 +1238,7 @@ app.addEventListener('click', async e => {
 
 app.addEventListener('toggle', e => {
   if (e.target.matches('details.entrant-box')) S.entrantsOpen = e.target.open;
+  if (e.target.matches('details.accounts-section')) S.accOpen = e.target.open;
   if (e.target.matches('details.archive-box')) S.archiveOpen = e.target.open;
   if (e.target.matches('details.players-box')) S.allPlayersOpen = e.target.open;
   if (e.target.matches('details.adv-fold')) {
