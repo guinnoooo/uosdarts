@@ -173,7 +173,7 @@ function render() {
   app.innerHTML = `${squadHtml()}${historyHtml()}${boardHtml()}${marketHtml()}${scoringHtml()}
     <dialog id="fx-picker" class="fx-dialog">
       <div class="fx-dialog-head"><h2 class="fx-pick-role"></h2><button class="link" data-act="close-scoring" aria-label="Close">✕</button></div>
-      <input id="fx-pq" placeholder="Search players" autocomplete="off">
+      <input id="fx-pq" type="search" placeholder="Search players" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="search">
       <div class="fx-pick-list"></div>
     </dialog>`;
 }
@@ -212,6 +212,16 @@ function pickerRows() {
   }).join('');
 }
 
+// On a phone the window fills the screen and sits above the keyboard, so
+// the search box and the list stay in view while typing.
+const touch = matchMedia('(pointer: coarse)').matches;
+function fitPicker() {
+  const d = app.querySelector('#fx-picker');
+  if (d && window.visualViewport) d.style.setProperty('--vvh', `${Math.round(visualViewport.height)}px`);
+}
+window.visualViewport?.addEventListener('resize', fitPicker);
+window.visualViewport?.addEventListener('scroll', () => { if (app.querySelector('#fx-picker[open]')) window.scrollTo(0, window.scrollY); });
+
 function openPicker(slot) {
   S.picker = slot;
   S.pq = '';
@@ -219,9 +229,22 @@ function openPicker(slot) {
   d.querySelector('.fx-pick-role').textContent = ROLES[slot].name;
   d.querySelector('#fx-pq').value = '';
   d.querySelector('.fx-pick-list').innerHTML = pickerRows();
+  fitPicker();
   d.showModal();
-  d.querySelector('#fx-pq').focus();
+  d.querySelector('.fx-pick-list').scrollTop = 0;
+  // Opening the keyboard straight away on a phone hides the list; let them
+  // see it first and tap the search box if they want it.
+  if (!touch) d.querySelector('#fx-pq').focus();
 }
+
+// Enter in the search box: pick the only match, or just put the keyboard away.
+app.addEventListener('keydown', e => {
+  if (e.target.id !== 'fx-pq' || e.key !== 'Enter') return;
+  e.preventDefault();
+  const rows = [...app.querySelectorAll('#fx-picker .fx-pick-row:not(.off)')];
+  if (rows.length === 1) rows[0].click();
+  else e.target.blur();
+});
 
 app.addEventListener('click', async e => {
   // Picking a role: tap Move on a player, then tap the role they should go to.
