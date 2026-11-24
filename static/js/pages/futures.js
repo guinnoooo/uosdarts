@@ -51,6 +51,7 @@ function marketHtml(m) {
       <td class="l">${esc(s.name)}</td><td>${cell(s)}</td></tr>`).join('')}</tbody></table>
     ${list.length > SHOW ? `<button class="link" data-fall="${m.id}">${S.all.has(m.id) ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}`
     : '<p class="muted">No prices yet.</p>'}
+    ${m.open ? '<p class="muted small">Others available on request.</p>' : ''}
   </section>`;
 }
 
