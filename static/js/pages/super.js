@@ -465,9 +465,50 @@ function render() {
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
     ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${futuresPanel()}${fantasyPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+  applyFolds();
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
+
+// ---------------------------------------------------------------- folding
+
+// Every panel can be folded away by tapping its heading, and each futures
+// market inside the Futures panel too. What's open is remembered on this
+// device. Out of the box only the everyday panels are open.
+const FOLD_KEY = 'uosdarts:superFolds';
+const OPEN_BY_DEFAULT = new Set(['Players', 'Friendlies to check']);
+let FOLDS = {};
+try { FOLDS = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') ?? {}; } catch { FOLDS = {}; }
+const foldKey = h => (h.tagName === 'H3' ? 'market:' : '') + h.textContent.replace(/\s*\(\d+\)\s*$/, '').trim();
+
+function applyFolds() {
+  app.querySelectorAll('section.panel > h2, .fut-market > h3').forEach(h => {
+    const key = foldKey(h);
+    const open = key in FOLDS ? FOLDS[key] : (h.tagName === 'H2' && OPEN_BY_DEFAULT.has(key));
+    h.classList.add('fold-head');
+    h.setAttribute('role', 'button');
+    h.setAttribute('aria-expanded', String(open));
+    h.tabIndex = 0;
+    h.parentElement.classList.toggle('folded', !open);
+  });
+}
+
+function toggleFold(h) {
+  const key = foldKey(h);
+  const open = h.parentElement.classList.toggle('folded') === false;
+  h.setAttribute('aria-expanded', String(open));
+  FOLDS[key] = open;
+  try { localStorage.setItem(FOLD_KEY, JSON.stringify(FOLDS)); } catch { /* private mode */ }
+}
+
+app.addEventListener('click', e => {
+  const h = e.target.closest('.fold-head');
+  if (h) toggleFold(h);
+});
+app.addEventListener('keydown', e => {
+  const h = e.target.closest?.('.fold-head');
+  if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleFold(h); }
+});
 
 // ---------------------------------------------------------------- actions
 
