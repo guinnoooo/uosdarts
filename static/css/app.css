@@ -1119,11 +1119,22 @@ button.chat-who:hover { text-decoration: underline; }
 
 /* Fantasy */
 .fx-squad { list-style: none; padding: 0; margin: .6rem 0; }
-.fx-slot { display: grid; grid-template-columns: 5.2rem 1fr auto; gap: .5rem; align-items: center; padding: .5rem .2rem; border-bottom: 1px solid var(--line); }
-.fx-slot:nth-child(6) { border-top: 1px dashed var(--line); margin-top: .3rem; }
-.fx-slot-btns { display: flex; gap: .4rem; align-items: center; }
-.fx-cap { min-width: 2rem; padding: .15rem .4rem; border-radius: 999px; }
-.fx-cap.on { background: var(--accent); color: #111; border-color: var(--accent); }
+.fx-slot { display: grid; grid-template-columns: 3rem 1fr auto; grid-template-areas: "pic role btns" "pic who btns"; gap: .1rem .7rem; align-items: center; padding: .6rem .2rem; border-bottom: 1px solid var(--line); cursor: default; }
+.fx-slot > .fx-photo { grid-area: pic; }
+.fx-slot .fx-role { grid-area: role; display: flex; flex-direction: column; }
+.fx-slot .fx-who, .fx-slot.empty > .muted.small:last-child { grid-area: who; }
+.fx-slot .fx-slot-btns { grid-area: btns; display: flex; gap: .6rem; align-items: center; }
+.fx-slot.empty { cursor: pointer; opacity: .85; }
+.fx-slot.picking { background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 8px; }
+.fx-slot.bench { border-top: 1px dashed var(--line); margin-top: .3rem; }
+.fx-photo { width: 3rem; height: 3rem; border-radius: 50%; object-fit: cover; background: var(--surface, #222); }
+.fx-thumb { width: 1.8rem; height: 1.8rem; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface, #222); }
+.fx-initials { display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: .8rem; color: var(--text-2); border: 1px solid var(--line); }
+.fx-photo.fx-initials { font-size: 1rem; }
+.fx-name { display: inline-flex; align-items: center; gap: .5rem; }
+.fx-week-list { list-style: none; }
+.fx-week-list li { display: flex; gap: .6rem; align-items: flex-start; padding: .3rem 0; }
+.fx-hint { color: var(--accent-soft); }
 .fx-market td, .fx-market th { padding: .4rem .3rem; }
 .fx-week { padding: .4rem 0; border-bottom: 1px solid var(--line); }
 .fx-week ul { margin: .4rem 0 .2rem 1rem; padding: 0; }
@@ -1136,3 +1147,5 @@ button.chat-who:hover { text-decoration: underline; }
 .folded > .fold-head::after { content: '▸'; }
 .folded > :not(.fold-head) { display: none !important; }
 .folded > .fold-head { margin-bottom: 0; }
+.fx-market td:last-child { width: 1%; white-space: nowrap; }
+.fx-market .fx-name { min-width: 0; }
