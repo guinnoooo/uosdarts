@@ -1166,6 +1166,8 @@ button.chat-who:hover { text-decoration: underline; }
 .fx-pick-row b { text-align: right; }
 .fx-pick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fx-slot:not(.empty) .fx-who, .fx-slot:not(.empty) > .fx-photo { cursor: pointer; }
+.fx-up { color: var(--good); }
+.fx-down { color: var(--live); }
 
 /* Phones: inputs at 16px so iOS doesn't zoom in when one is tapped. */
 @media (pointer: coarse) {
