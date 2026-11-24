@@ -21,8 +21,7 @@ async function initInner() {
   if (!session || session.user.is_anonymous) return renderLogin(!!session?.user?.is_anonymous);
   const { data } = await sb.from('admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
   if (!data) {
-    app.innerHTML = `<div class="panel"><p>Signed in as ${esc(toUsername(session.user.email))}, but this account isn't an admin.</p>
-      <p class="muted">Add this user id to the admins table: <code>${session.user.id}</code></p>
+    app.innerHTML = `<div class="panel"><p>You're not an admin.</p>
       <div class="row"><a href="/">Back to the public site</a><button id="signout-2">Sign in as someone else</button></div></div>`;
     document.getElementById('signout-2').addEventListener('click', async () => {
       await sb.auth.signOut();
