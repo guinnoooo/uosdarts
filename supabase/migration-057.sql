@@ -156,3 +156,12 @@ begin
               where s.market_id = m.id), '[]'::jsonb))
          order by m.sort, m.id) from futures_markets m), '[]'::jsonb);
 end $$;
+
+-- Ham Cup suggestions adjusted by hand: long shots brought in for a bigger
+-- margin (the book is about 137%), and Aidan Garratt added at 100/1.
+insert into public.futures_selections (market_id, player_id, name, suggested)
+select m.id, p.id, p.name, s.value
+  from jsonb_each_text('{"Lewis Forrest":"10/11","Luke Davies":"4/1","Mikey Guinness":"5/1","Oli Graham":"6/1","Dan Wells":"10/1","Matt Watts":"10/1","Luke Egan":"25/1","Adam Khalil":"33/1","Joel Keaney":"33/1","Matt Duke":"50/1","Max Halder":"66/1","Barney Chaudhry":"80/1","Aidan Garratt":"100/1"}'::jsonb) s
+  join public.players p on p.name = s.key
+  join public.futures_markets m on m.slug = 'ham-cup'
+on conflict (market_id, player_id) do update set suggested = excluded.suggested;
