@@ -343,3 +343,22 @@ select m.id, p.id, p.name, s.value
   cross join lateral jsonb_each_text(mk.value) s
   join public.players p on p.name = s.key
 on conflict (market_id, player_id) do update set suggested = excluded.suggested;
+
+-- At most two alumni can play on stage, and Jack Newton isn't eligible. Dartsity
+-- suggestions rerun with that cap; anyone no longer suggested is dropped if
+-- nobody has bet on them.
+with j as (select '{"dartsity-stage":{"Lewis Forrest":"1/10","Mikey Guinness":"1/10","Dan Wells":"1/10","Luke Egan":"2/7","Joel Keaney":"1/2","Matt Duke":"40/1","Max Halder":"Evens","Barney Chaudhry":"5/2","Liam English":"3/1","Jack Warby":"9/2","Joseph D''Ambrosio":"6/1","Dan Buckley":"11/2","Rory Peach":"9/1","James Lauer":"10/1","Darsh Johar":"14/1","Cian Hughes":"16/1","Dan Campbell":"20/1","Tom Sibley":"25/1","Evan Buxton":"25/1","Iwan James":"33/1","Ed Browne":"40/1","Alfie Mortimer":"50/1","Sam Tookey":"66/1","Aidan Garratt":"80/1","Finley Bowden":"80/1","Aidan Wood":"80/1","James Phillips":"100/1","Harvey Simpson":"80/1","Oli Makin":"100/1","George Burton":"100/1","Luke Lavery":"100/1","Matt Hawkins":"100/1","Danny Hartland":"150/1","Jude Cockin":"100/1","Ben Clarke":"150/1","Mike Britland":"100/1","Finley Jackson":"150/1","Leila Mitchell":"100/1","Ben Browne":"250/1","Thomas Batho":"150/1","Jack Vicars":"150/1","Jono Blatch":"250/1","Alex Vienna":"250/1"},"dartsity-qualifiers":{"Lewis Forrest":"40/1","Mikey Guinness":"10/1","Dan Wells":"1/4","Luke Egan":"4/6","Joel Keaney":"10/11","Max Halder":"7/4","Barney Chaudhry":"3/1","Liam English":"4/1","Jack Warby":"11/2","Joseph D''Ambrosio":"7/1","Dan Buckley":"13/2","Rory Peach":"10/1","James Lauer":"12/1","Darsh Johar":"16/1","Cian Hughes":"16/1","Dan Campbell":"20/1","Tom Sibley":"33/1","Evan Buxton":"33/1","Iwan James":"40/1","Ed Browne":"50/1","Alfie Mortimer":"50/1","Sam Tookey":"66/1","Aidan Garratt":"100/1","Finley Bowden":"100/1","Aidan Wood":"80/1","James Phillips":"100/1","Harvey Simpson":"100/1","Oli Makin":"100/1","George Burton":"100/1","Luke Lavery":"100/1","Matt Hawkins":"150/1","Danny Hartland":"150/1","Jude Cockin":"150/1","Ben Clarke":"150/1","Mike Britland":"150/1","Finley Jackson":"150/1","Leila Mitchell":"100/1","Ben Browne":"250/1","Thomas Batho":"150/1","Jack Vicars":"250/1","Jono Blatch":"250/1","Alex Vienna":"250/1"}}'::jsonb as v),
+want as (
+  select m.id as market_id, p.id as player_id, p.name, s.value as sugg
+    from j cross join lateral jsonb_each(j.v) mk
+    join public.futures_markets m on m.slug = mk.key
+    cross join lateral jsonb_each_text(mk.value) s
+    join public.players p on p.name = s.key),
+gone as (
+  delete from public.futures_selections fs using public.futures_markets m
+   where m.id = fs.market_id and m.slug in ('dartsity-stage', 'dartsity-qualifiers')
+     and not exists (select 1 from want w where w.market_id = fs.market_id and w.player_id = fs.player_id)
+     and not exists (select 1 from public.bets b where b.future_id = fs.id))
+insert into public.futures_selections (market_id, player_id, name, suggested)
+select market_id, player_id, name, sugg from want
+on conflict (market_id, player_id) do update set suggested = excluded.suggested;
