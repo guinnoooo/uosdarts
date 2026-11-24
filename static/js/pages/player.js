@@ -85,9 +85,9 @@ function eventsHtml(events) {
 function matchesHtml(list) {
   if (!list.length) return '<p class="muted">No matches on the site yet.</p>';
   return `<table class="lb-table pp-matches"><tbody>${list.map(m => `<tr>
-      <td class="l"><span class="pp-res ${m.won ? 'w' : 'l'}">${m.won ? 'W' : 'L'}</span></td>
-      <td class="l">v ${esc(m.opponent ?? '?')}<span class="muted small" style="display:block">${esc(m.event)} · ${day(m.at)}</span></td>
-      <td><b>${m.legs_for ?? 0}–${m.legs_against ?? 0}</b></td>
+      <td><span class="pp-res ${m.won ? 'pp-w' : 'pp-l'}">${m.won ? 'W' : 'L'}</span></td>
+      <td class="l">v ${esc(m.opponent ?? '?')}<span class="muted small" style="display:block">${esc(m.event)} · <span style="white-space:nowrap">${day(m.at)}</span></span></td>
+      <td class="pp-score"><b>${m.legs_for ?? 0}–${m.legs_against ?? 0}</b></td>
       <td class="muted small">${m.avg != null ? Number(m.avg).toFixed(2) : ''}</td></tr>`).join('')}</tbody></table>`;
 }
 
