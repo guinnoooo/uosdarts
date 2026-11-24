@@ -33,8 +33,18 @@ const byId = id => S.market.find(p => p.id === id);
 
 async function load() {
   // Fills in who was the underdog for any finished match that still needs it
-  // (for the Dark Horse role). Quick, and harmless if it fails.
-  if (!S.asked) { S.asked = true; sb.functions.invoke('place-bet', { body: { kind: 'prematch' } }).catch(() => null); }
+  // (for the Dark Horse role). Harmless if it fails. Each device asks at most
+  // every 15 minutes, so a busy page doesn't start the server function on
+  // every visit.
+  if (!S.asked) {
+    S.asked = true;
+    let last = 0;
+    try { last = Number(localStorage.getItem('uosdarts:prematch') || 0); } catch { /* private mode */ }
+    if (Date.now() - last > 15 * 60 * 1000) {
+      try { localStorage.setItem('uosdarts:prematch', String(Date.now())); } catch { /* private mode */ }
+      sb.functions.invoke('place-bet', { body: { kind: 'prematch' } }).catch(() => null);
+    }
+  }
   const [acc, market, board, gws, pts] = await Promise.all([loadAccount(), sb.rpc('fantasy_market'), sb.rpc('fantasy_leaderboard'), sb.rpc('fantasy_gws'), sb.rpc('fantasy_scoring_list')]);
   S.points = pts.data ?? [];
   S.market = market.data ?? [];

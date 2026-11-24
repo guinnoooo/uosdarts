@@ -39,15 +39,13 @@ function marketHtml(m) {
       ? `<button class="odds-pick small-pick${S.slip?.future_id === s.id ? ' on' : ''}" data-fbet="${s.id}"><b>${esc(s.price)}</b></button>`
       : `<b>${esc(s.price)}</b>`;
   };
-  // Markets start folded. The header shows the favourite and your bets so
-  // the page can be scanned without opening each one.
+  // Markets start folded. The header shows how many bets you have on it.
   const isOpen = S.open.has(m.id) || slipHere;
-  const fav = list.find(x => x.price && !x.result);
   const head = `<button class="fut-head" data-fopen="${m.id}" aria-expanded="${isOpen}">
       <span class="fut-title">${esc(m.title)}</span>
       <span class="fut-sum small muted">${[
         mine.length ? `<b class="fut-mine">${mine.length} bet${mine.length === 1 ? '' : 's'}</b>` : '',
-        !m.open ? esc(state) : fav && m.kind !== 'special' ? `${esc(fav.name)} ${esc(fav.price)}` : '',
+        !m.open ? esc(state) : '',
       ].filter(Boolean).join(' · ')}</span>
     </button>`;
   if (!isOpen) return `<section class="panel outright fut-closed">${head}</section>`;
