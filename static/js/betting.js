@@ -38,6 +38,8 @@ export function slipHtml(slip) {
     body = `<p class="small"><a href="${loginLink()}">Log in or sign up</a> to bet with tokens. Everyone starts with 10,000.</p>`;
   } else if (a.banned) {
     body = '<p class="small">Your account can\'t place bets.</p>';
+  } else if (a.can_bet === false) {
+    body = '<p class="small">Admins can\'t bet.</p>';
   } else {
     body = `<div class="slip-row">
         <label>Stake <input type="number" inputmode="numeric" min="10" step="10" data-slip-stake value="${esc(slip.stake ?? '')}" placeholder="Tokens"></label>
