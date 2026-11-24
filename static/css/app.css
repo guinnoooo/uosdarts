@@ -1329,9 +1329,11 @@ button.chat-who:hover { text-decoration: underline; }
 .pp-events th, .pp-events td:not(.l) { white-space: nowrap; }
 .pp-events { font-size: .9rem; }
 .pp-events th, .pp-events td { padding-left: .25rem; padding-right: .25rem; }
-.pp-res { display: inline-block; width: 1.5rem; text-align: center; border-radius: var(--r); font-weight: 700; font-size: .8rem; padding: .1rem 0; }
-.pp-res.w { background: rgba(138, 211, 174, .15); color: var(--good); }
-.pp-res.l { background: rgba(255, 90, 90, .12); color: var(--live); }
-.pp-matches td:first-child { width: 2rem; }
+.pp-res { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border-radius: var(--r); font-weight: 700; font-size: .8rem; padding: .1rem 0; }
+.pp-res.pp-w { background: rgba(138, 211, 174, .15); color: var(--good); }
+.pp-res.pp-l { background: rgba(255, 90, 90, .12); color: var(--live); }
+.pp-matches td:first-child { width: 2.2rem; text-align: left; }
+.pp-matches .pp-score { white-space: nowrap; }
+.pp-matches td:last-child { white-space: nowrap; }
 @media (max-width: 420px) { .pp-photo { width: 72px; height: 72px; } .pp-head h1 { font-size: 1.3rem; } .pp-tile b { font-size: 1.05rem; } }
 .player-modal-full { display: inline-block; margin-top: .8rem; font-weight: 600; }
