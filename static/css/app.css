@@ -1116,3 +1116,16 @@ button.chat-who:hover { text-decoration: underline; }
 .fut-scroll table { min-width: 34rem; }
 .fut-market + .fut-market { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .link.cash-out { color: var(--accent-soft); }
+
+/* Fantasy */
+.fx-squad { list-style: none; padding: 0; margin: .6rem 0; }
+.fx-slot { display: grid; grid-template-columns: 5.2rem 1fr auto; gap: .5rem; align-items: center; padding: .5rem .2rem; border-bottom: 1px solid var(--line); }
+.fx-slot:nth-child(6) { border-top: 1px dashed var(--line); margin-top: .3rem; }
+.fx-slot-btns { display: flex; gap: .4rem; align-items: center; }
+.fx-cap { min-width: 2rem; padding: .15rem .4rem; border-radius: 999px; }
+.fx-cap.on { background: var(--accent); color: #111; border-color: var(--accent); }
+.fx-market td, .fx-market th { padding: .4rem .3rem; }
+.fx-week { padding: .4rem 0; border-bottom: 1px solid var(--line); }
+.fx-week ul { margin: .4rem 0 .2rem 1rem; padding: 0; }
+.fx-rules { padding-left: 1.1rem; }
+.fx-rules li { margin: .25rem 0; }
