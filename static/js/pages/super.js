@@ -328,8 +328,8 @@ function fantasyPanel() {
   const addable = S.players.filter(p => !listed.has(p.id));
   return `<section class="panel futures-admin" data-fx>
     <h2>Fantasy prices</h2>
-    <p class="muted small">Budget 50.0 for six. A blank price can't be picked.</p>
-    <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">Player</th><th>Suggested</th><th>Price</th><th>In teams</th></tr></thead>
+    <p class="muted small">Budget £50.0m for six. A blank price can't be picked.</p>
+    <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">Player</th><th>Suggested (£m)</th><th>Price (£m)</th><th>In teams</th></tr></thead>
     <tbody>${list.map(r => `<tr>
       <td class="l">${esc(r.name)}</td>
       <td class="fut-sugg">${r.suggested ?? ''}</td>
