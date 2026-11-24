@@ -596,7 +596,6 @@ function oddsBlock(pv) {
   return `<div class="odds">
     <h3>GuinnessBet${thin ? '<sup class="odds-star">*</sup>' : ''}</h3>
     <div class="odds-row">${cell(1, a)}${cell(2, b)}</div>
-    ${bet && !S.slip ? '<p class="muted small odds-note">Tap a price to bet tokens on it.</p>' : ''}
     ${bet ? slipHtml(S.slip) : ''}
     ${myBetsHtml(S.myBets)}
     ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players in this match</p>' : ''}

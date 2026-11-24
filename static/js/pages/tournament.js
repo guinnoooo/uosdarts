@@ -115,7 +115,6 @@ function oddsSection() {
     ? `<button class="odds-pick small-pick${S.slip?.player_id === x.id ? ' on' : ''}" data-obet="${x.id}"><b>${outrightPrice(x.p)}</b></button>`
     : `<b>${outrightPrice(x.p)}</b>`;
   return `<section class="outright"><h2>${bet ? 'Odds' : 'Live odds'} to win the tournament${thin ? '<sup class="odds-star">*</sup>' : ''}</h2>
-    ${bet && !S.slip ? '<p class="muted small">Tap a price to bet tokens on it. Betting closes when the first match starts.</p>' : ''}
     ${bet ? slipHtml(S.slip) : ''}
     ${myBetsHtml(S.myBets)}
     <table class="outright-list"><tbody>${shown.map((x, i) => `<tr>

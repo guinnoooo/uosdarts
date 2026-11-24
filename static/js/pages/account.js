@@ -21,9 +21,8 @@ function formsHtml() {
   if (S.sent) {
     return `<section class="panel account-box">
       <h2>Check your email</h2>
-      <p>We've sent a link to <b>${esc(S.sent)}</b>. Click it to confirm your account, then you'll be logged in here.</p>
-      <p class="muted small">Nothing there? Check your junk folder, or <button class="link" data-act="resend">send it again</button>.</p>
-      <p><button class="link" data-act="view" data-v="login">Back to log in</button></p>
+      <p>Confirmation link sent to <b>${esc(S.sent)}</b>.</p>
+      <p class="muted small"><button class="link" data-act="resend">Send it again</button> · <button class="link" data-act="view" data-v="login">Log in</button></p>
     </section>`;
   }
   const tabs = `<div class="tabs account-tabs">
@@ -74,9 +73,8 @@ function recoverHtml() {
 function accountHtml(a, bets, email) {
   if (!a) {
     return `<section class="panel account-box">
-      <h2>Almost there</h2>
-      <p>You're logged in as ${esc(email ?? '')}, but there's no account for it yet.
-        If you've just signed up, click the link in the confirmation email first.</p>
+      <h2>Confirm your email</h2>
+      <p>Click the link we sent to ${esc(email ?? 'your email')}.</p>
       <button data-act="logout">Log out</button>
     </section>`;
   }
@@ -86,22 +84,22 @@ function accountHtml(a, bets, email) {
       <td>${fmtTokens(b.stake)}</td>
       <td class="bet-${b.status}">${statusText(b)} ${cancelButton(b)}</td>
     </tr>`).join('')}</tbody></table>`
-    : '<p class="muted">No bets yet. Tap a GuinnessBet price on an upcoming match to place one.</p>';
+    : '<p class="muted">No bets yet.</p>';
   if (a.can_bet === false) {
     return `${backLink()}<section class="panel account-box">
       <h2>${esc(a.display_name)}</h2>
-      <p>This is an admin login. You can use the chat, but admins can't bet.</p>
+      <p class="muted">Admin account: chat only.</p>
       <p class="muted small">${esc(a.email ?? '')} · <button class="link" data-act="logout">Log out</button></p>
     </section>`;
   }
   return `${backLink()}<section class="panel account-box">
       <h2>${esc(a.display_name)}</h2>
-      ${a.banned ? '<p class="error">This account has been blocked from the chat and betting.</p>' : ''}
+      ${a.banned ? '<p class="error">Blocked from chat and betting.</p>' : ''}
       <div class="token-row">
         <div><span class="muted small">Tokens</span><b>${fmtTokens(a.tokens)}</b></div>
         <div><span class="muted small">In open bets</span><b>${fmtTokens(a.in_play)}</b></div>
       </div>
-      <p class="muted small">Next top-up: +500 on ${when(a.next_topup)}. <a href="/leaderboard/">See the leaderboard</a>.</p>
+      <p class="muted small">+500 on ${when(a.next_topup)}</p>
       <p class="muted small">${esc(a.email ?? '')} · <button class="link" data-act="logout">Log out</button></p>
     </section>
     <section class="panel"><h2>Your bets</h2>${list}</section>`;
@@ -125,11 +123,11 @@ async function render() {
 app.addEventListener('click', async e => {
   const c = e.target.closest('[data-cancelbet]');
   if (c) {
-    if (!confirm('Cancel this bet and get your tokens back?')) return;
+    if (!confirm('Cancel this bet?')) return;
     c.disabled = true;
     const { error } = await sb.rpc('cancel_bet', { p_bet: Number(c.dataset.cancelbet) });
     if (error) { toast(error.message); c.disabled = false; return; }
-    toast('Bet cancelled. Your tokens are back.', false);
+    toast('Bet cancelled', false);
     render();
     return;
   }
@@ -176,7 +174,7 @@ app.addEventListener('submit', async e => {
       S.email = v('email');
       const { error } = await sb.auth.resetPasswordForEmail(S.email, { redirectTo: `${location.origin}/account/` });
       if (error) throw error;
-      toast('If there\'s an account for that email, a reset link is on its way', false);
+      toast('Reset link sent', false);
       S.view = 'login';
       render();
     } else if (f.id === 'f-newpw') {

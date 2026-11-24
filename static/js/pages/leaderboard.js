@@ -13,8 +13,7 @@ async function render() {
   const me = rows.find(r => r.me);
   app.innerHTML = `<section class="panel">
     <h2>Leaderboard</h2>
-    <p class="muted small">Tokens bet on GuinnessBet prices. Everyone starts with 10,000 and gets 500 more every Monday at 6pm.
-      ${me ? '' : '<a href="/account/?next=/leaderboard/">Sign up</a> to join in.'}</p>
+    ${me ? '' : '<p class="muted small"><a href="/account/?next=/leaderboard/">Sign up</a> to join in.</p>'}
     ${rows.length ? `<table class="lb-table">
       <thead><tr><th></th><th class="l">Name</th><th>Tokens</th><th>Bets</th><th>Won</th></tr></thead>
       <tbody>${rows.map((r, i) => `<tr class="${r.me ? 'me' : ''}">
@@ -24,7 +23,7 @@ async function render() {
         <td>${r.placed}</td>
         <td>${r.won}</td>
       </tr>`).join('')}</tbody></table>`
-      : '<p class="muted">Nobody yet. <a href="/account/">Be the first</a>.</p>'}
+      : '<p class="muted">Nobody yet.</p>'}
   </section>`;
 }
 

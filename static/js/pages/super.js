@@ -274,8 +274,7 @@ function accountsPanel() {
   const shown = q ? list.filter(a => `${a.display_name} ${a.email}`.toLowerCase().includes(q)) : list;
   return `<section class="panel">
     <h2>Accounts (${list.length})</h2>
-    <p class="muted small">Everyone signed up with a confirmed email. Their name shows in the chat and on the leaderboard.
-      Blocking an account stops it chatting and betting; its open bets still settle.</p>
+    <p class="muted small">Blocked accounts can't chat or bet.</p>
     ${list.length > 8 ? `<input id="acc-q" placeholder="Search name or email" value="${esc(S.accQ ?? '')}">` : ''}
     ${shown.length ? `<table class="points-list"><tbody>${shown.map(a => `<tr>
       <td><b>${esc(a.display_name)}</b>${a.banned ? ' <span class="error small">blocked</span>' : ''}
