@@ -32,17 +32,12 @@ function formsHtml() {
     </div>`;
   if (S.view === 'signup') {
     return `<section class="panel account-box">${tabs}
-      <p class="muted small">An account lets you use the match chat and bet tokens on GuinnessBet odds.
-        Everyone starts with 10,000 tokens and gets 500 more every Monday at 6pm.</p>
       <form id="f-signup" autocomplete="on">
-        <label>Name <span class="muted small">(shown in the chat and on the leaderboard)</span>
-          <input name="name" maxlength="30" minlength="2" required autocomplete="nickname"></label>
+        <label>Name <input name="name" maxlength="30" minlength="2" required autocomplete="name"></label>
         <label>Email <input name="email" type="email" required autocomplete="email" value="${esc(S.email)}"></label>
-        <label>Password <span class="muted small">(at least 8 characters)</span>
-          <input name="password" type="password" minlength="8" required autocomplete="new-password"></label>
+        <label>Password <input name="password" type="password" minlength="8" required autocomplete="new-password"></label>
         <button class="primary">Sign up</button>
       </form>
-      <p class="muted small">Your email is only seen by the site's super admins.</p>
     </section>`;
   }
   if (S.view === 'forgot') {
@@ -82,7 +77,6 @@ function accountHtml(a, bets, email) {
       <h2>Almost there</h2>
       <p>You're logged in as ${esc(email ?? '')}, but there's no account for it yet.
         If you've just signed up, click the link in the confirmation email first.</p>
-      <p class="muted small">Admin logins can't chat or bet: sign up separately with your email for that.</p>
       <button data-act="logout">Log out</button>
     </section>`;
   }
@@ -93,6 +87,13 @@ function accountHtml(a, bets, email) {
       <td class="bet-${b.status}">${statusText(b)} ${cancelButton(b)}</td>
     </tr>`).join('')}</tbody></table>`
     : '<p class="muted">No bets yet. Tap a GuinnessBet price on an upcoming match to place one.</p>';
+  if (a.can_bet === false) {
+    return `${backLink()}<section class="panel account-box">
+      <h2>${esc(a.display_name)}</h2>
+      <p>This is an admin login. You can use the chat, but admins can't bet.</p>
+      <p class="muted small">${esc(a.email ?? '')} · <button class="link" data-act="logout">Log out</button></p>
+    </section>`;
+  }
   return `${backLink()}<section class="panel account-box">
       <h2>${esc(a.display_name)}</h2>
       ${a.banned ? '<p class="error">This account has been blocked from the chat and betting.</p>' : ''}
