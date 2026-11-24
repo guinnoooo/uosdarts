@@ -3,6 +3,8 @@ import {
 } from '../db.js';
 import { mountChat } from '../chat.js';
 import { oomScores, matchChance, liveChance, pctPair, isThin, teamPreview } from '../winprob.js';
+import { bookPrices } from '../prices.js';
+import { loadAccount, slipHtml, slipEvent } from '../betting.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -542,6 +544,7 @@ function chartOff(frame) {
 
 // The player boxes keep what's typed even if the page redraws.
 app.addEventListener('input', e => {
+  slipEvent(e, { slip: () => S.slip, set: v => { S.slip = v; }, render });
   const k = e.target.dataset.pick;
   if (k && S.pick) { const [side, i] = k.split('-').map(Number); S.pick[side][i] = e.target.value; }
 });
@@ -572,54 +575,34 @@ app.addEventListener('pointerout', e => {
 
 // ---------------------------------------------------------------- odds
 
-// GuinnessBet: pretend bookmaker odds. The chance of each player winning
-// comes from winprob.js (career average, first 9, doubles, head-to-head,
-// order of merit), the same model as the live win probability.
-//
-// The prices are then made like a real book: a margin is built in and every
-// price is rounded shorter, never longer, so the two sides always add up to
-// more than 100% and there's no way to back both and be sure of a profit.
-const LADDER = ['1/100', '1/66', '1/50', '1/40', '1/33', '1/25', '1/20', '1/16', '1/14', '1/12', '1/10',
-  '1/9', '1/8', '1/7', '1/6', '1/5', '2/9', '1/4', '2/7', '1/3', '4/11', '2/5', '4/9', '1/2', '8/15', '4/7',
-  '8/13', '4/6', '8/11', '4/5', '5/6', '10/11', 'Evens', '11/10', '6/5', '5/4', '11/8', '6/4', '13/8', '7/4',
-  '15/8', '2/1', '9/4', '5/2', '11/4', '3/1', '10/3', '7/2', '4/1', '9/2', '5/1', '11/2', '6/1', '13/2',
-  '7/1', '15/2', '8/1', '9/1', '10/1', '11/1', '12/1', '14/1', '16/1', '18/1', '20/1', '25/1', '33/1'];
-const ladderValue = f => (f === 'Evens' ? 1 : f.split('/').reduce((a, b) => a / b));
-const implied = f => 1 / (ladderValue(f) + 1);
-const BOOK = 1.045;  // about 4.5% margin, so two even players are 10/11 each
-
-// The longest price on the ladder whose implied chance is at least `prob`.
-function priceFor(prob) {
-  let best = LADDER[0];
-  for (const f of LADDER) if (implied(f) >= prob) best = f;
-  return best;
-}
-
-function bookPrices(p1) {
-  const fav = p1 >= 0.5 ? 1 : 2;
-  const pf = Math.max(p1, 1 - p1);
-  // Favourite first, rounded shorter.
-  // The margin is shared the way bookmakers do it: most of it on prices
-  // near evens, very little on a heavy favourite.
-  const withMargin = q => q + (BOOK - 1) * 2 * q * (1 - q);
-  const favPrice = priceFor(Math.min(0.99, withMargin(pf)));
-  // Then the outsider, rounded shorter, and short enough that the book
-  // stays over 100% even when the favourite had to be rounded a lot.
-  const dogPrice = priceFor(Math.max(withMargin(1 - pf), 1.03 - implied(favPrice)));
-  return fav === 1 ? [favPrice, dogPrice] : [dogPrice, favPrice];
-}
+// GuinnessBet: pretend bookmaker odds, priced in prices.js (shared with the
+// place-bet edge function, so bets are struck at the price shown here).
+// Token bets can be placed on a match until it starts. Not on friendlies.
+const canBet = () => S.match.status === 'pending' && !isFriendly() && hasPlayers(S.match);
 
 function oddsBlock(pv) {
   const [a, b] = bookPrices(matchChance(pv, S.match));
+  S.prices = [a, b];
   const thin = isThin(pv);
+  const bet = canBet();
+  const cell = (n, price) => bet
+    ? `<button class="odds-pick${S.slip?.side === n ? ' on' : ''}" data-bet="${n}"><span class="odds-name">${esc(nameOf(n))}</span><b>${price}</b></button>`
+    : `<div><span class="odds-name">${esc(nameOf(n))}</span><b>${price}</b></div>`;
   return `<div class="odds">
     <h3>GuinnessBet${thin ? '<sup class="odds-star">*</sup>' : ''}</h3>
-    <div class="odds-row">
-      <div><span class="odds-name">${esc(nameOf(1))}</span><b>${a}</b></div>
-      <div><span class="odds-name">${esc(nameOf(2))}</span><b>${b}</b></div>
-    </div>
+    <div class="odds-row">${cell(1, a)}${cell(2, b)}</div>
+    ${bet && !S.slip ? '<p class="muted small odds-note">Tap a price to bet tokens on it.</p>' : ''}
+    ${bet ? slipHtml(S.slip) : ''}
     ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players in this match</p>' : ''}
   </div>`;
+}
+
+// Opening a slip for a side, or switching sides.
+function openSlip(side) {
+  if (!S.prices) return;
+  S.slip = { kind: 'match', match_id: id, side, selection: nameOf(side), price: S.prices[side - 1], stake: S.slip?.stake ?? 100 };
+  loadAccount().then(render, render);
+  render();
 }
 
 const winRate = (won, played) => (played ? `${Math.round((won / played) * 100)}%` : null);
@@ -827,6 +810,7 @@ async function savePlayers(form) {
     S.oomPlayers = null;   // someone may have been added
     S.preview = undefined; // new players, new prices
     S.names = undefined;
+    S.slip = null;
     await load();
   } catch (err) {
     toast(err.message);
@@ -1021,6 +1005,9 @@ async function startClaim() {
 
 app.addEventListener('click', async e => {
   if (e.target.closest('#match-chat')) return;   // the chat handles its own clicks
+  const pick = e.target.closest('[data-bet]');
+  if (pick) { openSlip(Number(pick.dataset.bet)); return; }
+  if (await slipEvent(e, { slip: () => S.slip, set: v => { S.slip = v; }, render })) return;
   const el = e.target.closest('button');
   if (!el) return;
   const { key, quick, act, first, codarts, codbl, missdbl, bull } = el.dataset;

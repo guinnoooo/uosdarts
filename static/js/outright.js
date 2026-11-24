@@ -9,6 +9,21 @@ import { standings, buildBracket } from './fixtures.js';
 
 const RUNS = 3000;
 
+// The run-throughs use a seeded random number generator, so the same
+// tournament state always gives the same prices: on the page and in the
+// place-bet edge function, which prices outright bets the same way.
+function seeded(seed) {
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) { h = Math.imul(h ^ seed.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  let a = h >>> 0;
+  return () => {   // mulberry32
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // Prices for an outright market. Rounded shorter like the match odds, with
 // a bigger margin (as bookmakers do on outrights), so backing everyone
 // always loses.
@@ -31,6 +46,7 @@ export function outrightPrice(p) {
 // oom: player id -> order of merit score (winprob oomScore)
 // t: the tournament row; entrants: tournament_players rows; matches: all rows
 export function outrightOdds({ figures, oom, t, entrants, matches }) {
+  const rand = seeded(String(t.id ?? 'x'));
   const fig = new Map(figures.map(f => [f.id, f]));
   const pv = (a, b) => ({
     p1: fig.get(a)?.career ?? null, p1_form: fig.get(a)?.form ?? null, p1_prov: fig.get(a)?.prov ?? null,
@@ -54,8 +70,8 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
     const p = leg(a, b);
     const pl = { 1: legFor(p, 1), 2: legFor(p, 2) };
     let x = l1, y = l2;
-    let s = Math.random() < 0.5 ? 1 : 2;
-    while (x < toWin && y < toWin) { if (Math.random() < pl[s]) x++; else y++; s = 3 - s; }
+    let s = rand() < 0.5 ? 1 : 2;
+    while (x < toWin && y < toWin) { if (rand() < pl[s]) x++; else y++; s = 3 - s; }
     return [x >= toWin ? 1 : 2, x, y];
   };
 
@@ -89,7 +105,7 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
       if (m.status === 'complete' && m.winner_id) w = m.winner_id;
       else if (!a || !b) w = a ?? b;   // a bye
       else if (m.status === 'live' && m.player1_id === a && m.player2_id === b) {
-        w = Math.random() < (m._live ?? 0.5) ? a : b;
+        w = rand() < (m._live ?? 0.5) ? a : b;
       } else {
         const toWin = m.legs_to_win ?? t.knockout_legs_to_win;
         w = playLegs(a, b, 0, 0, toWin)[0] === 1 ? a : b;

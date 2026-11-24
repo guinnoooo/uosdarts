@@ -43,6 +43,7 @@ async function loadInner() {
   S.hubsOn = (await sb.rpc('hub_enabled', { p_kind: 'uduk' })).data ?? false;
   S.friendlies = check(await sb.rpc('super_list_friendlies')) ?? [];
   S.openFriendlies = check(await sb.rpc('super_list_open_friendlies')) ?? [];
+  S.accounts = check(await sb.rpc('super_list_accounts')) ?? [];
   S.seeds = new Map((check(await sb.from('player_seeds').select('player_id, rating')) ?? [])
     .map(r => [r.player_id, Number(r.rating)]));
   if (S.sel) {
@@ -266,6 +267,27 @@ function reviewPanel() {
   ${openFriendliesPanel()}`;
 }
 
+// Email accounts (chat and token betting). Only super admins see emails.
+function accountsPanel() {
+  const list = S.accounts ?? [];
+  const q = (S.accQ ?? '').toLowerCase();
+  const shown = q ? list.filter(a => `${a.display_name} ${a.email}`.toLowerCase().includes(q)) : list;
+  return `<section class="panel">
+    <h2>Accounts (${list.length})</h2>
+    <p class="muted small">Everyone signed up with a confirmed email. Their name shows in the chat and on the leaderboard.
+      Blocking an account stops it chatting and betting; its open bets still settle.</p>
+    ${list.length > 8 ? `<input id="acc-q" placeholder="Search name or email" value="${esc(S.accQ ?? '')}">` : ''}
+    ${shown.length ? `<table class="points-list"><tbody>${shown.map(a => `<tr>
+      <td><b>${esc(a.display_name)}</b>${a.banned ? ' <span class="error small">blocked</span>' : ''}
+        <span class="muted small" style="display:block">${esc(a.email ?? '')} · ${Number(a.tokens).toLocaleString('en-GB')} tokens · ${a.bets} bets · ${a.messages} messages</span></td>
+      <td class="row" style="justify-content:flex-end;flex-wrap:nowrap">
+        <input type="number" step="100" placeholder="± tokens" data-acctok="${a.user_id}" style="width:7rem">
+        <button data-accadj="${a.user_id}">Give</button>
+        <button data-accban="${a.user_id}" data-banned="${a.banned}" class="${a.banned ? '' : 'danger'}">${a.banned ? 'Unblock' : 'Block'}</button>
+      </td></tr>`).join('')}</tbody></table>` : '<p class="muted">Nobody yet.</p>'}
+  </section>`;
+}
+
 // Friendlies that haven't finished: being played now, or set up and left.
 function openFriendliesPanel() {
   const list = S.openFriendlies ?? [];
@@ -331,7 +353,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
@@ -367,6 +389,20 @@ app.addEventListener('click', async e => {
   if (el.dataset.delpts) {
     await run(async () => check(await sb.rpc('super_delete_points', { p_id: Number(el.dataset.delpts) })),
       'Entry removed');
+    return;
+  }
+  if (el.dataset.accban) {
+    const banned = el.dataset.banned !== 'true';
+    await run(async () => check(await sb.rpc('super_set_banned', { p_user: el.dataset.accban, p_banned: banned })),
+      banned ? 'Account blocked' : 'Account unblocked');
+    return;
+  }
+  if (el.dataset.accadj) {
+    const box = app.querySelector(`[data-acctok="${el.dataset.accadj}"]`);
+    const n = Math.trunc(Number(box?.value));
+    if (!n) { toast('Enter a number of tokens (negative to take some away)'); return; }
+    await run(async () => check(await sb.rpc('super_adjust_tokens', { p_user: el.dataset.accadj, p_change: n })),
+      n > 0 ? `Gave ${n} tokens` : `Took ${-n} tokens`);
     return;
   }
   if (el.dataset.frdelete) {
@@ -516,6 +552,13 @@ app.addEventListener('input', e => {
   if (e.target.id === 'p-filter') {
     S.filter = e.target.value;
     render();
+  }
+  if (e.target.id === 'acc-q') {
+    S.accQ = e.target.value;
+    render();
+    const box = app.querySelector('#acc-q');
+    box?.focus();
+    box?.setSelectionRange(box.value.length, box.value.length);
   }
 });
 

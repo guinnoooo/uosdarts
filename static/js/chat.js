@@ -1,18 +1,16 @@
-import { sb, esc, toast, ensureSignedIn } from './db.js';
+import { sb, esc, toast } from './db.js';
+import { loadAccount } from './betting.js';
 
 // Live chat for one match. It lives in its own box under the match, outside
 // the part of the page that's redrawn on every score, so a half-typed
 // message is never lost.
-const NAME_KEY = 'uosdarts:chatname';
-const savedName = () => { try { return localStorage.getItem(NAME_KEY) ?? ''; } catch { return ''; } };
-const saveName = n => { try { localStorage.setItem(NAME_KEY, n); } catch { /* private mode */ } };
 
-// Switch to turn the chat off everywhere without removing it. Set back to
-// true to bring it back exactly as it was.
-export const CHAT_ENABLED = false;
+// Switch to turn the chat off everywhere without removing it.
+export const CHAT_ENABLED = true;
 
-// Chat is behind a password. Once entered, it stays unlocked for this
-// browser until the super admin changes it.
+// The chat needs an account (an email that's been confirmed), so every
+// message is tied to someone the super admin can see. The name on a message
+// is the account's name.
 export async function mountChat(host, matchId) {
   if (!CHAT_ENABLED) {
     host.innerHTML = `<section class="chat">
@@ -21,49 +19,27 @@ export async function mountChat(host, matchId) {
     </section>`;
     return;
   }
-  const { data: { session } } = await sb.auth.getSession();
-  const ok = session ? (await sb.rpc('chat_ok')).data === true : false;
-  if (ok) { openChat(host, matchId); return; }
-
+  const acc = await loadAccount();
+  if (acc) { openChat(host, matchId, acc); return; }
+  const next = encodeURIComponent(location.pathname + location.search);
   host.innerHTML = `<section class="chat">
     <h2>Chat</h2>
-    <form class="chat-lock" autocomplete="off">
-      <p class="muted small">Enter the chat password to see and join the chat.</p>
-      <div class="chat-send">
-        <input name="pw" type="password" placeholder="Chat password" required>
-        <button class="primary">Unlock</button>
-      </div>
-    </form>
+    <p class="muted small"><a href="/account/?next=${next}">Log in or sign up</a> to see and join the chat.</p>
   </section>`;
-  const form = host.querySelector('.chat-lock');
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
-    const btn = form.querySelector('button');
-    btn.disabled = true;
-    try {
-      await ensureSignedIn();
-      const { error } = await sb.rpc('chat_unlock', { p_password: form.elements.pw.value });
-      if (error) throw error;
-      openChat(host, matchId);
-    } catch (err) {
-      toast(err.message);
-      btn.disabled = false;
-    }
-  });
 }
 
-async function openChat(host, matchId) {
+async function openChat(host, matchId, acc) {
   const C = { msgs: [], admin: false };
   host.innerHTML = `<section class="chat">
     <h2>Chat</h2>
     <div class="chat-list" aria-live="polite"><p class="muted small">Loading…</p></div>
-    <form class="chat-form" autocomplete="off">
-      <input name="name" class="chat-name" maxlength="30" placeholder="Your name" value="${esc(savedName())}" required>
+    ${acc.banned ? '<p class="muted small">Your account can\'t post in the chat.</p>' : `<form class="chat-form" autocomplete="off">
+      <p class="muted small chat-as">Chatting as ${esc(acc.display_name)}</p>
       <div class="chat-send">
         <input name="body" maxlength="280" placeholder="Say something…" required>
         <button class="primary">Send</button>
       </div>
-    </form>
+    </form>`}
   </section>`;
   const list = host.querySelector('.chat-list');
   const form = host.querySelector('.chat-form');
@@ -111,18 +87,16 @@ async function openChat(host, matchId) {
       })
     .subscribe();
 
-  form.addEventListener('submit', async e => {
+  form?.addEventListener('submit', async e => {
     e.preventDefault();
-    const name = form.elements.name.value.trim();
+    const name = acc.display_name;
     const body = form.elements.body.value.trim();
-    if (!name || !body) return;
+    if (!body) return;
     const btn = form.querySelector('button');
     btn.disabled = true;
     try {
-      await ensureSignedIn();
       const { data: newId, error: err } = await sb.rpc('post_chat', { p_match: matchId, p_name: name, p_body: body });
       if (err) throw err;
-      saveName(name);
       form.elements.body.value = '';
       // Show it straight away; the live update for it is then ignored.
       if (!C.msgs.some(x => x.id === newId)) {

@@ -3,3 +3,6 @@
 .hugo_build.lock
 .DS_Store
 Thumbs.db
+
+# Copied in from static/js when the place-bet function is deployed.
+supabase/functions/place-bet/*.js
