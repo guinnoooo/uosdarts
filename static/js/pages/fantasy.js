@@ -157,7 +157,7 @@ const scoringHtml = () => `<dialog id="fx-scoring" class="fx-dialog">
     <li><b>Captain</b>: all their points double.</li>
     <li><b>Power Scorer</b>: 180s and 140+ score triple.</li>
     <li><b>Big Finisher</b>: 100+ checkouts score triple.</li>
-    <li><b>Dark Horse</b>: match wins score triple when they were the underdog in the odds.</li>
+    <li><b>Dark Horse</b>: when they win a match as the underdog in the odds, the win and their legs in it score triple.</li>
     <li><b>Europa Specialist</b>: also scores for their Europa matches.</li>
     <li><b>Bench</b>: plays the role of the first starter who doesn't play that week.</li>
   </ul>
