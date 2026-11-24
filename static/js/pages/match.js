@@ -4,7 +4,7 @@ import {
 import { mountChat } from '../chat.js';
 import { oomScores, matchChance, liveChance, pctPair, isThin, teamPreview } from '../winprob.js';
 import { bookPrices } from '../prices.js';
-import { loadAccount, slipHtml, slipEvent } from '../betting.js';
+import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml } from '../betting.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -66,6 +66,11 @@ async function loadInner() {
       S.preview = teamPreview(np.data, oom.data ?? []);
       if (S.preview && !S.preview.unavailable) S.preview.h2h = np.data?.h2h ?? [];
     }
+  }
+  // Your own bets on it, for an upcoming match you could bet on.
+  if (S.match.status === 'pending' && S.myBets === undefined) {
+    S.myBets = [];
+    loadAccount().then(a => (a ? refreshBets().then(render) : null)).catch(() => {});
   }
   render();
   watch();
@@ -544,7 +549,7 @@ function chartOff(frame) {
 
 // The player boxes keep what's typed even if the page redraws.
 app.addEventListener('input', e => {
-  slipEvent(e, { slip: () => S.slip, set: v => { S.slip = v; }, render });
+  slipEvent(e, betCtx);
   const k = e.target.dataset.pick;
   if (k && S.pick) { const [side, i] = k.split('-').map(Number); S.pick[side][i] = e.target.value; }
 });
@@ -593,11 +598,15 @@ function oddsBlock(pv) {
     <div class="odds-row">${cell(1, a)}${cell(2, b)}</div>
     ${bet && !S.slip ? '<p class="muted small odds-note">Tap a price to bet tokens on it.</p>' : ''}
     ${bet ? slipHtml(S.slip) : ''}
+    ${myBetsHtml(S.myBets)}
     ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players in this match</p>' : ''}
   </div>`;
 }
 
 // Opening a slip for a side, or switching sides.
+const refreshBets = async () => { S.myBets = await myBetsOn({ matchId: id }); };
+const betCtx = { slip: () => S.slip, set: v => { S.slip = v; }, render: () => render(), changed: refreshBets };
+
 function openSlip(side) {
   if (!S.prices) return;
   S.slip = { kind: 'match', match_id: id, side, selection: nameOf(side), price: S.prices[side - 1], stake: S.slip?.stake ?? 100 };
@@ -1007,7 +1016,7 @@ app.addEventListener('click', async e => {
   if (e.target.closest('#match-chat')) return;   // the chat handles its own clicks
   const pick = e.target.closest('[data-bet]');
   if (pick) { openSlip(Number(pick.dataset.bet)); return; }
-  if (await slipEvent(e, { slip: () => S.slip, set: v => { S.slip = v; }, render })) return;
+  if (await slipEvent(e, betCtx)) return;
   const el = e.target.closest('button');
   if (!el) return;
   const { key, quick, act, first, codarts, codbl, missdbl, bull } = el.dataset;
