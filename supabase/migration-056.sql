@@ -327,3 +327,19 @@ select m.id, p.id, p.name, s.value
   cross join lateral jsonb_each_text(mk.value) s
   join public.players p on p.name = s.key
 on conflict (market_id, player_id) do update set suggested = excluded.suggested;
+
+-- Only students and first-year alumni can play on stage, so these four are out
+-- of both Dartsity markets, and the Dartsity suggestions are rerun without them.
+delete from public.futures_selections s using public.futures_markets m, public.players p
+ where m.id = s.market_id and p.id = s.player_id
+   and m.slug in ('dartsity-stage', 'dartsity-qualifiers')
+   and p.name in ('Matt Watts', 'Luke Davies', 'Oli Graham', 'Adam Khalil')
+   and not exists (select 1 from public.bets b where b.future_id = s.id);
+
+insert into public.futures_selections (market_id, player_id, name, suggested)
+select m.id, p.id, p.name, s.value
+  from jsonb_each('{"dartsity-stage":{"Lewis Forrest":"1/10","Mikey Guinness":"1/10","Dan Wells":"1/10","Luke Egan":"4/9","Joel Keaney":"4/7","Matt Duke":"4/5","Max Halder":"6/4","Barney Chaudhry":"7/2","Liam English":"9/2","Jack Warby":"11/2","Joseph D''Ambrosio":"8/1","Dan Buckley":"7/1","Rory Peach":"14/1","James Lauer":"16/1","James Beer":"20/1","Darsh Johar":"16/1","Cian Hughes":"20/1","Jack Newton":"16/1","Louis Woods-Kelly":"16/1","Dan Campbell":"33/1","Tom Sibley":"40/1","Evan Buxton":"40/1","Iwan James":"40/1","Ed Browne":"66/1","Alfie Mortimer":"66/1","Sam Tookey":"100/1","Aidan Garratt":"100/1","Finley Bowden":"150/1","Aidan Wood":"100/1","James Phillips":"100/1","Adam Butcher":"150/1","Harvey Simpson":"100/1","Oli Makin":"150/1","George Burton":"150/1","Luke Lavery":"150/1","Matt Hawkins":"150/1","Danny Hartland":"150/1","Jude Cockin":"150/1","Ben Clarke":"150/1","Mike Britland":"250/1","Finley Jackson":"250/1","Leila Mitchell":"150/1","Ben Browne":"250/1","Thomas Batho":"250/1","Jack Vicars":"250/1"},"dartsity-qualifiers":{"Lewis Forrest":"1/8","Mikey Guinness":"1/5","Dan Wells":"2/7","Luke Egan":"10/11","Joel Keaney":"5/4","Matt Duke":"6/4","Max Halder":"5/2","Barney Chaudhry":"9/2","Liam English":"6/1","Jack Warby":"7/1","Joseph D''Ambrosio":"10/1","Dan Buckley":"9/1","Rory Peach":"16/1","James Lauer":"16/1","James Beer":"20/1","Darsh Johar":"20/1","Cian Hughes":"25/1","Jack Newton":"20/1","Louis Woods-Kelly":"20/1","Dan Campbell":"33/1","Tom Sibley":"40/1","Evan Buxton":"50/1","Iwan James":"50/1","Ed Browne":"80/1","Alfie Mortimer":"80/1","Sam Tookey":"100/1","Aidan Garratt":"150/1","Finley Bowden":"150/1","Aidan Wood":"100/1","James Phillips":"150/1","Adam Butcher":"150/1","Harvey Simpson":"150/1","Oli Makin":"150/1","George Burton":"150/1","Luke Lavery":"150/1","Matt Hawkins":"150/1","Danny Hartland":"250/1","Jude Cockin":"250/1","Ben Clarke":"150/1","Mike Britland":"250/1","Finley Jackson":"250/1","Leila Mitchell":"150/1","Ben Browne":"250/1","Thomas Batho":"250/1","Jack Vicars":"250/1"}}'::jsonb) mk
+  join public.futures_markets m on m.slug = mk.key
+  cross join lateral jsonb_each_text(mk.value) s
+  join public.players p on p.name = s.key
+on conflict (market_id, player_id) do update set suggested = excluded.suggested;
