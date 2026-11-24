@@ -104,7 +104,7 @@ function accountHtml(a, bets, email) {
         <div><span class="muted small">Tokens</span><b>${fmtTokens(a.tokens)}</b></div>
         <div><span class="muted small">In open bets</span><b>${fmtTokens(a.in_play)}</b></div>
       </div>
-      <p class="muted small">+500 on ${when(a.next_topup)}</p>
+      <p class="muted small">+250 on ${when(a.next_topup)}</p>
       <p class="muted small">${esc(a.email ?? '')} · <button class="link" data-act="logout">Log out</button></p>
     </section>
     <section class="panel"><h2>Your bets</h2>${list}</section>`;
