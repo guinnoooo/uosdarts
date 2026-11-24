@@ -132,12 +132,12 @@ function teamWeekHtml(w) {
 function boardHtml() {
   return `<section class="panel">
     <h2>Leaderboard</h2>
-    ${S.board.length ? `<table class="lb-table"><thead><tr><th></th><th class="l">Team</th><th>Week</th><th>Total</th></tr></thead>
+    ${S.board.length ? `<table class="lb-table"><thead><tr><th></th><th class="l">Team</th><th>Points</th></tr></thead>
       <tbody>${S.board.map((r, i) => `<tr class="${r.me ? 'me' : ''}">
         <td class="muted">${i + 1}</td>
         <td class="l"><button class="link" data-view="${r.user_id}">${esc(r.name)}</button><span class="muted small lb-play">${esc(r.manager)}</span></td>
-        <td>${r.week ?? ''}</td><td><b>${r.total}</b></td></tr>
-        ${S.open === r.user_id && S.view ? `<tr><td colspan="4">${teamWeekHtml(S.view)}</td></tr>` : ''}`).join('')}</tbody></table>`
+        <td><b>${r.total}</b></td></tr>
+        ${S.open === r.user_id && S.view ? `<tr><td colspan="3">${teamWeekHtml(S.view)}</td></tr>` : ''}`).join('')}</tbody></table>`
       : '<p class="muted">No teams yet.</p>'}
   </section>`;
 }
