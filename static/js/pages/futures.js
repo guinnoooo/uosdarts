@@ -47,7 +47,7 @@ function marketHtml(m) {
       <span class="fut-title">${esc(m.title)}</span>
       <span class="fut-sum small muted">${[
         mine.length ? `<b class="fut-mine">${mine.length} bet${mine.length === 1 ? '' : 's'}</b>` : '',
-        !m.open ? esc(state) : fav ? `${esc(fav.name)} ${esc(fav.price)}` : '',
+        !m.open ? esc(state) : fav && m.kind !== 'special' ? `${esc(fav.name)} ${esc(fav.price)}` : '',
       ].filter(Boolean).join(' · ')}</span>
     </button>`;
   if (!isOpen) return `<section class="panel outright fut-closed">${head}</section>`;
