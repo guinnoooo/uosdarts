@@ -23,7 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Finding the latest CLI uses GitHub's API, which sometimes refuses with
+      # "rate limit exceeded". If it does, wait a minute and try once more.
       - uses: supabase/setup-cli@v1
+        id: cli
+        continue-on-error: true
+        with:
+          version: latest
+      - if: steps.cli.outcome == 'failure'
+        run: sleep 60
+      - if: steps.cli.outcome == 'failure'
+        uses: supabase/setup-cli@v1
         with:
           version: latest
       - name: Copy the shared model code in next to the function
