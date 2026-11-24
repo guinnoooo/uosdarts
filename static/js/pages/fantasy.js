@@ -14,7 +14,7 @@ const ROLES = [
   { name: 'Power Scorer', note: 'Triple for 180s and 140+' },
   { name: 'Big Finisher', note: 'Triple for 100+ checkouts' },
   { name: 'Dark Horse', note: 'Triple for upset wins' },
-  { name: 'Tricky Player', note: 'Triple for wins on a lower average' },
+  { name: 'Europa Specialist', note: 'Also scores in the Europa' },
   { name: 'Bench', note: 'Covers a starter who doesn\'t play' },
 ];
 
@@ -35,7 +35,8 @@ async function load() {
   // (for the Dark Horse role). Quick, and harmless if it fails.
   await Promise.race([sb.functions.invoke('place-bet', { body: { kind: 'prematch' } }).catch(() => null),
     new Promise(r => setTimeout(r, 4000))]);
-  const [acc, market, board, gws] = await Promise.all([loadAccount(), sb.rpc('fantasy_market'), sb.rpc('fantasy_leaderboard'), sb.rpc('fantasy_gws')]);
+  const [acc, market, board, gws, pts] = await Promise.all([loadAccount(), sb.rpc('fantasy_market'), sb.rpc('fantasy_leaderboard'), sb.rpc('fantasy_gws'), sb.rpc('fantasy_scoring_list')]);
+  S.points = pts.data ?? [];
   S.market = market.data ?? [];
   S.curGw = (gws.data ?? []).filter(g => g.locks_at && new Date(g.locks_at) <= new Date()).map(g => g.gw).at(-1) ?? null;
   S.board = board.data ?? [];
@@ -122,7 +123,7 @@ function teamWeekHtml(w) {
   return `<details class="fx-week"><summary><b>${gwLabel(w.gw)}</b> · ${w.total} points${w.hits ? ` (−${w.hits} for changes)` : ''}</summary>
     <ul class="fx-week-list">${w.starters.map(s => `<li>${photo(s.slug, s.name, 'fx-thumb')}
       <span><span class="muted small">${esc(s.role)}</span> ${esc(s.name)}: <b>${s.points}</b>
-      <span class="muted small" style="display:block">${s.played ? esc(det(s.detail)) : 'didn\'t play'}</span></span></li>`).join('')}
+      <span class="muted small" style="display:block">${s.played ? esc(det(s.detail)) : 'didn\'t play'}${s.europa ? ` · Europa: ${s.europa} (${esc(det(s.europa_detail))})` : ''}</span></span></li>`).join('')}
       ${w.bench_name ? `<li class="muted">${photo(w.bench_slug, w.bench_name, 'fx-thumb')}<span>Bench: ${esc(w.bench_name)},
         ${w.bench_came_on ? `came on as ${esc(w.bench_role)}, <b>${w.bench_points}</b>` : 'not needed'}</span></li>` : ''}</ul>
   </details>`;
@@ -144,45 +145,32 @@ function boardHtml() {
 const scoringButton = '<button class="link" data-act="scoring">Explain the scoring</button>';
 
 // What scores what, in a window over the page.
-const SCORING = `<dialog id="fx-scoring" class="fx-dialog">
+// What scores what, in a window over the page. The values come from the
+// database, where a super admin sets them.
+const scoringHtml = () => `<dialog id="fx-scoring" class="fx-dialog">
   <div class="fx-dialog-head"><h2>Scoring</h2><button class="link" data-act="close-scoring" aria-label="Close">✕</button></div>
-  <table class="fx-points"><tbody>
-    <tr><td>Match won</td><td>2</td></tr>
-    <tr><td>Leg won</td><td>1</td></tr>
-    <tr><td>140+</td><td>1</td></tr>
-    <tr><td>180</td><td>3</td></tr>
-    <tr><td>100+ checkout</td><td>5</td></tr>
-    <tr><td>Winning the event</td><td>10</td></tr>
-    <tr><th colspan="2">Match average</th></tr>
-    <tr><td>50+</td><td>1</td></tr>
-    <tr><td>60+</td><td>2</td></tr>
-    <tr><td>70+</td><td>4</td></tr>
-    <tr><td>80+</td><td>6</td></tr>
-    <tr><th colspan="2">Legs won in</th></tr>
-    <tr><td>19 to 21 darts</td><td>2</td></tr>
-    <tr><td>16 to 18 darts</td><td>4</td></tr>
-    <tr><td>15 darts or fewer</td><td>8</td></tr>
-  </tbody></table>
+  <p class="small muted">Every PC and major counts. Europa matches only count for your Europa Specialist.</p>
+  <table class="fx-points"><tbody>${S.points.map(x => `<tr><td>${esc(x.label)}</td><td>${x.points}</td></tr>`).join('')}</tbody></table>
   <p class="small muted">Averages score the highest band reached, once per match.</p>
   <h3>Roles</h3>
   <ul class="small fx-rules">
     <li><b>Captain</b>: all their points double.</li>
     <li><b>Power Scorer</b>: 180s and 140+ score triple.</li>
     <li><b>Big Finisher</b>: 100+ checkouts score triple.</li>
-    <li><b>Dark Horse</b>: match wins score triple when they were the underdog in the odds.</li>
-    <li><b>Tricky Player</b>: match wins score triple when they averaged less than their opponent.</li>
+    <li><b>Dark Horse</b>: when they win a match as the underdog in the odds, the win and their legs in it score triple.</li>
+    <li><b>Europa Specialist</b>: also scores for their Europa matches.</li>
     <li><b>Bench</b>: plays the role of the first starter who doesn't play that week.</li>
   </ul>
   <h3>Rules</h3>
   <ul class="small fx-rules">
-    <li>Every PC and major counts. Teams lock when the week's first one starts.</li>
+    <li>Teams lock when the week's first PC or major starts.</li>
     <li>One free change a week, then 4 points per change.</li>
     <li>Prices move a little each week with form.</li>
   </ul>
 </dialog>`;
 
 function render() {
-  app.innerHTML = `${squadHtml()}${historyHtml()}${boardHtml()}${marketHtml()}${SCORING}`;
+  app.innerHTML = `${squadHtml()}${historyHtml()}${boardHtml()}${marketHtml()}${scoringHtml()}`;
 }
 
 app.addEventListener('input', e => {

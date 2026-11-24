@@ -46,6 +46,7 @@ async function loadInner() {
   S.accounts = check(await sb.rpc('super_list_accounts')) ?? [];
   S.futures = check(await sb.rpc('super_futures')) ?? [];
   S.fantasy = check(await sb.rpc('super_fantasy_prices')) ?? [];
+  S.fxScoring = check(await sb.rpc('fantasy_scoring_list')) ?? [];
   if (S.accBetsFor) S.accBets = check(await sb.rpc('super_account_bets', { p_user: S.accBetsFor })) ?? [];
   S.seeds = new Map((check(await sb.from('player_seeds').select('player_id, rating')) ?? [])
     .map(r => [r.player_id, Number(r.rating)]));
@@ -347,6 +348,21 @@ function fantasyPanel() {
   </section>`;
 }
 
+// What each thing scores in fantasy darts. Changes apply to every week,
+// past ones included, the next time points are worked out.
+function fantasyScoringPanel() {
+  const list = S.fxScoring ?? [];
+  return `<section class="panel futures-admin" data-fxs>
+    <h2>Fantasy scoring</h2>
+    <p class="muted small">Changing a value rescores every week, past ones included.</p>
+    <table class="points-list"><tbody>${list.map(r => `<tr>
+      <td class="l">${esc(r.label)}</td>
+      <td><input class="fut-price" type="number" step="1" data-fxs-pts="${esc(r.key)}" data-orig="${r.points}" value="${r.points}"></td>
+    </tr>`).join('')}</tbody></table>
+    <div class="row"><button class="primary" data-fxssave="1">Save scoring</button></div>
+  </section>`;
+}
+
 function futuresPanel() {
   const list = S.futures ?? [];
   if (!list.length) return '';
@@ -464,7 +480,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${futuresPanel()}${fantasyPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${futuresPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   applyFolds();
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
@@ -561,6 +577,7 @@ app.addEventListener('click', async e => {
   }
   if (await futuresClick(el)) return;
   if (await fantasyClick(el)) return;
+  if (await fantasyScoringClick(el)) return;
   if (el.dataset.accadj) {
     const box = app.querySelector(`[data-acctok="${el.dataset.accadj}"]`);
     const n = Math.trunc(Number(box?.value));
@@ -712,6 +729,19 @@ app.addEventListener('click', async e => {
   }
 });
 
+async function fantasyScoringClick(el) {
+  const box = el.closest('[data-fxs]');
+  if (!box || !el.dataset.fxssave) return false;
+  const pts = {};
+  box.querySelectorAll('[data-fxs-pts]').forEach(i => {
+    if (i.value.trim() !== '' && Number(i.value) !== Number(i.dataset.orig)) pts[i.dataset.fxsPts] = Math.round(Number(i.value));
+  });
+  if (!Object.keys(pts).length) { toast('Nothing changed'); return true; }
+  if (!confirm('Change the scoring? Every week is rescored with the new values, past ones included.')) return true;
+  await run(async () => check(await sb.rpc('super_fantasy_set_scoring', { p_points: pts })), 'Scoring saved');
+  return true;
+}
+
 async function fantasyClick(el) {
   const box = el.closest('[data-fx]');
   if (!box) return false;
@@ -808,6 +838,10 @@ async function futuresClick(el) {
 }
 
 app.addEventListener('input', e => {
+  if (e.target.dataset?.fxsPts !== undefined) {
+    e.target.classList.toggle('fut-changed', e.target.value.trim() !== e.target.dataset.orig);
+    return;
+  }
   if (e.target.dataset?.fxPrice !== undefined) {
     e.target.classList.toggle('fut-changed', e.target.value.trim() !== e.target.dataset.orig);
     return;
