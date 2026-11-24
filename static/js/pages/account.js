@@ -78,8 +78,18 @@ function accountHtml(a, bets, email) {
       <button data-act="logout">Log out</button>
     </section>`;
   }
-  const list = bets.length ? `<div class="betcards">${bets.map(b => betCard(b)).join('')}</div>`
-    : '<p class="muted">No bets yet.</p>';
+  // Open bets first, then settled ones, with cancelled bets folded away.
+  const open = bets.filter(b => b.status === 'open');
+  const settled = bets.filter(b => ['won', 'lost', 'void', 'cashed_out'].includes(b.status));
+  const cancelled = bets.filter(b => b.status === 'cancelled');
+  const cards = list => `<div class="betcards">${list.map(b => betCard(b)).join('')}</div>`;
+  const net = settled.reduce((t, b) => t + Number(b.payout ?? 0) - (b.status === 'void' ? 0 : Number(b.stake)), 0);
+  const list = !bets.length ? '<p class="muted">No bets yet.</p>' : `
+    <h3 class="bets-head">Open <span class="muted">${open.length}</span></h3>
+    ${open.length ? cards(open) : '<p class="muted small">Nothing open right now.</p>'}
+    ${settled.length ? `<details class="bets-group" open><summary><h3 class="bets-head">Settled <span class="muted">${settled.length}</span>
+      <span class="small ${net >= 0 ? 'bet-won' : 'bet-lost'}">${net >= 0 ? '+' : '−'}${fmtTokens(Math.abs(net))}</span></h3></summary>${cards(settled)}</details>` : ''}
+    ${cancelled.length ? `<details class="bets-group"><summary><h3 class="bets-head">Cancelled <span class="muted">${cancelled.length}</span></h3></summary>${cards(cancelled)}</details>` : ''}`;
   if (a.can_bet === false) {
     return `${backLink()}<section class="panel account-box">
       <h2>${esc(a.display_name)}</h2>
