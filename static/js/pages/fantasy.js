@@ -96,6 +96,8 @@ function squadHtml() {
 }
 
 function marketHtml() {
+  // Pick % only arrives once at least 5 teams exist.
+  const showPick = S.market.some(p => p.picked != null);
   const q = S.q.toLowerCase();
   const list = q ? S.market.filter(p => p.name.toLowerCase().includes(q)) : S.market;
   const inSquad = new Set(S.squad.filter(Boolean));
@@ -103,9 +105,9 @@ function marketHtml() {
   return `<section class="panel">
     <h2>Players</h2>
     <input id="fx-q" placeholder="Search players" value="${esc(S.q)}" autocomplete="off">
-    ${S.market.length ? `<table class="lb-table fx-market"><thead><tr><th class="l">Player</th><th>Price</th><th>Pts</th><th title="Share of teams that have them">Pick</th><th></th></tr></thead>
+    ${S.market.length ? `<table class="lb-table fx-market"><thead><tr><th class="l">Player</th><th>Price</th><th>Pts</th>${showPick ? '<th title="Share of teams that have them">Pick</th>' : ''}<th></th></tr></thead>
     <tbody>${list.map(p => `<tr>
-      <td class="l"><span class="fx-name">${photo(p.slug, p.name, 'fx-thumb')}${esc(p.name)}</span></td><td>${money(p.price)}</td><td title="Season points (last week ${p.last})">${p.season}</td><td>${p.picked ?? 0}%</td>
+      <td class="l"><span class="fx-name">${photo(p.slug, p.name, 'fx-thumb')}${esc(p.name)}</span></td><td>${money(p.price)}</td><td title="Season points (last week ${p.last})">${p.season}</td>${showPick ? `<td>${p.picked}%</td>` : ''}
       <td>${S.account && S.team?.next_gw ? (inSquad.has(p.id) ? '<span class="muted small">In</span>'
         : `<button class="small-pick odds-pick" data-add="${p.id}"${full ? ' disabled' : ''}>Add</button>`) : ''}</td>
     </tr>`).join('')}</tbody></table>` : '<p class="muted">Prices aren\'t set yet.</p>'}
@@ -207,7 +209,7 @@ function pickerRows() {
     const off = taken.has(p.id) || over;
     return `<button class="fx-pick-row${off ? ' off' : ''}" data-pickp="${p.id}"${off ? ' disabled' : ''}>
       ${photo(p.slug, p.name, 'fx-thumb')}<span class="fx-pick-name">${esc(p.name)}</span>
-      <span class="muted small">${taken.has(p.id) ? 'In team' : over ? 'Over budget' : `${p.picked ?? 0}% · ${p.season} pts`}</span>
+      <span class="muted small">${taken.has(p.id) ? 'In team' : over ? 'Over budget' : `${p.picked != null ? `${p.picked}% · ` : ''}${p.season} pts`}</span>
       <b>${money(p.price)}</b></button>`;
   }).join('');
 }
