@@ -27,7 +27,7 @@ export const returnsFor = (stake, price) => Math.floor((Number(stake) || 0) * (l
 
 const loginLink = () => `/account/?next=${encodeURIComponent(location.pathname + location.search)}`;
 
-// The slip under a market. slip: { kind, match_id | tournament_id, side | player_id,
+// The slip under a market. slip: { kind, match_id | tournament_id | future_id, side | player_id,
 // selection, price, stake, note }.
 export function slipHtml(slip) {
   if (!slip) return '';
@@ -82,6 +82,12 @@ export function myBetsHtml(list) {
 }
 
 async function placeBet(slip) {
+  // Futures are priced by hand, so the database checks the price itself.
+  if (slip.kind === 'future') {
+    const { data, error } = await sb.rpc('place_future_bet', { p_selection: slip.future_id, p_price: slip.price, p_stake: Number(slip.stake) });
+    if (error) throw new Error(error.message);
+    return data;
+  }
   const body = {
     kind: slip.kind, price: slip.price, stake: Number(slip.stake),
     ...(slip.kind === 'match' ? { match_id: slip.match_id, side: slip.side } : { tournament_id: slip.tournament_id, player_id: slip.player_id }),
@@ -100,6 +106,7 @@ async function placeBet(slip) {
 // betting server up (the first request after a quiet spell is the slow one)
 // and catches a moved price before the person presses Place.
 export async function quoteSlip(slip, ctx) {
+  if (slip.kind === 'future') return;
   const body = { kind: slip.kind, quote: true,
     ...(slip.kind === 'match' ? { match_id: slip.match_id, side: slip.side } : { tournament_id: slip.tournament_id, player_id: slip.player_id }) };
   try {
@@ -155,6 +162,7 @@ export async function slipEvent(e, ctx) {
   try {
     const r = await placeBet({ ...s, stake });
     if (r?.changed) {
+      if (!r.price) { toast('That price has been taken off'); ctx.set(null); ctx.render(); await ctx.changed?.(); ctx.render(); return true; }
       s.price = r.price;
       s.note = `Price moved to ${r.price}.`;
       ctx.render();

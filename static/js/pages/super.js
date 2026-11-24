@@ -44,6 +44,8 @@ async function loadInner() {
   S.friendlies = check(await sb.rpc('super_list_friendlies')) ?? [];
   S.openFriendlies = check(await sb.rpc('super_list_open_friendlies')) ?? [];
   S.accounts = check(await sb.rpc('super_list_accounts')) ?? [];
+  S.futures = check(await sb.rpc('super_futures')) ?? [];
+  if (S.accBetsFor) S.accBets = check(await sb.rpc('super_account_bets', { p_user: S.accBetsFor })) ?? [];
   S.seeds = new Map((check(await sb.from('player_seeds').select('player_id, rating')) ?? [])
     .map(r => [r.player_id, Number(r.rating)]));
   if (S.sel) {
@@ -279,12 +281,94 @@ function accountsPanel() {
     ${shown.length ? `<table class="points-list"><tbody>${shown.map(a => `<tr>
       <td><b>${esc(a.display_name)}</b>${a.banned ? ' <span class="error small">blocked</span>' : ''}
         <span class="muted small" style="display:block">${esc(a.email ?? '')} · ${Number(a.tokens).toLocaleString('en-GB')} tokens · ${a.bets} bets · ${a.messages} messages</span></td>
-      <td class="row" style="justify-content:flex-end;flex-wrap:nowrap">
+      <td class="row" style="justify-content:flex-end;flex-wrap:wrap">
         <input type="number" step="100" placeholder="± tokens" data-acctok="${a.user_id}" style="width:7rem">
         <button data-accadj="${a.user_id}">Give</button>
         <button data-accban="${a.user_id}" data-banned="${a.banned}" class="${a.banned ? '' : 'danger'}">${a.banned ? 'Unblock' : 'Block'}</button>
-      </td></tr>`).join('')}</tbody></table>` : '<p class="muted">Nobody yet.</p>'}
+        <button data-accbets="${a.user_id}"${a.bets ? '' : ' disabled'}>${S.accBetsFor === a.user_id ? 'Hide bets' : 'Bets'}</button>
+      </td></tr>${S.accBetsFor === a.user_id ? `<tr><td colspan="2">${accountBetsHtml(S.accBets ?? [])}</td></tr>` : ''}`).join('')}</tbody></table>` : '<p class="muted">Nobody yet.</p>'}
   </section>`;
+}
+
+const BET_STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cancelled: 'Cancelled' };
+const fmtN = n => Number(n ?? 0).toLocaleString('en-GB');
+const shortWhen = d => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+// Every bet one account has placed, newest first, with the net result.
+function accountBetsHtml(list) {
+  if (!list.length) return '<p class="muted small">No bets.</p>';
+  const settled = list.filter(b => b.status === 'won' || b.status === 'lost');
+  const net = settled.reduce((t, b) => t + Number(b.payout) - Number(b.stake), 0);
+  const open = list.filter(b => b.status === 'open');
+  return `<div class="acc-bets">
+    <p class="small">${list.length} bets · ${settled.length} settled, net ${net >= 0 ? '+' : ''}${fmtN(net)} · ${open.length} open, ${fmtN(open.reduce((t, b) => t + Number(b.stake), 0))} staked</p>
+    <table class="bets-list"><tbody>${list.map(b => `<tr>
+      <td class="l"><b>${esc(b.selection)}</b> at ${esc(b.price)}
+        <span class="muted small">${esc(b.market)}${b.event && !b.market.includes(b.event) ? ` · ${esc(b.event)}` : ''} · ${shortWhen(b.placed_at)}</span></td>
+      <td>${fmtN(b.stake)}</td>
+      <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+// ---------------------------------------------------------------- futures
+
+const FUT_STATUS = { draft: 'Draft (hidden)', open: 'Open', suspended: 'Suspended', closed: 'Closed', settled: 'Settled' };
+const localInput = d => {
+  if (!d) return '';
+  const x = new Date(d);
+  return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
+function futuresPanel() {
+  const list = S.futures ?? [];
+  if (!list.length) return '';
+  return `<section class="panel futures-admin">
+    <h2>Futures</h2>
+    <p class="muted small">Draft markets are hidden from everyone else. Only selections with a price show on the
+      <a href="/futures/">futures page</a>. Prices are fixed odds: changing one doesn't move bets already placed.</p>
+    ${list.map(futureMarketHtml).join('')}
+  </section>`;
+}
+
+function futureMarketHtml(m) {
+  const inMarket = new Set(m.selections.map(s => s.player_id));
+  const addable = S.players.filter(p => !inMarket.has(p.id));
+  const staked = m.selections.reduce((t, s) => t + Number(s.staked), 0);
+  const liability = m.selections.reduce((t, s) => t + Number(s.liability), 0);
+  return `<div class="fut-market" data-fm="${m.id}">
+    <h3>${esc(m.title)}</h3>
+    <div class="new-player-grid">
+      <label>Title <input type="text" data-fm-title value="${esc(m.title)}"></label>
+      <label>Status <select data-fm-status>${Object.entries(FUT_STATUS).map(([k, v]) =>
+        `<option value="${k}"${m.status === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label>Betting closes <input type="datetime-local" data-fm-closes value="${localInput(m.closes_at)}"></label>
+    </div>
+    <label>Rules <textarea data-fm-rules rows="2">${esc(m.rules ?? '')}</textarea></label>
+    <div class="row"><button class="primary" data-futsave="${m.id}">Save market</button>
+      <span class="muted small">${fmtN(staked)} staked · ${fmtN(liability)} to pay if every open bet wins</span></div>
+    <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">Player</th><th>Suggested</th><th>Price</th><th>Bets</th><th>Result</th></tr></thead>
+    <tbody>${m.selections.map(s => `<tr>
+      <td class="l">${esc(s.name)}</td>
+      <td class="fut-sugg">${esc(s.suggested ?? '')}</td>
+      <td><input class="fut-price" data-fs-price="${s.id}" data-orig="${esc(s.price ?? '')}" data-sugg="${esc(s.suggested ?? '')}" value="${esc(s.price ?? '')}" placeholder="off"></td>
+      <td class="small">${s.bets ? `${s.bets} · ${fmtN(s.staked)}` : ''}</td>
+      <td><select data-fs-res="${s.id}">
+          <option value=""${s.result ? '' : ' selected'}>–</option>
+          ${['won', 'lost', 'void'].map(r => `<option${s.result === r ? ' selected' : ''}>${r}</option>`).join('')}
+        </select>
+        <button data-futres="${s.id}">Set</button>
+        ${s.bets ? '' : `<button class="link" data-futrm="${s.id}" title="Remove">✕</button>`}</td>
+    </tr>`).join('')}</tbody></table></div>
+    <div class="row">
+      <button data-futsugg="${m.id}">Fill empty prices with suggestions</button>
+      <button class="primary" data-futprices="${m.id}">Save prices</button>
+    </div>
+    <div class="row">
+      <select data-fm-add><option value="">Add a player…</option>${addable.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+      <button data-futadd="${m.id}">Add</button>
+      <button class="danger" data-futrest="${m.id}">Settle everyone left as lost</button>
+    </div>
+  </div>`;
 }
 
 // Friendlies that haven't finished: being played now, or set up and left.
@@ -352,7 +436,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${futuresPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
 }
@@ -396,6 +480,17 @@ app.addEventListener('click', async e => {
       banned ? 'Account blocked' : 'Account unblocked');
     return;
   }
+  if (el.dataset.accbets) {
+    const u = el.dataset.accbets;
+    if (S.accBetsFor === u) { S.accBetsFor = null; S.accBets = null; render(); return; }
+    try {
+      S.accBets = check(await sb.rpc('super_account_bets', { p_user: u })) ?? [];
+      S.accBetsFor = u;
+    } catch (err) { toast(err.message); }
+    render();
+    return;
+  }
+  if (await futuresClick(el)) return;
   if (el.dataset.accadj) {
     const box = app.querySelector(`[data-acctok="${el.dataset.accadj}"]`);
     const n = Math.trunc(Number(box?.value));
@@ -547,7 +642,74 @@ app.addEventListener('click', async e => {
   }
 });
 
+async function futuresClick(el) {
+  const box = el.closest('[data-fm]');
+  if (!box) return false;
+  const q = sel => box.querySelector(sel);
+  const mid = Number(box.dataset.fm);
+  const market = (S.futures ?? []).find(m => m.id === mid);
+  if (el.dataset.futsugg) {
+    let n = 0;
+    box.querySelectorAll('[data-fs-price]').forEach(i => {
+      if (!i.value.trim() && i.dataset.sugg) { i.value = i.dataset.sugg; i.classList.add('fut-changed'); n++; }
+    });
+    toast(n ? `Filled ${n}. Check them, then Save prices.` : 'Nothing empty to fill', !n);
+    return true;
+  }
+  if (el.dataset.futprices) {
+    const prices = {};
+    box.querySelectorAll('[data-fs-price]').forEach(i => {
+      if (i.value.trim() !== i.dataset.orig) prices[i.dataset.fsPrice] = i.value.trim() || null;
+    });
+    if (!Object.keys(prices).length) { toast('No prices changed'); return true; }
+    await run(async () => check(await sb.rpc('super_future_prices', { p_market: mid, p_prices: prices })),
+      `${Object.keys(prices).length} price${Object.keys(prices).length === 1 ? '' : 's'} saved`);
+    return true;
+  }
+  if (el.dataset.futsave) {
+    const status = q('[data-fm-status]').value;
+    const closes = q('[data-fm-closes]').value;
+    if (status === 'open' && market?.status !== 'open'
+      && !confirm(`Open "${market?.title}"? Everyone will be able to see it and bet on the priced selections.`)) return true;
+    await run(async () => check(await sb.rpc('super_future_market', {
+      p_market: mid, p_title: q('[data-fm-title]').value, p_rules: q('[data-fm-rules]').value,
+      p_status: status, p_closes_at: closes ? new Date(closes).toISOString() : null,
+    })), 'Market saved');
+    return true;
+  }
+  if (el.dataset.futres) {
+    const sid = Number(el.dataset.futres);
+    const r = q(`[data-fs-res="${sid}"]`).value || null;
+    const sel = market?.selections.find(x => x.id === sid);
+    const what = r ? { won: 'a winner', lost: 'a loser', void: 'void (stakes back)' }[r] : 'unsettled (bets back to open)';
+    if (!confirm(`Settle ${sel?.name ?? 'this'} as ${what}? ${sel?.bets ?? 0} bets are affected.`)) return true;
+    await run(async () => check(await sb.rpc('super_future_settle', { p_selection: sid, p_result: r })), 'Settled');
+    return true;
+  }
+  if (el.dataset.futrm) {
+    await run(async () => check(await sb.rpc('super_future_remove', { p_selection: Number(el.dataset.futrm) })), 'Removed');
+    return true;
+  }
+  if (el.dataset.futadd) {
+    const pid = q('[data-fm-add]').value;
+    if (!pid) { toast('Pick a player'); return true; }
+    await run(async () => check(await sb.rpc('super_future_add', { p_market: mid, p_player: pid })), 'Added. Give them a price.');
+    return true;
+  }
+  if (el.dataset.futrest) {
+    const left = market?.selections.filter(x => !x.result).length ?? 0;
+    if (!confirm(`Settle all ${left} unsettled selections in "${market?.title}" as lost and mark the market settled? Set the winners (and any voids) first.`)) return true;
+    await run(async () => check(await sb.rpc('super_future_settle_rest', { p_market: mid })), 'Market settled');
+    return true;
+  }
+  return false;
+}
+
 app.addEventListener('input', e => {
+  if (e.target.dataset?.fsPrice !== undefined) {
+    e.target.classList.toggle('fut-changed', e.target.value.trim() !== e.target.dataset.orig);
+    return;
+  }
   if (e.target.id === 'p-filter') {
     S.filter = e.target.value;
     render();
