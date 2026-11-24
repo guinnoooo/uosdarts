@@ -16,7 +16,7 @@ let year = null;
 const who = name => {
   if (!name) return '<span class="muted">unknown</span>';
   return people(name).map(n => H.hasProfile(n)
-    ? `<a href="/order-of-merit/#player-${esc(H.slugOf(n))}">${esc(n)}</a>` : esc(n)).join(' &amp; ');
+    ? `<a href="/player/?p=${esc(H.slugOf(n))}">${esc(n)}</a>` : esc(n)).join(' &amp; ');
 };
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
