@@ -1129,3 +1129,10 @@ button.chat-who:hover { text-decoration: underline; }
 .fx-week ul { margin: .4rem 0 .2rem 1rem; padding: 0; }
 .fx-rules { padding-left: 1.1rem; }
 .fx-rules li { margin: .25rem 0; }
+
+/* Super admin: panels fold away under their headings */
+.fold-head { cursor: pointer; user-select: none; display: flex; align-items: center; gap: .5rem; }
+.fold-head::after { content: '▾'; font-size: .8em; color: var(--text-2); margin-left: auto; }
+.folded > .fold-head::after { content: '▸'; }
+.folded > :not(.fold-head) { display: none !important; }
+.folded > .fold-head { margin-bottom: 0; }
