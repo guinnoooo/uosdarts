@@ -71,7 +71,7 @@ function squadHtml() {
     const head = `<span class="fx-role"><b>${role.name}</b><span class="muted small">${role.note}</span></span>`;
     if (!id) {
       return `<li class="fx-slot empty${sel}${i === 5 ? ' bench' : ''}" data-slot="${i}">${photo(null, '+', 'fx-photo')}${head}
-        <span class="muted small">${S.pick !== null && S.squad[S.pick] && S.pick !== i ? 'Move here' : 'Empty'}</span></li>`;
+        <span class="muted small">${S.pick !== null && S.squad[S.pick] && S.pick !== i ? 'Move here' : 'Tap to pick'}</span></li>`;
     }
     return `<li class="fx-slot${sel}${i === 5 ? ' bench' : ''}" data-slot="${i}">
       ${photo(p?.slug, p?.name)}
@@ -163,17 +163,27 @@ const scoringHtml = () => `<dialog id="fx-scoring" class="fx-dialog">
   <h3>Rules</h3>
   <ul class="small fx-rules">
     <li>Teams lock when the week's first PC or major starts.</li>
-    <li>One free change a week, then 4 points per change.</li>
+    <li>One free change a week, then ${S.team?.hit ?? 8} points per change.</li>
     <li>Prices move a little each week with form.</li>
   </ul>
 </dialog>`;
 
 function render() {
-  app.innerHTML = `${squadHtml()}${historyHtml()}${boardHtml()}${marketHtml()}${scoringHtml()}`;
+  app.innerHTML = `${squadHtml()}${historyHtml()}${boardHtml()}${marketHtml()}${scoringHtml()}
+    <dialog id="fx-picker" class="fx-dialog">
+      <div class="fx-dialog-head"><h2 class="fx-pick-role"></h2><button class="link" data-act="close-scoring" aria-label="Close">✕</button></div>
+      <input id="fx-pq" placeholder="Search players" autocomplete="off">
+      <div class="fx-pick-list"></div>
+    </dialog>`;
 }
 
 app.addEventListener('input', e => {
   if (e.target.id === 'fx-name') { S.name = e.target.value; return; }
+  if (e.target.id === 'fx-pq') {
+    S.pq = e.target.value;
+    app.querySelector('#fx-picker .fx-pick-list').innerHTML = pickerRows();
+    return;
+  }
   if (e.target.id === 'fx-q') {
     S.q = e.target.value;
     render();
@@ -182,6 +192,35 @@ app.addEventListener('input', e => {
     box.setSelectionRange(box.value.length, box.value.length);
   }
 });
+
+// The player picker: a window with a search box, opened by tapping a role.
+function pickerRows() {
+  const slot = S.picker;
+  const q = (S.pq ?? '').toLowerCase();
+  const taken = new Set(S.squad.filter((id, i) => id && i !== slot));
+  const room = Number(S.team?.budget ?? 0) - cost() + Number(byId(S.squad[slot])?.price ?? 0);
+  const list = S.market.filter(p => !q || p.name.toLowerCase().includes(q));
+  if (!list.length) return '<p class="muted small">No one matches.</p>';
+  return list.map(p => {
+    const over = Number(p.price) > room;
+    const off = taken.has(p.id) || over;
+    return `<button class="fx-pick-row${off ? ' off' : ''}" data-pickp="${p.id}"${off ? ' disabled' : ''}>
+      ${photo(p.slug, p.name, 'fx-thumb')}<span class="fx-pick-name">${esc(p.name)}</span>
+      <span class="muted small">${taken.has(p.id) ? 'In team' : over ? 'Over budget' : `${p.season} pts`}</span>
+      <b>${money(p.price)}</b></button>`;
+  }).join('');
+}
+
+function openPicker(slot) {
+  S.picker = slot;
+  S.pq = '';
+  const d = app.querySelector('#fx-picker');
+  d.querySelector('.fx-pick-role').textContent = ROLES[slot].name;
+  d.querySelector('#fx-pq').value = '';
+  d.querySelector('.fx-pick-list').innerHTML = pickerRows();
+  d.showModal();
+  d.querySelector('#fx-pq').focus();
+}
 
 app.addEventListener('click', async e => {
   // Picking a role: tap Move on a player, then tap the role they should go to.
@@ -192,15 +231,22 @@ app.addEventListener('click', async e => {
     if (S.pick !== null && S.pick !== to) {
       [S.squad[S.pick], S.squad[to]] = [S.squad[to], S.squad[S.pick]];
       S.pick = null;
-    } else if (!S.squad[to]) {
-      S.pick = S.pick === to ? null : to;   // the next Add fills this role
+      render();
+    } else {
+      openPicker(to);   // choose (or replace) who plays this role
     }
-    render();
     return;
   }
   if (!b) return;
   if (b.dataset.act === 'scoring') { app.querySelector('#fx-scoring')?.showModal(); return; }
   if (b.dataset.act === 'close-scoring') { b.closest('dialog')?.close(); return; }
+  if (b.dataset.pickp) {
+    S.squad[S.picker] = b.dataset.pickp;
+    S.pick = null;
+    app.querySelector('#fx-picker')?.close();
+    render();
+    return;
+  }
   if (b.dataset.add) {
     const i = S.pick !== null && !S.squad[S.pick] ? S.pick : S.squad.indexOf(null);
     if (i < 0) { toast('Squad full'); return; }
