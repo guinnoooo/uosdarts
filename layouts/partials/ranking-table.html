@@ -6,7 +6,7 @@
 {{ $pcOnly := .pcOnly | default false }}
 
 <div class="ranking-list-wrap">
-  <div class="ranking-list" id="ranking-list" data-pc-only="{{ $pcOnly }}" data-season="{{ $site.Params.season }}">
+  <div class="ranking-list" id="ranking-list" data-pc-only="{{ $pcOnly }}" data-season="{{ $site.Params.season }}" data-history="{{ partial "history-json.html" . }}">
     {{ range $ranked }}
       {{ $slug := urlize .name }}
       {{ $hasInfo := isset $site.Data.players $slug }}
@@ -72,6 +72,7 @@
           {{ end }}{{ end }}
         </div>
       {{ end }}
+      <div class="player-modal-honours" data-honours-for="{{ $slug }}"></div>
     </div>
   </dialog>
 {{ end }}

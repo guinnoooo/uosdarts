@@ -3,6 +3,7 @@
 // page is never blank.
 
 import { sb, esc } from '../db.js';
+import { loadHistory, honoursFor, honoursHtml } from '../history.js';
 
 const list = document.getElementById('ranking-list');
 const note = document.getElementById('ranking-note');
@@ -83,6 +84,7 @@ function modalHtml(p) {
           ${stat('avg', 'Average')}${stat('first9', 'First 9 Avg')}${stat('dbl_pct', 'Doubles')}
         </div>
       </div>
+      <div class="player-modal-honours" data-honours-for="${slug}"></div>
     </div>
   </dialog>`;
 }
@@ -180,7 +182,33 @@ function liveStats(data) {
   }
 }
 
+// Titles, Dartsity record and committee roles from data/history.
+async function fillHonours() {
+  if (!list.dataset.history) return;
+  try {
+    const H = await loadHistory(list.dataset.history);
+    for (const box of document.querySelectorAll('[data-honours-for]')) {
+      box.innerHTML = honoursHtml(honoursFor(H, box.dataset.honoursFor), esc);
+    }
+  } catch { /* the profiles still work without it */ }
+}
+
+// The history page links to /order-of-merit/#player-<slug>.
+function openFromHash() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (!id.startsWith('player-')) return;
+  const box = document.getElementById(id);
+  if (box && !box.open) box.showModal();
+}
+
 async function run() {
+  openFromHash();
+  await runTable();
+  await fillHonours();
+  openFromHash();
+}
+
+async function runTable() {
   const pcOnly = list.dataset.pcOnly === 'true';
   const season = list.dataset.season || '2026/27';
   try {

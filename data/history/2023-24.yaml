@@ -1,0 +1,146 @@
+# 2023/24. What each field means is explained at the top of data/history_names.yaml.
+season: 2023/24
+committee:
+- role: President
+  name: Lewis Forrest
+- role: Captain
+  name: Tom Jepson
+- role: Treasurer
+  name: Jack Newton
+- role: Secretary
+  name: Adam Butcher
+- role: Social Secretary
+  name: Aidan Wood
+- role: Social Media Secretary
+  name: Tom Halliday
+- role: Inclusions Officer
+  name: Elliot Hopkins
+- role: Dartselona Captain
+  name: Zack Sefton
+internal:
+- event: Pears Pairs Trophy
+  winner: Joe Hopkins & Lewis Forrest
+  runner_up: Jack Newton & Tom Burkill
+  semis:
+  - Aayaan Patel & Damien Reed
+  - Adam Butcher & Zack Sefton
+- event: Ham Cup
+  winner: Nathan Hennessy
+  runner_up: Conall Doughty
+  third: Max Orange
+  fourth: George Francis
+- event: Easter Egg Cup
+  winner: Lewis Forrest
+  runner_up: Matt Watts
+  third: Oli Graham
+  fourth: Nathan Hennessy
+- event: Premier League
+  winner: Lewis Forrest
+  runner_up: Matt Watts
+  semis:
+  - Aaron Heath
+  - Tom Jepson
+- event: Players Championship Finals
+  winner: Lewis Forrest
+  runner_up: Tom Jepson
+  third: Matt Watts
+  fourth: Luke Davies
+trophies:
+- title: UDUK Summer Showdown
+  kind: individual
+  winners:
+  - Adam Warner
+  detail: Beat James Buckby (Hallam) 3-0 in the final at the Magna Centre
+varsity:
+  name: Dartsity
+  result: won
+  score: 7-0
+  title: 8
+  captain: Tom Jepson
+  picks:
+  - Jack Quinn
+  - Lewis Forrest
+  - Luke Davies
+  - Matt Watts
+  qualifiers:
+  - name: First qualifier
+    winner: Tom Halliday
+    runner_up: Tom Graham
+    semis:
+    - Jack Newton
+    - Luke Humphreys
+  - name: Second qualifier
+    winner: Zack Sefton
+    runner_up: Oli Graham
+    semis:
+    - Aayaan Patel
+    - Tom Graham
+  matches:
+  - us: Jack Quinn
+    them: Oliver Pearce-Burgess
+    score: 3-2
+  - us: Zack Sefton
+    them: Jack Clucas
+    score: 3-2
+  - us: Tom Halliday
+    them: Oliver Wilson
+    score: 3-2
+  - us: Matt Watts
+    them: Filip Brom
+    score: 3-1
+  - us: Luke Davies
+    them: James Buckby
+    score: 3-1
+  - us: Tom Jepson
+    them: Morgan Shillito
+    score: 3-1
+  - us: Lewis Forrest
+    them: Dom Tofts
+    score: 3-1
+  highlights:
+  - The first 7-0 whitewash in Dartsity history.
+  - Matt Watts won it for Uni of at 4-0.
+  - Tom Jepson hit another Dartsity 180.
+notable:
+- 'The Uni Arms Academicals swept the Franchise Summer League: the Summer Bowl, the Singles Championship (Luke Davies) and the Pairs Championship (Adam Warner and Luke Davies).'
+awards:
+- award: Man of the Year
+  name: Matt Watts
+- award: Jobber of the Year
+  name: Tom Halliday
+- award: A Team Player of the Year
+  name: Matt Watts and Lewis Forrest
+- award: A Team Captain's Player of the Year
+  name: Luke Humphreys
+- award: B Team Player of the Year
+  name: Aidan Wood and Jack Kelly
+- award: B Team Captain's Player of the Year
+  name: Dan Wells
+- award: Franny Player of the Year
+  name: Matt Watts
+- award: Best Fresher
+  name: James Beer and Dan Wells
+- award: Most Improved
+  name: Tom Halliday
+- award: Least Improved
+  name: Adam Butcher
+- award: Worst Pop Tarts Graft
+  name: Aidan Wood
+- award: Biggest Lightweight
+  name: James Beer
+- award: Best Trio
+  name: James Beer, James Henderson and Dan Wells (the Boro Sandwich)
+- award: Best (Worst) Karaoke
+  name: Louis Healy (Suspicious Minds)
+- award: Dartselona Player of the Year
+  name: James Henderson
+- award: Moment of the Year
+  name: Winning Steel City Darts 7-0
+- award: Match of the Year
+  name: Lewis Forrest v Matt Watts (Premier League final)
+- award: Worst Match of the Year
+  name: James Beer v Adam Butcher at Wet Wednesday
+- award: Cutie Pie of the Year
+  name: James Beer
+- award: Cheekiest Monkey
+  name: Oliver Pearce-Burgess (Hallam)

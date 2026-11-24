@@ -1,0 +1,82 @@
+# 2019/20. What each field means is explained at the top of data/history_names.yaml.
+season: 2019/20
+committee:
+- role: President and Captain
+  name: Greg Batting
+- role: Vice President
+  name: Conall Doughty
+- role: Treasurer
+  name: Stephen Godfrey
+- role: Secretary
+  name: Ste Smith
+- role: Social Secretary and Dartselona Captain
+  name: Ryan Adamson
+- role: Media Secretary
+  name: Joe Hopkins
+- role: B Team Captain
+  name: Jordan Sollof
+- role: Inclusions Officer
+  name: Mike Chen
+- role: Tour Secretary
+  name: Ben Tomlinson
+internal:
+- event: Ham Cup
+  winner: Greg Batting
+  runner_up: Max Orange
+  third: Conall Doughty
+  fourth: Ste Smith
+- event: Easter Egg Cup
+  winner: Conall Doughty
+  runner_up: Tim Close
+  third: Jonny Stevens
+  fourth: Joe Hopkins
+- event: Premier League
+  winner: Greg Batting
+  runner_up: Adam Warner
+  semis:
+  - Conall Doughty
+  - Nathan Hennessy
+trophies:
+- title: Rileys University Cup, Lincoln Championship
+  kind: individual
+  winners:
+  - Adam Warner
+varsity:
+  name: Dartsity
+  result: cancelled
+  captain: Greg Batting
+  picks:
+  - Adam Warner
+  - Conall Doughty
+  - Nathan Hennessy
+  qualifiers:
+  - name: First qualifier
+    winner: Tim Close
+    runner_up: Jonny Stevens
+    semis:
+    - Olly Nunn
+    - Joe Hopkins
+  - name: Second qualifier
+    winner: Joe Hopkins and Jonny Stevens
+    semis:
+    - Karl Thorenwaite
+    - Stephen Godfrey
+    note: Both finalists qualified, so the final was not played
+  note: 'Squad: Greg Batting (c), Adam Warner, Conall Doughty, Nathan Hennessy, Tim Close, Jonny Stevens and Joe Hopkins. Scheduled for 20 March and cancelled because of lockdown.'
+awards:
+- award: Player's Player of the Year
+  name: Conall Doughty
+- award: Freshers of the Year
+  name: Joe Burniston and Olly Nunn
+- award: Worst Player of the Year
+  name: Mike Chen
+- award: Award for Not Being Touched
+  name: Jordan Sollof
+- award: Worst Excuse for Missing a Game
+  name: Mike Chen
+- award: Dartselona Player of the Year
+  name: Jonny Stevens
+- award: Karaoke Performance of the Year
+  name: Stephen Godfrey
+- award: Favourite Leaving Member
+  name: Conall Doughty

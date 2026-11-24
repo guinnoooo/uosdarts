@@ -1,0 +1,17 @@
+# 2007/08. What each field means is explained at the top of data/history_names.yaml.
+season: 2007/08
+internal:
+- event: Committee Tournament
+  winner: Danny Burgess
+  runner_up: Phil Jarvest
+- event: Sheffield Classic
+  winner: Danny Burgess
+  runner_up: Tim O'Neill
+- event: Ladder
+  winner: Danny Burgess
+  runner_up: Conall Kelly
+  third: Tim O'Neill
+varsity:
+  name: Varsity
+  result: lost
+  score: 1-12

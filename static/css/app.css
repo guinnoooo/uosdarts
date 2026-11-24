@@ -1190,3 +1190,39 @@ button.chat-who:hover { text-decoration: underline; }
 .fx-admin-team { margin: .75rem 0; }
 .fx-admin-team p { margin: 0 0 .25rem; }
 .fx-admin-team td:first-child { width: 9rem; }
+.futures-group { margin: 1.5rem 0 .5rem; }
+
+/* ---------------------------------------------------------------- history */
+.hist-tabs { display: flex; gap: .4rem; overflow-x: auto; margin: 0 0 1rem; padding-bottom: .25rem; }
+.hist-tabs button { white-space: nowrap; background: var(--surface); border: 1px solid var(--line); color: var(--text-2);
+  border-radius: 999px; padding: .4rem .85rem; font: inherit; font-size: .9rem; cursor: pointer; }
+.hist-tabs button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.hist-big { font-size: 1.1rem; margin: 0 0 .75rem; }
+.hist-big b { font-size: 1.6rem; color: var(--accent); }
+.hist-year { border-top: 1px solid var(--line); padding: .6rem 0; }
+.hist-year summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem; list-style: none; }
+.hist-year summary::-webkit-details-marker { display: none; }
+.hist-year summary::before { content: '▸'; color: var(--text-3); }
+.hist-year[open] summary::before { content: '▾'; }
+.hist-season { font-weight: 700; font-family: var(--mono); }
+.hist-res { font-weight: 600; }
+.hist-won, .hist-w { color: var(--good); }
+.hist-lost, .hist-l { color: var(--live); }
+.hist-cancelled { color: var(--text-3); }
+.hist-matches td.r { text-align: right; }
+.hist-score { font-family: var(--mono); text-align: center; white-space: nowrap; }
+.hist-notes { margin: .4rem 0; padding-left: 1.1rem; }
+.hist-notes li { margin: .2rem 0; }
+.hist-trophies { list-style: none; padding: 0; margin: 0; }
+.hist-trophies li { display: flex; gap: .6rem; padding: .5rem 0; border-top: 1px solid var(--line); }
+.hist-cup { font-size: 1.2rem; line-height: 1.3; }
+.hist-facts { list-style: none; padding: 0; margin: 0 0 .5rem; }
+.hist-facts li { padding: .2rem 0; }
+.panel h3 { margin-top: 1.2rem; }
+
+/* honours on the player profiles */
+.player-modal-honours:empty { display: none; }
+.player-modal-honours { margin-top: 1rem; }
+.honours-head { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin: 0 0 .3rem; }
+.honours { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
+.honours li { padding: .2rem 0; border-top: 1px solid var(--line); }

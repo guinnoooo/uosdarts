@@ -1,0 +1,44 @@
+# 2013/14. What each field means is explained at the top of data/history_names.yaml.
+season: 2013/14
+committee:
+- role: President
+  name: George Francis
+- role: Treasurer
+  name: James Douglas
+- role: Secretary
+  name: Dave Slattery
+- role: Captain
+  name: Tom Hogg
+- role: Social Secretary
+  name: Joe Maguire
+internal:
+- event: Ham Cup
+  winner: Dave Slattery
+  runner_up: George Francis
+  third: Max Orange
+  high_checkout: Dave Slattery (126)
+- event: Easter Egg Cup
+  winner: Steven Organ
+  runner_up: Tom Hogg
+  third: Max Orange
+  high_checkout: George Francis (116)
+- event: Home Brew Cup
+  winner: Tom Hogg
+  runner_up: Ed McCosh
+  third: Max Orange
+  high_checkout: Tom Hogg (127)
+- event: Sheffield Darts League
+  winner: Max Orange
+  runner_up: Tom Hogg
+  high_checkout: Rob Matthews (129)
+- event: Champions League
+  winner: Tom Hogg
+  runner_up: Max Orange
+  high_checkout: Tom Hogg (101)
+awards:
+- award: Captain's Player of the Year
+  name: Ellis Turner
+- award: Team's Player of the Year
+  name: Max Orange
+- award: Most Improved
+  name: Ed McCosh

@@ -1,0 +1,28 @@
+# 2011/12. What each field means is explained at the top of data/history_names.yaml.
+season: 2011/12
+committee:
+- role: President
+  name: Rob Worrall
+- role: Treasurer
+  name: Andy Warlow
+- role: Secretary
+  name: Mike McDermott
+internal:
+- event: Sheffield Darts League
+  winner: Daniel Dootson
+  runner_up: Tom Hogg
+  high_checkout: Martin Halton (130)
+- event: Ham Cup
+  winner: Rob Worrall
+  runner_up: Nick Hood
+  high_checkout: Joe Maguire (70)
+- event: Home Brew Cup
+  winner: Tom Hogg
+  runner_up: Adam Franklin
+awards:
+- award: Captain's Player of the Year
+  name: George Francis
+- award: Team's Player of the Year
+  name: Adam Franklin
+- award: Most Improved
+  name: Nick Travers

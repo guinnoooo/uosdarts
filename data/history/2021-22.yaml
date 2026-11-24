@@ -1,0 +1,119 @@
+# 2021/22. What each field means is explained at the top of data/history_names.yaml.
+season: 2021/22
+committee:
+- role: President
+  name: Olly Nunn
+- role: Captain
+  name: Callum Murton
+- role: Treasurer
+  name: Luke Davies
+- role: Social Secretary
+  name: Joe Burniston
+- role: Inclusions Officer
+  name: Tom Jepson
+- role: Dartselona Captain
+  name: Zack Sefton
+internal:
+- event: Ham Cup
+  winner: Conall Doughty
+  runner_up: Nathan Hennessy
+  third: Ed McCosh
+  fourth: Taylor Rothwell
+- event: Easter Egg Cup
+  winner: Jack Quinn
+  runner_up: Lewis Forrest
+  third: Tom Jepson
+  fourth: Dan Adams
+- event: Players Championship Finals
+  winner: Jack Lewis
+  runner_up: Jack Quinn
+  semis:
+  - Tom Jepson
+  - Dan Booth
+trophies:
+- title: NUDL Singles Champion
+  kind: individual
+  winners:
+  - Conall Doughty
+  detail: Beat Loughborough's Ryan Pass 5-1 in the final
+varsity:
+  name: Dartsity
+  result: won
+  score: 4-3
+  title: 6
+  captain: Luke Davies
+  picks:
+  - Nathan Hennessy
+  - Jonny Stevens
+  - Lewis Forrest
+  qualifiers:
+  - name: First qualifier
+    winner: Dan Booth
+    runner_up: Tom Jepson
+    semis:
+    - Cory Van Tongeren
+    - Zack Sefton
+  - name: Second qualifier
+    winner: Tom Jepson
+    runner_up: Olly Nunn
+    semis:
+    - Carl Cheetham
+    - Cory Van Tongeren
+  - name: Third qualifier
+    winner: Olly Nunn
+    runner_up: Ethan Curtis
+    semis:
+    - Tom Burkill
+    - Jack Quinn
+  matches:
+  - us: Lewis Forrest
+    them: Bart Timmer
+    score: 1-3
+  - us: Jonny Stevens
+    them: Nathan Hemmingway
+    score: 1-3
+  - us: Olly Nunn
+    them: Sam Taylor
+    score: 3-0
+  - us: Tom Jepson
+    them: Todd Haynes
+    score: 3-1
+  - us: Nathan Hennessy
+    them: Jamie Flint
+    score: 3-2
+  - us: Luke Davies
+    them: Deck Ingber
+    score: 3-0
+  - us: Dan Booth
+    them: Eddie Castaldo
+    score: 2-3
+  highlights:
+  - Luke Davies 106 checkout
+notable:
+- Adam Warner won the UK Open qualifier at Rileys Liverpool.
+- Adam Warner and Luke Davies won the Uni Arms Academicals' first major trophy, the Franchise League Pairs Championship.
+awards:
+- award: Man of the Year
+  name: Olly Nunn
+- award: Jobber of the Year
+  name: Luke Davies
+- award: A Team Player of the Year
+  name: Luke Davies
+- award: B Team Player of the Year
+  name: Damien Reed
+- award: Franny Player of the Year
+  name: Adam Warner
+- award: Best Fresher
+  name: Lewis Forrest
+- award: Most Improved
+  name: Cory Van Tongeren
+- award: Least Improved
+  name: Callum Murton
+- award: Worst Pop Tarts Graft
+  name: Olly Nunn
+- award: Biggest Lightweight
+  name: Carl Cheetham
+- award: Best Duo
+  name: Lewis Forrest and Jack Newton
+- award: Best (Worst) Karaoke
+  name: Adam Warner and Olly Nunn

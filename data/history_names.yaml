@@ -1,0 +1,28 @@
+# The history page (/history/) and the honours on each player's profile are
+# built from the files in data/history, one per season (2025-26.yaml and so
+# on). To add a season, copy the newest file and change it. Every field is
+# optional, so leave out anything you don't know.
+#
+#   season:     "2026/27"
+#   committee:  list of { role, name }
+#   internal:   list of { event, winner, runner_up, third, fourth, semis: [a, b], high_checkout, note }
+#               Pairs are written "Name & Name". Use the same event name every
+#               year (Ham Cup, Easter Egg Cup...) so the roll of honour lines up.
+#   varsity:    { name, result: won | lost | cancelled, score: "4-3" (ours first),
+#                 title: 9 (which title this was), venue, attendance, note,
+#                 captain, picks: [...],
+#                 qualifiers: list of { name, winner, runner_up, semis },
+#                 matches: list of { us, them, score: "3-1" (ours first), won, note }
+#                 highlights: [...] }
+#               "us" can be a list for a pairs match. Give "won: true" when the
+#               score isn't known.
+#   trophies:   list of { title, kind: team | individual | society, winners: [...], captain, detail }
+#               The trophy cabinet. The Stems is left out on purpose.
+#   notable:    list of sentences
+#   awards:     list of { award, name }
+#
+# Write each person's name the same way every time. The names below are
+# spelled differently from their player profile, so this maps them across.
+aliases:
+  Olly Nunn: oliver-nunn
+  Alby Jarman: alb-jarman

@@ -1,0 +1,189 @@
+# 2025/26. What each field means is explained at the top of data/history_names.yaml.
+season: 2025/26
+committee:
+- role: President
+  name: Aidan Wood
+- role: Vice President
+  name: Matt Duke
+- role: Captain
+  name: Lewis Forrest
+- role: Treasurer
+  name: Ben O'Callaghan
+- role: Secretary
+  name: Jack Warburton
+- role: Social Secretary
+  name: Barney Chaudhry
+- role: Social Secretary
+  name: Jake O'Neill
+- role: Social Media Secretary
+  name: Ruben Parker
+- role: Inclusions Officer
+  name: Tom Graham
+- role: Dartselona Captain
+  name: Cian Hughes
+internal:
+- event: Pears Pairs Trophy
+  winner: Ben O'Callaghan & Jack Kelly
+  runner_up: Mikey Guinness & Joe Hopkins
+  semis:
+  - Lewis Forrest & Adam Butcher
+  - Jack Newton & Jack Warburton
+  note: Double-in
+- event: Ham Cup
+  winner: Jonny Stevens
+  runner_up: Lewis Forrest
+  third: Nathan Hennessy
+  fourth: Jack Newton
+- event: Premier League
+  winner: James Streatfield
+  runner_up: Matt Watts
+  semis:
+  - Lewis Forrest
+  - Mikey Guinness
+- event: Easter Egg Cup
+  winner: Lewis Forrest
+  runner_up: Matt Watts
+  semis:
+  - Jack Lewis
+  - Luke Davies
+- event: Players Championship Finals
+  winner: Lewis Forrest
+  runner_up: Mikey Guinness
+  semis:
+  - Joe Hopkins
+  - Matt Duke
+trophies:
+- title: National Champions
+  kind: team
+  detail: Beat Durham 7-0, Leeds 6-4 and Lancaster 6-4 in the final at Leicester
+  winners:
+  - Lewis Forrest
+  - Ben O'Callaghan
+  - James Streatfield
+  - Oli Graham
+  - Mikey Guinness
+  - Matt Duke
+  - James Beer
+  - Matt Watts
+  captain: Lewis Forrest
+- title: UDUK Canvas Open
+  kind: individual
+  winners:
+  - Lewis Forrest
+  detail: Beat James Streatfield 7-6 in an all-Sheffield final, averaging 70.12 to 69.05
+- title: 'SU Activities Awards: Event of the Year'
+  kind: society
+  detail: For Steel City Darts 2026
+varsity:
+  name: Dartsity
+  result: won
+  score: 4-3
+  title: 9
+  venue: Forge Warehouse
+  attendance: '832'
+  captain: Lewis Forrest
+  picks:
+  - Matt Watts
+  - Oli Graham
+  - James Streatfield
+  - Ben O'Callaghan
+  qualifiers:
+  - name: First qualifier
+    winner: Mikey Guinness
+    runner_up: Matt Duke
+    semis:
+    - Joel Keaney
+    - Alby Jarman
+  - name: Second qualifier
+    winner: Matt Duke
+    runner_up: Tom Graham
+    semis:
+    - Ruben Parker
+    - Aidan Garratt
+  matches:
+  - us: Oli Graham
+    them: Morgan Shillito
+    score: 1-3
+  - us: Mikey Guinness
+    them: Oliver Wilson
+    score: 3-0
+  - us: Matt Duke
+    them: Harry Taylor
+    score: 3-2
+  - us: Ben O'Callaghan
+    them: Hedley-Paul Keegan
+    score: 3-2
+  - us: Matt Watts
+    them: James Buckby
+    score: 1-3
+  - us: Lewis Forrest
+    them: Will Ellis
+    score: 3-1
+  - us: James Streatfield
+    them: Oliver Pearce-Burgess
+    score: 2-3
+awards:
+- award: Man of the Year
+  name: Lewis Forrest
+- award: Jobber of the Year
+  name: Tom Graham
+- award: A Team Player of the Year
+  name: James Streatfield
+- award: A Team Captain's Player of the Year
+  name: Mikey Guinness
+- award: B Team Player of the Year
+  name: Barney Chaudhry
+- award: B Team Captain's Player of the Year
+  name: Adam Butcher
+- award: C Team Player of the Year
+  name: Aidan Wood
+- award: C Team Captain's Player of the Year
+  name: Jack Warburton
+- award: Academicals Player of the Year
+  name: Olly Nunn
+- award: Academicals Captain's Player of the Year
+  name: Ben O'Callaghan
+- award: Understudies Player of the Year
+  name: Mikey Guinness
+- award: Understudies Captain's Player of the Year
+  name: Matt Duke
+- award: Slingers Player of the Year
+  name: Aidan Garratt
+- award: Slingers Captain's Player of the Year
+  name: Dan Campbell
+- award: Dodgy Tossers Player of the Year
+  name: Tommy Watson
+- award: Dodgy Tossers Captain's Player of the Year
+  name: Luke Egan
+- award: Overall Franny Player of the Year
+  name: James Streatfield
+- award: Best Fresher
+  name: Aidan Garratt
+- award: Most Improved
+  name: Dan Campbell
+- award: Least Improved
+  name: Jake O'Neill
+- award: Worst Pop Tarts Graft
+  name: Tom Sibley
+- award: Biggest Lightweight
+  name: Jack Warburton
+- award: Best Duo
+  name: Aidan Garratt and Sam Tookey
+- award: Best (Worst) Karaoke
+  name: James Henderson
+- award: Dartselona Player of the Year
+  name: Cian Hughes
+- award: Dartselona Captain's Player of the Year
+  name: Aidan Wood
+- award: Moment of the Year
+  name: Winning Dartsity
+- award: Match of the Year
+  name: Lewis Forrest v Will Ellis (Dartsity)
+- award: Worst Match of the Year
+  name: Ruben Parker v Jake O'Neill in the Premier League
+- award: James Beer Cutie Pie of the Year
+  name: James Beer
+- award: OPB Cheeky Monkey Award
+  name: Oliver Pearce-Burgess (Hallam)
+- award: Making Darts Sexy Award
+  name: Lewis Forrest

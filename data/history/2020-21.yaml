@@ -1,0 +1,36 @@
+# 2020/21. What each field means is explained at the top of data/history_names.yaml.
+season: 2020/21
+committee:
+- role: President
+  name: Ryan Adamson
+- role: Vice President
+  name: Jordan Sollof
+- role: Captain
+  name: Callum Murton
+- role: Treasurer
+  name: Olly Nunn
+- role: Secretary and Social Secretary
+  name: Joe Burniston
+- role: Inclusions Officer
+  name: Tom Wright
+- role: Dartselona Captain
+  name: Jonny Stevens
+internal:
+- event: Ham Cup
+  winner: Conall Doughty
+  runner_up: Nathan Hennessy
+  semis:
+  - Tom Jepson
+  - Joe Hopkins
+- event: Premier League
+  winner: Conall Doughty
+  runner_up: Adam Warner
+  semis:
+  - Tom Wright
+  - Oli Newall
+- event: Corona Cup
+  winner: Adam Warner
+  runner_up: Oli Newall
+  semis:
+  - Nathan Hennessy
+  - Luke Davies

@@ -1,0 +1,25 @@
+# 2008/09. What each field means is explained at the top of data/history_names.yaml.
+season: 2008/09
+internal:
+- event: Ladder
+  winner: Danny Burgess
+  runner_up: Paul Scattergood
+  third: Bob Mudd
+- event: Freshers Cup
+  winner: Danny Burgess
+  runner_up: Tom Horton
+- event: November Knockout
+  winner: Danny Burgess
+  runner_up: Paul Scattergood
+- event: Christmas Cracker
+  winner: Danny Burgess
+  runner_up: Bob Mudd
+  note: 301 double in, double out
+- event: February Ranking Event
+  winner: Paul Scattergood
+  runner_up: Bob Mudd
+  high_checkout: Bob Mudd (84)
+  note: The one that didn't have a name
+- event: Round the Board
+  winner: Paul Scattergood
+  runner_up: Jon Day

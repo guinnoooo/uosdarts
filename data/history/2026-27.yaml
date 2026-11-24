@@ -1,0 +1,23 @@
+# 2026/27. What each field means is explained at the top of data/history_names.yaml.
+season: 2026/27
+committee:
+- role: President
+  name: Ruben Parker
+- role: Vice President
+  name: Aidan Wood
+- role: Captain
+  name: Ben O'Callaghan
+- role: Treasurer
+  name: Dan Wells
+- role: Secretary
+  name: Cian Hughes
+- role: Social Secretary
+  name: Aidan Garratt
+- role: Social Secretary
+  name: Sam Tookey
+- role: Social Media Secretary
+  name: James Henderson
+- role: Inclusions Officer
+  name: Dan Campbell
+- role: Dartselona Captain
+  name: Tom Sibley

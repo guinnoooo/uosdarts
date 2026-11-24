@@ -1,0 +1,13 @@
+# 2009/10. What each field means is explained at the top of data/history_names.yaml.
+season: 2009/10
+internal:
+- event: Committee Tournament
+  winner: Danny Burgess
+  runner_up: Paul Scattergood
+  third: Bob Mudd
+- event: Sheffield Classic
+  winner: Paul Scattergood
+  runner_up: Harry Clasper
+- event: Sheffield Summer Showdown
+  winner: Danny Burgess
+  runner_up: Lewis Melland

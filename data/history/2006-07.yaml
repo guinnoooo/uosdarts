@@ -1,0 +1,9 @@
+# 2006/07. What each field means is explained at the top of data/history_names.yaml.
+season: 2006/07
+internal:
+- event: Committee Tournament
+  winner: Tim Jeffery
+  runner_up: Tim O'Neill
+- event: Sheffield Classic
+  winner: Tim Jeffery
+  runner_up: Matt Cansick

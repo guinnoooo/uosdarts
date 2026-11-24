@@ -408,7 +408,7 @@ function fantasyScoringPanel() {
 }
 
 function futuresPanel() {
-  const list = S.futures ?? [];
+  const list = (S.futures ?? []).filter(m => m.kind !== 'special');
   if (!list.length) return '';
   return `<section class="panel futures-admin">
     <h2>Futures</h2>
@@ -417,7 +417,21 @@ function futuresPanel() {
   </section>`;
 }
 
+// Specials: custom markets with options typed in by hand. They show on the
+// Futures page under their own heading and settle like any other future.
+function specialsPanel() {
+  const list = (S.futures ?? []).filter(m => m.kind === 'special');
+  return `<section class="panel futures-admin">
+    <h2>Specials</h2>
+    <p class="muted small">New specials start as drafts, hidden until you open them.</p>
+    <div class="row"><input type="text" id="sp-title" placeholder="e.g. Will anyone hit a 9-darter this season?" style="flex:1">
+      <button class="primary" data-act="sp-create">Create</button></div>
+    ${list.map(futureMarketHtml).join('')}
+  </section>`;
+}
+
 function futureMarketHtml(m) {
+  const special = m.kind === 'special';
   const inMarket = new Set(m.selections.map(s => s.player_id));
   const addable = S.players.filter(p => !inMarket.has(p.id));
   const staked = m.selections.reduce((t, s) => t + Number(s.staked), 0);
@@ -433,10 +447,10 @@ function futureMarketHtml(m) {
     <label>Rules <textarea data-fm-rules rows="2">${esc(m.rules ?? '')}</textarea></label>
     <div class="row"><button class="primary" data-futsave="${m.id}">Save market</button>
       <span class="muted small">${fmtN(staked)} staked · ${fmtN(liability)} to pay if every open bet wins</span></div>
-    <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">Player</th><th>Suggested</th><th>Price</th><th>Bets</th><th>Result</th></tr></thead>
+    <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">${special ? 'Option' : 'Player'}</th>${special ? '' : '<th>Suggested</th>'}<th>Price</th><th>Bets</th><th>Result</th></tr></thead>
     <tbody>${m.selections.map(s => `<tr>
       <td class="l">${esc(s.name)}</td>
-      <td class="fut-sugg">${esc(s.suggested ?? '')}</td>
+      ${special ? '' : `<td class="fut-sugg">${esc(s.suggested ?? '')}</td>`}
       <td><input class="fut-price" data-fs-price="${s.id}" data-orig="${esc(s.price ?? '')}" data-sugg="${esc(s.suggested ?? '')}" value="${esc(s.price ?? '')}" placeholder="off"></td>
       <td class="small">${s.bets ? `${s.bets} · ${fmtN(s.staked)}` : ''}</td>
       <td><select data-fs-res="${s.id}">
@@ -447,13 +461,18 @@ function futureMarketHtml(m) {
         ${s.bets ? '' : `<button class="link" data-futrm="${s.id}" title="Remove">✕</button>`}</td>
     </tr>`).join('')}</tbody></table></div>
     <div class="row">
-      <button data-futsugg="${m.id}">Fill empty prices with suggestions</button>
+      ${special ? '' : `<button data-futsugg="${m.id}">Fill empty prices with suggestions</button>`}
       <button class="primary" data-futprices="${m.id}">Save prices</button>
     </div>
     <div class="row">
-      <select data-fm-add><option value="">Add a player…</option>${addable.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
-      <button data-futadd="${m.id}">Add</button>
+      ${special
+        ? `<input type="text" data-sp-name placeholder="Option, e.g. Yes" style="flex:1">
+           <input type="text" data-sp-price placeholder="Price" style="width:5rem">
+           <button data-spadd="${m.id}">Add</button>`
+        : `<select data-fm-add><option value="">Add a player…</option>${addable.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+           <button data-futadd="${m.id}">Add</button>`}
       <button class="danger" data-futrest="${m.id}">Settle everyone left as lost</button>
+      ${special && !m.selections.some(x => x.bets) ? `<button class="danger" data-spdel="${m.id}">Delete</button>` : ''}
     </div>
   </div>`;
 }
@@ -523,7 +542,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${allBetsPanel()}${futuresPanel()}${fantasyTeamsPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${allBetsPanel()}${futuresPanel()}${specialsPanel()}${fantasyTeamsPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   applyFolds();
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
@@ -661,6 +680,12 @@ app.addEventListener('click', async e => {
       S.showReviewed = !S.showReviewed;
       render();
       break;
+    case 'sp-create': {
+      const title = val('#sp-title');
+      if (!title) { toast('Give the special a title'); break; }
+      await run(async () => check(await sb.rpc('super_special_create', { p_title: title })), 'Special created as a draft. Add the options.');
+      break;
+    }
     case 'add-player': {
       const name = val('#p-new');
       if (!name) { toast('Type a name first'); break; }
@@ -869,6 +894,18 @@ async function futuresClick(el) {
     const pid = q('[data-fm-add]').value;
     if (!pid) { toast('Pick a player'); return true; }
     await run(async () => check(await sb.rpc('super_future_add', { p_market: mid, p_player: pid })), 'Added. Give them a price.');
+    return true;
+  }
+  if (el.dataset.spadd) {
+    const name = q('[data-sp-name]').value.trim();
+    if (!name) { toast('Type the option first'); return true; }
+    await run(async () => check(await sb.rpc('super_special_add', { p_market: mid, p_name: name, p_price: q('[data-sp-price]').value.trim() || null })),
+      `${name} added`);
+    return true;
+  }
+  if (el.dataset.spdel) {
+    if (!confirm(`Delete "${market?.title}"? Nobody has bet on it.`)) return true;
+    await run(async () => check(await sb.rpc('super_special_delete', { p_market: mid })), 'Special deleted');
     return true;
   }
   if (el.dataset.futrest) {
