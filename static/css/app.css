@@ -883,6 +883,10 @@ button.link.danger-link { color: var(--live); display: block; margin: .3rem auto
 }
 .mc-legs small { font-size: .72rem; font-weight: 500; color: var(--text-3); margin-left: .3rem; }
 .friendly-format { margin-top: -.2rem; }
+.friendly-form [hidden] { display: none !important; }
+.friendly-side { display: grid; gap: .5rem; }
+.friendly-side:has(.side-label:not([hidden])) { border: 1px solid var(--line); border-radius: var(--r); padding: .55rem .7rem .7rem; }
+.side-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-mid); }
 
 /* ---------------------------------------------------------------- match chat */
 

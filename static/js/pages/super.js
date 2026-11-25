@@ -251,6 +251,7 @@ function chatPanel() {
 // towards each player's averages, first 9, doubles % and the odds model
 // (never 180s, 100+ checkouts, sheet legs, win rates or the order of merit).
 // Players never see any of this.
+const isPairs = f => /&/.test(`${f.p1_name}${f.p2_name}`);
 function reviewPanel() {
   const todo = S.friendlies.filter(f => f.counted === null);
   const done = S.friendlies.filter(f => f.counted !== null);
@@ -264,14 +265,14 @@ function reviewPanel() {
         <a href="/match/?id=${f.match_id}">${esc(f.p1_name)} ${score(f)} ${esc(f.p2_name)}</a>
         <span class="muted small">${when(f)} · ${f.visits} visits${f.remote ? ' · remote' : ''}</span>
       </div>
-      <div class="row">
+      ${isPairs(f) ? '<p class="muted small">Pairs: the visits aren\'t split between players, so it can\'t be counted.</p>' : `<div class="row">
         <label>${esc(f.p1_name)} <span class="muted small">(avg ${f.p1_avg ?? '–'})</span>
           <select data-side="1">${opts(f.match_p1_id)}</select></label>
         <label>${esc(f.p2_name)} <span class="muted small">(avg ${f.p2_avg ?? '–'})</span>
           <select data-side="2">${opts(f.match_p2_id)}</select></label>
-      </div>
+      </div>`}
       <div class="row">
-        <button data-frcount="${f.tournament_id}" class="primary">Played properly, count it</button>
+        ${isPairs(f) ? '' : `<button data-frcount="${f.tournament_id}" class="primary">Played properly, count it</button>`}
         <button data-frskip="${f.tournament_id}">Don't count</button>
         <button data-frdelete="${f.match_id}" class="danger">Delete</button>
       </div>
