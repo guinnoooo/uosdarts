@@ -1348,3 +1348,7 @@ tr.fut-sugg-row td { border-top: 0; padding-top: 0; padding-bottom: .7rem; }
 .fut-to { font-family: var(--mono); font-weight: 700; white-space: nowrap; }
 .fut-to.in { color: var(--good); }
 .fut-to.out { color: var(--live); }
+/* futures: a price that moved this week */
+.fut-arrow { font-size: .7rem; margin-right: .3rem; vertical-align: middle; }
+.fut-arrow.in { color: var(--good); }
+.fut-arrow.out { color: var(--live); }
