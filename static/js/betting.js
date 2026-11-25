@@ -27,7 +27,23 @@ export const returnsFor = (stake, price) => Math.floor((Number(stake) || 0) * (l
 // Decimal odds of a price on the ladder (6/4 -> 2.5), and of several multiplied (an acca).
 const decimalOf = f => Math.round((ladderValue(f) + 1) * 10000) / 10000;
 const accaDecimal = sels => Math.round(sels.reduce((t, x) => t * decimalOf(x.price), 1) * 10000) / 10000;
-const slipReturns = s => (s.kind === 'sels' ? Math.floor((Number(s.stake) || 0) * accaDecimal(s.sels)) : returnsFor(s.stake, s.price));
+// An acca's odds as a fraction, rounded down (never up) to one that reads
+// cleanly: X/1, X/2, X/3 or X/5 under 5/1, X/1 or X/2 up to 10/1, whole
+// numbers above that, 1/X under 1/5. The database rounds the same way
+// (nice_fraction in migration 085), so the slip shows what the bet pays.
+export function niceFraction(dec) {
+  const f = dec - 1;
+  let num = 0, den = 1, best = -1;
+  for (const b of [1, 2, 3, 5]) {
+    if ((f >= 10 && b > 1) || (f >= 5 && b > 2)) continue;
+    const a = Math.floor(f * b + 1e-7);
+    if (a / b > best + 1e-9) { best = a / b; num = a; den = b; }
+  }
+  if (num === 0 && f > 0) { num = 1; den = Math.ceil(1 / f - 1e-7); }
+  return { num, den, text: num === den ? 'Evens' : `${num}/${den}`, decimal: Math.round((1 + num / den) * 10000) / 10000 };
+}
+const accaOdds = sels => (sels.length > 1 ? niceFraction(accaDecimal(sels)) : { text: sels[0]?.price ?? '', decimal: accaDecimal(sels) });
+const slipReturns = s => (s.kind === 'sels' ? Math.floor((Number(s.stake) || 0) * accaOdds(s.sels).decimal) : returnsFor(s.stake, s.price));
 
 const loginLink = () => `/account/?next=${encodeURIComponent(location.pathname + location.search)}`;
 
@@ -321,11 +337,12 @@ function accaRemove(i) { ACCA = ACCA.filter((_, j) => j !== i); saveAcca(); }
 // The bar along the bottom of the page, and the acca slip when it's opened.
 export function accaBarHtml() {
   if (!ACCA.length) return '';
-  const dec = accaDecimal(ACCA);
+  const odds = accaOdds(ACCA);
+  const dec = odds.decimal;
   const a = ACCOUNT;
   if (!ACCA_UI.open) {
     return `<div class="acca-bar"><button class="acca-open" data-acca="open">
-      <span>Acca · ${ACCA.length} pick${ACCA.length === 1 ? '' : 's'}</span><b>${dec.toFixed(2)}</b></button></div>`;
+      <span>Acca · ${ACCA.length} pick${ACCA.length === 1 ? '' : 's'}</span><b>${esc(odds.text)}</b></button></div>`;
   }
   const can = a && !a.banned && a.can_bet !== false;
   return `<div class="acca-bar acca-bar-open">
@@ -335,7 +352,7 @@ export function accaBarHtml() {
         <div><b>${esc(x.label)}</b><span class="muted small">${esc(x.title)}</span></div>
         <span class="acca-price">${esc(x.price)}</span>
         <button class="link" data-acca="remove" data-i="${i}" aria-label="Remove">✕</button></li>`).join('')}</ul>
-      <p class="acca-total">Odds <b>${dec.toFixed(2)}</b> <span class="muted small">(every pick has to win)</span></p>
+      <p class="acca-total">Odds <b>${esc(odds.text)}</b> <span class="muted small">(every pick has to win)</span></p>
       ${ACCA_UI.note ? `<p class="small slip-note">${esc(ACCA_UI.note)}</p>` : ''}
       ${ACCA.length < 2 ? '<p class="muted small">Add a pick from another match to make an acca.</p>'
         : !a ? `<p class="small"><a href="${loginLink()}">Log in</a> to bet.</p>`
@@ -357,7 +374,7 @@ async function accaEvent(e, ctx) {
   if (box && e.type === 'input') {
     ACCA_UI.stake = box.value;
     const ret = document.querySelector('[data-acca-ret]');
-    if (ret) ret.textContent = fmtTokens(Math.floor((Number(box.value) || 0) * accaDecimal(ACCA)));
+    if (ret) ret.textContent = fmtTokens(Math.floor((Number(box.value) || 0) * accaOdds(ACCA).decimal));
     return true;
   }
   const btn = e.target.closest?.('[data-acca]');
@@ -388,7 +405,8 @@ async function accaEvent(e, ctx) {
         ACCA_UI.note = applyPrices(ACCA, r.prices) ?? 'Prices moved.';
         saveAcca();
       } else {
-        toast(`Acca placed: ${fmtTokens(stake)} at ${Number(r.decimal ?? accaDecimal(ACCA)).toFixed(2)}. Returns ${fmtTokens(Math.floor(stake * Number(r.decimal ?? accaDecimal(ACCA))))}.`, false);
+        const o = accaOdds(ACCA);
+        toast(`Acca placed: ${fmtTokens(stake)} at ${r.price ?? o.text}. Returns ${fmtTokens(Math.floor(stake * Number(r.decimal ?? o.decimal)))}.`, false);
         if (ACCOUNT && r?.tokens != null) ACCOUNT.tokens = r.tokens;
         ACCA = []; saveAcca();
         ACCA_UI = { open: false, stake, note: null, busy: false };
