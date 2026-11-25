@@ -83,15 +83,27 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
   // Knockout rounds count back from the final for per-round legs.
   const koLegs = (round, rounds) => t.round_legs?.ko?.[rounds - round] ?? t.knockout_legs_to_win;
 
+  // Who feeds each match, and the order to play them in, only depend on the
+  // draw, so they're worked out once per draw rather than once per run-through.
+  const plans = new WeakMap();
+  function planFor(rows) {
+    let p = plans.get(rows);
+    if (!p) {
+      const feeders = new Map();  // match id -> { 1: feeder id, 2: feeder id }
+      for (const m of rows) if (m.next_match_id) {
+        const f = feeders.get(m.next_match_id) ?? {};
+        f[m.next_slot] = m.id;
+        feeders.set(m.next_match_id, f);
+      }
+      p = { feeders, sorted: [...rows].sort((a, b) => a.round - b.round || a.slot - b.slot) };
+      plans.set(rows, p);
+    }
+    return p;
+  }
+
   function playKnockout(rows) {
     const winner = new Map();   // match id -> player id
-    const feeders = new Map();  // match id -> { 1: feeder id, 2: feeder id }
-    for (const m of rows) if (m.next_match_id) {
-      const f = feeders.get(m.next_match_id) ?? {};
-      f[m.next_slot] = m.id;
-      feeders.set(m.next_match_id, f);
-    }
-    const sorted = [...rows].sort((a, b) => a.round - b.round || a.slot - b.slot);
+    const { feeders, sorted } = planFor(rows);
     let champion = null;
     for (const m of sorted) {
       const side = n => {

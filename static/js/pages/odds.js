@@ -57,7 +57,7 @@ function matchCard(m) {
   const open = S.more.has(m.id);
   const more = open ? marketsFor(m) : null;
   const picked = accaPicks().find(x => x.match_id === m.id);
-  return `<div class="ob-match${picked ? ' ob-picked' : ''}">
+  return `<div class="ob-match${picked ? ' ob-picked' : ''}" data-card="${m.id}">
     <div class="ob-top">
       <span class="ob-round">${esc(matchLabel(m, m.ko_rounds))}${m.thin ? '<sup class="odds-star">*</sup>' : ''}</span>
       <a class="ob-link" href="/match/?id=${m.id}">Match page ›</a>
@@ -75,28 +75,51 @@ function matchCard(m) {
   </div>`;
 }
 
+function groupMeta(g) {
+  const inAcca = accaPicks().filter(x => g.list.some(m => m.id === x.match_id)).length;
+  return `${esc(day(g.starts))} · ${g.list.length} match${g.list.length === 1 ? '' : 'es'}${inAcca ? ` · <b>${inAcca} in acca</b>` : ''}`;
+}
+
+// A tap only changes one match's buttons, its event's count and the acca
+// bar, so only those are redrawn (a full redraw with every event open is
+// slow on a phone).
+function refreshPicks(matchId) {
+  const card = app.querySelector(`[data-card="${matchId}"]`);
+  if (!card) { render(); return; }
+  for (const btn of card.querySelectorAll('[data-add]')) {
+    let on = false;
+    try { on = accaHas(JSON.parse(btn.dataset.add)); } catch { /* leave it */ }
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+  }
+  card.classList.toggle('ob-picked', accaPicks().some(x => x.match_id === matchId));
+  const g = groups().find(x => x.list.some(m => m.id === matchId));
+  const meta = g && app.querySelector(`[data-group="${g.id}"] .ob-group-meta`);
+  if (meta) meta.innerHTML = groupMeta(g);
+  const bar = app.querySelector('.acca-bar');
+  const html = accaBarHtml();
+  if (bar) { if (html) bar.outerHTML = html; else bar.remove(); } else if (html) app.insertAdjacentHTML('beforeend', html);
+}
+
 function render() {
   if (S.error) { app.innerHTML = `<p class="error">${esc(S.error)}</p>`; return; }
   if (!S.loaded) { app.innerHTML = '<p class="muted">Loading…</p>'; return; }
   const gs = groups();
-  const picks = accaPicks();
   const thin = S.matches.some(m => m.thin);
   app.innerHTML = `
     <div class="ob-head">
       <h1>Odds</h1>
-      <p class="muted">Tap prices to build an acca: one pick per match, and every pick has to win. For a single bet, open the match page.</p>
+      <p class="muted">One pick per match.</p>
     </div>
     ${gs.length ? gs.map(g => {
-      const inAcca = picks.filter(x => g.list.some(m => m.id === x.match_id)).length;
       return `<details class="ob-group" data-group="${g.id}"${S.open.has(g.id) ? ' open' : ''}>
         <summary>
           <span class="ob-group-name">${esc(g.name)}</span>
-          <span class="ob-group-meta">${esc(day(g.starts))} · ${g.list.length} match${g.list.length === 1 ? '' : 'es'}${inAcca ? ` · <b>${inAcca} in acca</b>` : ''}</span>
+          <span class="ob-group-meta">${groupMeta(g)}</span>
         </summary>
         <div class="ob-list">${S.open.has(g.id) ? g.list.map(matchCard).join('') : ''}</div>
       </details>`;
-    }).join('') : `<div class="card empty"><p>No matches to bet on right now.</p>
-      <p class="muted small">Matches show up here once both players are known, and come off when they start.</p></div>`}
+    }).join('') : '<div class="card empty"><p>No matches to bet on right now.</p></div>'}
     ${thin ? '<p class="muted small odds-note">* Little record for one of the players, so these odds are rougher.</p>' : ''}
     ${accaBarHtml()}`;
 }
@@ -123,8 +146,10 @@ app.addEventListener('input', e => { slipEvent(e, ctx); });
 app.addEventListener('click', async e => {
   const b = e.target.closest('[data-add]');
   if (b) {
-    try { accaToggle(JSON.parse(b.dataset.add)); } catch { return; }
-    render();
+    let sel;
+    try { sel = JSON.parse(b.dataset.add); } catch { return; }
+    accaToggle(sel);
+    refreshPicks(sel.match_id);
     return;
   }
   await slipEvent(e, ctx);

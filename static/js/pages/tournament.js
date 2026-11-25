@@ -93,13 +93,33 @@ function computeOdds() {
   S.oddsAt = Date.now();
 }
 
-// A score update can arrive several times a second; the odds are redone at
-// most every few seconds.
+// Later updates are worked out in a background worker, so the page never
+// stalls while the run-throughs happen. Without one, they run here instead.
+let worker = null, job = 0;
+try {
+  worker = new Worker(new URL(`../outright-worker.js${new URL(import.meta.url).search}`, import.meta.url), { type: 'module' });
+  worker.onmessage = e => {
+    if (e.data.job !== job) return;
+    if (e.data.odds) S.odds = e.data.odds;
+    S.oddsAt = Date.now();
+    scheduleRender();
+  };
+  worker.onerror = () => { worker = null; };
+} catch { worker = null; }
+
+function refreshOdds() {
+  if (!S.oddsData) return;
+  if (!worker) { computeOdds(); scheduleRender(); return; }
+  job++;
+  worker.postMessage({ job, args: { ...S.oddsData, t: S.t, entrants: S.entrants, matches: S.matches.map(m => ({ ...m })) } });
+}
+
+// A leg can finish on several boards a minute; the odds are redone at most
+// every 10 seconds.
 let oddsTimer = null;
 function scheduleOdds() {
   if (!S.oddsData || oddsTimer) return;
-  oddsTimer = setTimeout(() => { oddsTimer = null; computeOdds(); scheduleRender(); },
-    Math.max(0, 4000 - (Date.now() - (S.oddsAt ?? 0))));
+  oddsTimer = setTimeout(() => { oddsTimer = null; refreshOdds(); }, Math.max(0, 10000 - (Date.now() - (S.oddsAt ?? 0))));
 }
 
 // Outright bets: open until the first match of the tournament starts.
@@ -148,9 +168,13 @@ function applyMatchRow(row) {
 
 // Several matches can update in the same instant, so coalesce into one redraw.
 let frame = null;
+// On a busy night the scores can change many times a second; this page is
+// an overview, so it redraws at most every 400 ms.
+let lastRender = 0;
 function scheduleRender() {
   if (frame) return;
-  frame = requestAnimationFrame(() => { frame = null; render(); });
+  const wait = Math.max(0, 400 - (performance.now() - lastRender));
+  frame = setTimeout(() => requestAnimationFrame(() => { frame = null; lastRender = performance.now(); render(); }), wait);
 }
 
 function koRounds() {
