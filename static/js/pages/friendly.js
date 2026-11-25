@@ -1,7 +1,8 @@
 import { sb, esc, toast, ensureSignedIn, showLoadError } from '../db.js';
 
-// Start a friendly: two names, a length and a start score. Friendlies don't
-// count for anything; they're there so a match can be scored and watched.
+// Start a friendly: two names (or two pairs), a length and a start score.
+// Friendlies don't count for anything; they're there so a match can be
+// scored and watched. A pair is sent as "A & B", the way team doubles are.
 const app = document.getElementById('app');
 const range = n => Array.from({ length: n }, (_, i) => i + 1);
 const PW_KEY = 'uosdarts:friendlypw';
@@ -23,8 +24,22 @@ async function init() {
   const names = (players.data ?? []).map(p => `<option value="${esc(p.name)}">`).join('');
   app.innerHTML = `<form class="panel narrow friendly-form" data-form="friendly">
     <h1>Start a friendly</h1>
-    <label>Player 1 <input name="p1" list="player-names" maxlength="40" autocomplete="off" required></label>
-    <label>Player 2 <input name="p2" list="player-names" maxlength="40" autocomplete="off" required></label>
+    <div class="seg friendly-format" role="radiogroup" aria-label="Singles or pairs">
+      <label><input type="radio" name="kind" value="singles" checked> Singles</label>
+      <label><input type="radio" name="kind" value="pairs"> Pairs</label>
+    </div>
+    <div class="friendly-side">
+      <span class="side-label pairs-only" hidden>Pair 1</span>
+      <label><span class="singles-only">Player 1</span><span class="pairs-only" hidden>Player</span>
+        <input name="p1" list="player-names" maxlength="40" autocomplete="off" required></label>
+      <label class="pairs-only" hidden>Partner <input name="p1b" list="player-names" maxlength="40" autocomplete="off"></label>
+    </div>
+    <div class="friendly-side">
+      <span class="side-label pairs-only" hidden>Pair 2</span>
+      <label><span class="singles-only">Player 2</span><span class="pairs-only" hidden>Player</span>
+        <input name="p2" list="player-names" maxlength="40" autocomplete="off" required></label>
+      <label class="pairs-only" hidden>Partner <input name="p2b" list="player-names" maxlength="40" autocomplete="off"></label>
+    </div>
     <datalist id="player-names">${names}</datalist>
     <p class="muted small">Pick names from the list for GuinnessBet odds. Friendlies don't count towards any stats.</p>
     <div class="seg friendly-format" role="radiogroup" aria-label="Format">
@@ -42,10 +57,10 @@ async function init() {
         <select name="start">${[501, 301, 701, 170, 101].map(n => `<option ${n === 501 ? 'selected' : ''}>${n}</option>`).join('')}</select>
       </label>
     </div>
-    <label class="check-row"><input type="checkbox" name="remote"> Remote: each player scores their own throws on their own phone</label>
+    <label class="check-row"><input type="checkbox" name="remote"> Remote: each side scores their own throws on their own phone</label>
     <div class="remote-only" hidden>
       <label>Match password <input name="rpw" type="text" autocomplete="off" minlength="4" maxlength="40" placeholder="At least 4 characters"></label>
-      <p class="muted small">You're player 1. Send player 2 the match link and this password.</p>
+      <p class="muted small">You score for <span class="singles-only">player 1</span><span class="pairs-only" hidden>pair 1</span>. Send the other side the match link and this password.</p>
     </div>
     <label>Friendly password <input name="pw" type="password" autocomplete="off" value="${esc(savedPw())}" required></label>
     <button class="primary big">Start scoring</button>
@@ -58,12 +73,14 @@ app.addEventListener('submit', async e => {
   const f = new FormData(e.target);
   const btn = e.target.querySelector('button');
   btn.disabled = true;
+  const pairs = f.get('kind') === 'pairs';
+  const side = n => [f.get(`p${n}`), pairs ? f.get(`p${n}b`) : null].map(x => String(x ?? '').trim()).filter(Boolean).join(' & ');
   try {
     await ensureSignedIn();
     const { data: matchId, error } = await sb.rpc('create_friendly', {
       p_password: String(f.get('pw')),
-      p_p1: String(f.get('p1')),
-      p_p2: String(f.get('p2')),
+      p_p1: side(1),
+      p_p2: side(2),
       p_legs: Number(f.get('legs')),
       p_start: Number(f.get('start')),
       p_sets: f.get('format') === 'sets' ? Number(f.get('sets')) : null,
@@ -81,6 +98,13 @@ app.addEventListener('submit', async e => {
 
 // Sets: pick the number of sets, and the legs box becomes legs per set.
 app.addEventListener('change', e => {
+  if (e.target.name === 'kind') {
+    const pairs = e.target.value === 'pairs';
+    app.querySelectorAll('.pairs-only').forEach(el => { el.hidden = !pairs; });
+    app.querySelectorAll('.singles-only').forEach(el => { el.hidden = pairs; });
+    app.querySelectorAll('[name="p1b"], [name="p2b"]').forEach(el => { el.required = pairs; });
+    return;
+  }
   if (e.target.name === 'remote') {
     const box = app.querySelector('.remote-only');
     box.hidden = !e.target.checked;
