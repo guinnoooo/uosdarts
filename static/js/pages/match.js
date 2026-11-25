@@ -4,7 +4,8 @@ import {
 import { mountChat } from '../chat.js';
 import { oomScores, matchChance, liveChance, pctPair, isThin, teamPreview } from '../winprob.js';
 import { bookPrices } from '../prices.js';
-import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml, quoteSlip } from '../betting.js';
+import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml, quoteSlip, accaBarHtml, accaHas } from '../betting.js';
+import { matchMarkets, marketsAllowed, pickLabel } from '../markets.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -50,8 +51,15 @@ async function loadInner() {
   // Upcoming matches use it for the preview, finished ones for the win probability chart.
   if (S.match.status !== 'live' && S.match.player1_id && S.match.player2_id && S.preview === undefined) {
     S.preview = null;   // so a second load doesn't fetch it again
-    const pv = await sb.rpc('match_preview', { p_match: id });
+    // The scoring markets also need each player's visit record; only before the match.
+    const wantFigs = S.match.status === 'pending' && marketsAllowed(S.match).stats;
+    const [pv, fg] = await Promise.all([
+      sb.rpc('match_preview', { p_match: id }),
+      wantFigs ? sb.rpc('market_figures', { p_match: id }) : Promise.resolve({ data: null }),
+    ]);
     S.preview = pv.error ? null : pv.data;
+    S.figs = fg.error ? null : fg.data;
+    S.markets = undefined;
     // Order of merit standing, a small extra factor in the GuinnessBet prices.
     if (S.preview) {
       const oom = await sb.rpc('oom_table');
@@ -593,12 +601,13 @@ function oddsBlock(pv) {
   const thin = isThin(pv);
   const bet = canBet();
   const cell = (n, price) => bet
-    ? `<button class="odds-pick${S.slip?.side === n ? ' on' : ''}" data-bet="${n}"><span class="odds-name">${esc(nameOf(n))}</span><b>${price}</b></button>`
+    ? `<button class="odds-pick${S.slip?.kind === 'match' && S.slip?.side === n ? ' on' : ''}${accaHas({ match_id: id, market: 'win', pick: String(n) }) ? ' in-acca' : ''}" data-bet="${n}"><span class="odds-name">${esc(nameOf(n))}</span><b>${price}</b></button>`
     : `<div><span class="odds-name">${esc(nameOf(n))}</span><b>${price}</b></div>`;
   return `<div class="odds">
     <h3>GuinnessBet${thin ? '<sup class="odds-star">*</sup>' : ''}</h3>
     <div class="odds-row">${cell(1, a)}${cell(2, b)}</div>
-    ${bet ? slipHtml(S.slip) : ''}
+    ${bet && S.slip?.kind === 'match' ? slipHtml(S.slip) : ''}
+    ${bet ? marketsHtml() : ''}
     ${myBetsHtml(S.myBets)}
     ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players in this match</p>' : ''}
   </div>`;
@@ -610,11 +619,61 @@ const betCtx = { slip: () => S.slip, set: v => { S.slip = v; }, render: () => re
 
 function openSlip(side) {
   if (!S.prices) return;
-  S.slip = { kind: 'match', match_id: id, side, selection: nameOf(side), price: S.prices[side - 1], stake: S.slip?.stake ?? 100 };
+  const price = S.prices[side - 1];
+  S.slip = { kind: 'match', match_id: id, side, selection: nameOf(side), price, stake: S.slip?.stake ?? 100,
+    accaable: true, sels: [{ match_id: id, market: 'win', pick: String(side), label: nameOf(side), title: `${nameOf(1)} v ${nameOf(2)}`, price }] };
   loadAccount().then(render, render);
   render();
   quoteSlip(S.slip, betCtx);
 }
+
+// The other markets (markets.js): correct score, handicap, legs, first leg,
+// 100+ visits, averages and a 180. Worked out once per preview, never while
+// the match is being scored.
+function marketList() {
+  if (S.markets === undefined) {
+    S.markets = S.preview && !S.preview.unavailable && S.match.status === 'pending'
+      ? matchMarkets(S.preview, S.match, S.figs ?? {}, [nameOf(1), nameOf(2)]) : [];
+  }
+  return S.markets;
+}
+
+function marketsHtml() {
+  const list = marketList();
+  if (!list.length) return '';
+  const open = S.slip?.kind === 'sels' ? S.slip.sels[0].market : null;
+  const one = mk => `<details class="mk"${open === mk.key || S.mkOpen?.has(mk.key) ? ' open' : ''} data-mkd="${mk.key}">
+    <summary>${esc(mk.title)}</summary>
+    <div class="mk-picks${mk.multi ? ' mk-multi' : ''}">${mk.outcomes.map(o => {
+      const on = open === mk.key && S.slip.sels[0].pick === o.pick;
+      const inAcca = accaHas({ match_id: id, market: mk.key, pick: o.pick });
+      return `<button class="odds-pick small-pick mk-pick${on ? ' on' : ''}${inAcca ? ' in-acca' : ''}" data-mk="${mk.key}" data-mkpick="${esc(o.pick)}">
+        <span class="odds-name">${esc(o.label)}</span><b>${esc(o.price)}</b></button>`;
+    }).join('')}</div>
+    ${open === mk.key ? slipHtml(S.slip) : ''}
+  </details>`;
+  return `<div class="markets"><h4 class="mk-head">More markets</h4>${list.map(one).join('')}</div>`;
+}
+
+function openMarketSlip(key, pick) {
+  const mk = marketList().find(x => x.key === key);
+  const o = mk?.outcomes.find(x => x.pick === pick);
+  if (!o) return;
+  const label = pickLabel(mk, o);
+  S.slip = { kind: 'sels', selection: label, price: o.price, stake: S.slip?.stake ?? 100, accaable: true,
+    sels: [{ match_id: id, market: key, pick, label, title: `${nameOf(1)} v ${nameOf(2)}: ${mk.title}`, price: o.price }] };
+  loadAccount().then(render, render);
+  render();
+  quoteSlip(S.slip, betCtx);
+}
+
+// Which markets are open, so a redraw doesn't fold them back up.
+app.addEventListener('toggle', e => {
+  const d = e.target.closest?.('[data-mkd]');
+  if (!d) return;
+  S.mkOpen ??= new Set();
+  if (d.open) S.mkOpen.add(d.dataset.mkd); else S.mkOpen.delete(d.dataset.mkd);
+}, true);
 
 const winRate = (won, played) => (played ? `${Math.round((won / played) * 100)}%` : null);
 
@@ -820,6 +879,7 @@ async function savePlayers(form) {
     S.pick = null;
     S.oomPlayers = null;   // someone may have been added
     S.preview = undefined; // new players, new prices
+    S.markets = undefined;
     S.names = undefined;
     S.slip = null;
     await load();
@@ -920,7 +980,8 @@ function render() {
     ${scoring ? '' : statsTable()}
     ${m.status === 'complete' ? winChart() : ''}
     ${scoring ? '' : allLegs(m.status !== 'complete')}
-    ${S.pendingCheckout ? checkoutModal() : S.pendingDoubles ? doublesModal() : S.pendingBull && scoring ? bullModal() : ''}`;
+    ${S.pendingCheckout ? checkoutModal() : S.pendingDoubles ? doublesModal() : S.pendingBull && scoring ? bullModal() : ''}
+    ${m.status === 'live' ? '' : accaBarHtml()}`;
   // Stops a fast double tap on the keypad zooming the page on phones.
   document.documentElement.classList.toggle('scoring', scoring);
   track();
@@ -1018,6 +1079,8 @@ app.addEventListener('click', async e => {
   if (e.target.closest('#match-chat')) return;   // the chat handles its own clicks
   const pick = e.target.closest('[data-bet]');
   if (pick) { openSlip(Number(pick.dataset.bet)); return; }
+  const mkPick = e.target.closest('[data-mk]');
+  if (mkPick) { openMarketSlip(mkPick.dataset.mk, mkPick.dataset.mkpick); return; }
   if (await slipEvent(e, betCtx)) return;
   const el = e.target.closest('button');
   if (!el) return;

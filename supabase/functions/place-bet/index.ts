@@ -15,6 +15,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { MODEL, oomScore, matchChance } from './winprob.js';
 import { previewFor, matchPrices, decimalOf } from './prices.js';
 import { outrightOdds, outrightPrice } from './outright.js';
+import { MK, matchMarkets, pickLabel } from './markets.js';
 
 const MATCH_SELECT =
   '*, p1:players!matches_player1_id_fkey(id,name), p2:players!matches_player2_id_fkey(id,name)';
@@ -46,6 +47,7 @@ Deno.serve(async req => {
     // from the snapshot taken as each match started. Anyone can ask; it
     // only ever fills in what's missing.
     if (body.kind === 'prematch') return reply(await fillPrematch(db));
+    if (body.kind === 'sels') return reply(await placeSelections(db, req, body, stake));
     if (body.kind !== 'match' && body.kind !== 'outright') return reply({ error: 'Bad request' }, 400);
     // Who's asking (not needed for a quote) and the price, worked out side by side.
     const auth = req.headers.get('Authorization') ?? '';
@@ -142,4 +144,70 @@ async function fillPrematch(db: any) {
     if (e) throw new Error(e.message);
   }
   return { filled: rows.length };
+}
+
+
+// ---------------------------------------------------------------- match markets and accas
+//
+// body: { kind: 'sels', sels: [{ match_id, market, pick }], prices: [what the
+// page showed, in the same order], stake, quote? }. One selection is a bet on
+// a match market; two or more are an acca (one pick per match, no futures).
+// Every price is worked out again here; if any has moved, nothing is placed.
+
+async function placeSelections(db: any, req: Request, body: Record<string, unknown>, stake: number) {
+  const raw = Array.isArray(body.sels) ? body.sels as Record<string, unknown>[] : [];
+  if (!raw.length) throw new Error('Nothing to bet on');
+  if (raw.length > 50) throw new Error('Too many picks');
+  const ids = raw.map(s => String(s.match_id));
+  if (new Set(ids).size !== ids.length) throw new Error('An acca can only have one pick from each match');
+
+  const auth = req.headers.get('Authorization') ?? '';
+  const who = body.quote ? Promise.resolve(null)
+    : createClient(URL_, ANON, { global: { headers: { Authorization: auth } } }).auth.getUser().then(r => r.data.user, () => null);
+  const [user, oom] = await Promise.all([who, db.rpc('oom_table')]);
+  const priced = await Promise.all(raw.map(s => priceSelection(db, oom.data ?? [], String(s.match_id), String(s.market), String(s.pick))));
+  const prices = priced.map(p => p.price);
+  if (body.quote) return { prices, version: MODEL.version, markets_version: MK.version };
+  if (!user || user.is_anonymous) throw new Error('Log in to bet');
+  const shown = Array.isArray(body.prices) ? body.prices.map(String) : [];
+  if (prices.some((p, i) => p !== shown[i])) return { changed: true, prices };
+
+  const { data, error } = await db.rpc('place_selections_internal', {
+    p_user: user.id, p_stake: stake, p_sels: priced, p_version: MODEL.version * 100 + MK.version,
+  });
+  if (error) throw new Error(error.message);
+  return { placed: true, prices, ...data };
+}
+
+async function priceSelection(db: any, oomRows: unknown[], matchId: string, market: string, pick: string) {
+  const [mr, block, pr, nr, fr] = await Promise.all([
+    db.from('matches').select(MATCH_SELECT).eq('id', matchId).single(),
+    db.rpc('match_bet_block', { p_match: matchId }),
+    db.rpc('match_preview', { p_match: matchId }),
+    market === 'win' ? db.rpc('names_preview', { p_match: matchId }) : Promise.resolve({ data: null }),
+    market === 'win' ? Promise.resolve({ data: null }) : db.rpc('market_figures', { p_match: matchId }),
+  ]);
+  const m = mr.data;
+  if (mr.error || !m) throw new Error('Match not found');
+  const name1 = m.p1?.name ?? m.p1_name, name2 = m.p2?.name ?? m.p2_name;
+  if (block.data) throw new Error(`${name1} v ${name2}: ${block.data}`);
+  const linked = m.player1_id && m.player2_id;
+  const preview = linked && !pr.error ? pr.data : null;
+  const names = !linked && !nr.error ? nr.data : null;
+  const pv = previewFor(m, { preview, names, oomRows, name1, name2 });
+  if (!pv) throw new Error(`No odds for ${name1} v ${name2}`);
+  const title = `${name1} v ${name2}`;
+  if (market === 'win') {
+    if (pick !== '1' && pick !== '2') throw new Error('Pick a side');
+    const price = matchPrices(pv, m)[Number(pick) - 1];
+    return { match_id: matchId, market, pick, line: null, fav: null, title, label: pick === '1' ? name1 : name2, price, decimal: decimalOf(price) };
+  }
+  const mk = matchMarkets(pv, m, fr.data ?? {}, [name1, name2]).find((x: any) => x.key === market);
+  const o = mk?.outcomes.find((x: any) => x.pick === pick);
+  if (!mk || !o) throw new Error(`That market isn't available for ${title}`);
+  return {
+    match_id: matchId, market, pick, line: mk.line ?? null, fav: mk.fav ?? null,
+    title: `${title}: ${mk.title}`, label: pickLabel(mk, o),
+    price: o.price, decimal: o.decimal,
+  };
 }

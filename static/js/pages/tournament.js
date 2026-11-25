@@ -3,7 +3,7 @@ import { standings } from '../fixtures.js';
 import { matchCard, setWatching } from '../ui.js';
 import { oomScore } from '../winprob.js';
 import { outrightOdds, outrightPrice } from '../outright.js';
-import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml, quoteSlip } from '../betting.js';
+import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml, quoteSlip, accaBarHtml } from '../betting.js';
 
 const app = document.getElementById('app');
 const id = qs('id');
@@ -329,7 +329,8 @@ function render() {
     </div>
     ${S.tab === 'matches' && (S.odds?.length ?? 0) >= 2 ? '' : myBetsHtml(S.myBets)}
     ${tabs()}
-    <div class="tab-body">${body}</div>`;
+    <div class="tab-body">${body}</div>
+    ${accaBarHtml()}`;
   if (keepX) {
     const nb = app.querySelector('.ko-bracket');
     if (nb) nb.scrollLeft = keepX;
