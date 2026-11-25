@@ -450,9 +450,12 @@ function fantasyScoringPanel() {
 function futuresPanel() {
   const list = (S.futures ?? []).filter(m => m.kind !== 'special');
   if (!list.length) return '';
+  const pending = list.reduce((t, m) => t + m.selections.filter(x => x.proposed).length, 0);
   return `<section class="panel futures-admin">
-    <h2>Futures</h2>
-    <p class="muted small">Drafts are hidden. A blank price isn't shown.</p>
+    <h2>Futures${pending ? ` <span class="fut-pending">${pending} to approve</span>` : ''}</h2>
+    <p class="muted small">Drafts are hidden. A blank price isn't shown. Prices only change when you approve them:
+      suggestions come from form each week and from betting as it happens.</p>
+    <div class="row"><button data-futsuggest="1">Refresh suggestions</button></div>
     ${list.map(futureMarketHtml).join('')}
   </section>`;
 }
@@ -469,6 +472,9 @@ function specialsPanel() {
     ${list.map(futureMarketHtml).join('')}
   </section>`;
 }
+
+// Decimal odds from "5/2" or "Evens", for comparing prices.
+const frac = p => { if (!p) return Infinity; if (/^evens$/i.test(p)) return 2; const [a, b] = String(p).split('/').map(Number); return b ? 1 + a / b : Infinity; };
 
 function futureMarketHtml(m) {
   const special = m.kind === 'special';
@@ -487,6 +493,8 @@ function futureMarketHtml(m) {
     <label>Rules <textarea data-fm-rules rows="2">${esc(m.rules ?? '')}</textarea></label>
     <div class="row"><button class="primary" data-futsave="${m.id}">Save market</button>
       <span class="muted small">${fmtN(staked)} staked · ${fmtN(liability)} to pay if every open bet wins</span></div>
+    ${m.selections.some(x => x.proposed) ? `<div class="row fut-approve-row"><b>${m.selections.filter(x => x.proposed).length} suggested move${m.selections.filter(x => x.proposed).length === 1 ? '' : 's'}</b>
+      <button class="primary" data-futapproveall="${m.id}">Approve all</button></div>` : ''}
     <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">${special ? 'Option' : 'Player'}</th>${special ? '' : '<th>Suggested</th>'}<th>Price</th><th>Bets</th><th>Result</th></tr></thead>
     <tbody>${m.selections.map(s => `<tr>
       <td class="l">${esc(s.name)}</td>
@@ -499,7 +507,10 @@ function futureMarketHtml(m) {
         </select>
         <button data-futres="${s.id}">Set</button>
         ${s.bets ? '' : `<button class="link" data-futrm="${s.id}" title="Remove">✕</button>`}</td>
-    </tr>`).join('')}</tbody></table></div>
+    </tr>${s.proposed ? `<tr class="fut-sugg-row"><td colspan="${special ? 4 : 5}">
+      <span class="fut-to ${frac(s.proposed) < frac(s.price) ? 'in' : 'out'}">${frac(s.proposed) < frac(s.price) ? '▼ Shorten' : '▲ Drift'} to ${esc(s.proposed)}</span>
+      <button class="primary small-btn" data-futok="${s.id}">Approve</button><button class="small-btn" data-futno="${s.id}">Reject</button>
+      <span class="muted small" style="display:block">${esc(s.proposed_reason ?? '')}</span></td></tr>` : ''}`).join('')}</tbody></table></div>
     <div class="row">
       ${special ? '' : `<button data-futsugg="${m.id}">Fill empty prices with suggestions</button>`}
       <button class="primary" data-futprices="${m.id}">Save prices</button>
@@ -895,6 +906,10 @@ async function fantasyClick(el) {
 }
 
 async function futuresClick(el) {
+  if (el.dataset.futsuggest) {
+    await run(async () => check(await sb.rpc('super_future_suggest')), 'Suggestions updated');
+    return true;
+  }
   const box = el.closest('[data-fm]');
   if (!box) return false;
   const q = sel => box.querySelector(sel);
@@ -946,6 +961,19 @@ async function futuresClick(el) {
     const pid = q('[data-fm-add]').value;
     if (!pid) { toast('Pick a player'); return true; }
     await run(async () => check(await sb.rpc('super_future_add', { p_market: mid, p_player: pid })), 'Added. Give them a price.');
+    return true;
+  }
+  if (el.dataset.futok) {
+    await run(async () => check(await sb.rpc('super_future_approve', { p_selection: Number(el.dataset.futok) })), 'Price changed');
+    return true;
+  }
+  if (el.dataset.futno) {
+    await run(async () => check(await sb.rpc('super_future_reject', { p_selection: Number(el.dataset.futno) })), 'Suggestion dismissed');
+    return true;
+  }
+  if (el.dataset.futapproveall) {
+    if (!confirm(`Approve every suggested move in "${market?.title}"?`)) return true;
+    await run(async () => check(await sb.rpc('super_future_approve_all', { p_market: mid })), 'Prices changed');
     return true;
   }
   if (el.dataset.spadd) {
