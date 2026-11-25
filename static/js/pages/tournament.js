@@ -143,7 +143,7 @@ function oddsSection() {
       <td class="muted">${i + 1}</td><td class="l">${esc(x.name)}</td>
       <td>${price(x)}</td></tr>`).join('')}</tbody></table>
     ${list.length > 5 ? `<button data-act="odds-toggle" class="link">${S.oddsAll ? 'Show top 5' : `Show all ${list.length}`}</button>` : ''}
-    ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players</p>' : ''}
+    ${thin ? '<p class="muted small odds-note">* Little data on some players, so these odds are rough</p>' : ''}
   </section>`;
 }
 
