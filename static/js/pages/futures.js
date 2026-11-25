@@ -25,6 +25,19 @@ async function loadBets() {
 
 const RESULT = { won: 'Won', lost: 'Lost', void: 'Void' };
 
+// Decimal odds, to tell whether a price came in or went out.
+const dec = p => { if (/^evens$/i.test(p ?? '')) return 2; const [a, b] = String(p ?? '').split('/').map(Number); return b ? 1 + a / b : null; };
+
+// A small arrow for a price that moved in the last week: green when it came
+// in (shorter), red when it went out (longer).
+function moved(s) {
+  const now = dec(s.price), was = dec(s.was);
+  if (!now || !was || now === was) return '';
+  const inward = now < was;
+  return `<span class="fut-arrow ${inward ? 'in' : 'out'}" title="${inward ? 'In' : 'Out'} from ${esc(s.was)}"
+    aria-label="${inward ? 'Shortened' : 'Drifted'} from ${esc(s.was)}">${inward ? '▼' : '▲'}</span>`;
+}
+
 function marketHtml(m) {
   const mine = S.bets.filter(b => b.future_market === m.id);
   const list = m.selections;
@@ -35,9 +48,9 @@ function marketHtml(m) {
   const cell = s => {
     if (s.result) return `<span class="muted small">${RESULT[s.result]}</span>`;
     if (!s.price) return '';
-    return m.open
+    return moved(s) + (m.open
       ? `<button class="odds-pick small-pick${S.slip?.future_id === s.id ? ' on' : ''}" data-fbet="${s.id}"><b>${esc(s.price)}</b></button>`
-      : `<b>${esc(s.price)}</b>`;
+      : `<b>${esc(s.price)}</b>`);
   };
   // Markets start folded. The header shows how many bets you have on it.
   const isOpen = S.open.has(m.id) || slipHere;

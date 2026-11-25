@@ -69,7 +69,7 @@ const STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cance
 const hhmm = d => new Date(d).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 export const statusText = b => `${STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtTokens(b.payout)}`
   : b.status === 'open' ? ` · to win ${fmtTokens(b.returns)}` : ''}`;
-// Futures: free to cancel for 24 hours, then cash out at the current price less a fee.
+// Futures: free to cancel for 12 hours, then cash out at the current price less a fee.
 export const cancelButton = b => (b.can_cancel
   ? `<button class="link" data-cancelbet="${b.id}">Cancel${b.free_cancel_until ? ` (till ${hhmm(b.free_cancel_until)})` : ''}</button>`
   : b.cash_out != null ? `<button class="link cash-out" data-cashout="${b.id}" data-value="${b.cash_out}">Cash out ${fmtTokens(b.cash_out)}</button>` : '');
