@@ -120,7 +120,7 @@ function render() {
         <div class="ob-list">${S.open.has(g.id) ? g.list.map(matchCard).join('') : ''}</div>
       </details>`;
     }).join('') : '<div class="card empty"><p>No matches to bet on right now.</p></div>'}
-    ${thin ? '<p class="muted small odds-note">* Little record for one of the players, so these odds are rougher.</p>' : ''}
+    ${thin ? '<p class="muted small odds-note">* Little data on a player, so these odds are rough</p>' : ''}
     ${accaBarHtml()}`;
 }
 

@@ -609,7 +609,7 @@ function oddsBlock(pv) {
     ${bet && S.slip?.kind === 'match' ? slipHtml(S.slip) : ''}
     ${bet ? marketsHtml() : ''}
     ${myBetsHtml(S.myBets)}
-    ${thin ? '<p class="muted small odds-note">* These odds are likely inaccurate due to a small sample size for one or more players in this match</p>' : ''}
+    ${thin ? '<p class="muted small odds-note">* Little data on a player, so these odds are rough</p>' : ''}
   </div>`;
 }
 
