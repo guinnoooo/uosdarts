@@ -309,6 +309,13 @@ export function accaAdd(sel) {
   ACCA_UI.note = null;
   saveAcca();
 }
+// Tapping a price on the Odds page: in the acca if it wasn't, out if it was.
+export function accaToggle(sel) {
+  if (accaHas(sel)) ACCA = ACCA.filter(x => !(x.match_id === sel.match_id && x.market === sel.market && x.pick === sel.pick));
+  else ACCA = [...ACCA.filter(x => x.match_id !== sel.match_id), { ...sel }];
+  ACCA_UI.note = null;
+  saveAcca();
+}
 function accaRemove(i) { ACCA = ACCA.filter((_, j) => j !== i); saveAcca(); }
 
 // The bar along the bottom of the page, and the acca slip when it's opened.

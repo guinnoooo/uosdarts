@@ -1,0 +1,4 @@
+---
+title: "Odds"
+layout: "odds"
+---
