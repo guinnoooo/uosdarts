@@ -27,11 +27,11 @@ export function oomScores(rows, name1, name2) {
 // Every number the model uses, in one place, so it can be retuned once there
 // are enough results to measure it against (see tools/model-eval.mjs).
 export const MODEL = {
-  version: 7,
+  version: 8,
   baseline: 45,       // average assumed for someone with no record and no provisional average
   scale: 14,          // average points that make about one step in leg odds
-  f9Weight: 0.3,      // how much first 9 counts on top of the average
-  dblWeight: 0.15,    // average points per percentage point of doubles above 25%
+  f9Weight: 0.5,      // how much first 9 counts on top of the average
+  dblWeight: 0.05,   // average points per percentage point of doubles above 25%
   formWeight: 0.6,    // how far recent form can move a player from their career level
   formFull: 150,      // weighted recent darts for recent form to count fully
   h2hPrior: 4,        // meetings before head-to-head counts for half
@@ -47,8 +47,8 @@ export const MODEL = {
   legCap: 0.8,        // no one rated more than this to win a leg before it starts
   thinPull: 0.75,     // with no record, every input counts this much (rising to fully at knownDarts darts)
   throwEdge: 0.12,    // extra pull towards whoever throws first in a leg: about 53% between equals (measured 51.6% to 54.6% so far)
-  ratingWeight: 0.15, // how far the results rating (Glicko) moves the leg odds
-  ratingCap: 0.3,     // the most the rating can move them, in the model's steps
+  ratingWeight: 0.25, // how far the results rating (Glicko) moves the leg odds
+  ratingCap: 0.6,     // the most the rating can move them, in the model's steps
   sdRef: 27.4,        // a typical spread of visit scores
   sdWeight: 0.5,      // how much a wider spread (a streakier pair) pulls a leg towards 50/50
 };
