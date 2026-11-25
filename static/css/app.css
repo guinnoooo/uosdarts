@@ -1352,3 +1352,48 @@ tr.fut-sugg-row td { border-top: 0; padding-top: 0; padding-bottom: .7rem; }
 .fut-arrow { font-size: .7rem; margin-right: .3rem; vertical-align: middle; }
 .fut-arrow.in { color: var(--good); }
 .fut-arrow.out { color: var(--live); }
+
+/* GuinnessBet match markets and accas */
+.markets { margin-top: 1rem; }
+.mk-head { margin: 0 0 .4rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-mid); }
+.mk { border: 1px solid var(--line); border-radius: var(--r); margin-bottom: .4rem; background: var(--surface); }
+.mk > summary { cursor: pointer; padding: .55rem .75rem; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+.mk > summary::-webkit-details-marker { display: none; }
+.mk > summary::after { content: '+'; color: var(--text-3); }
+.mk[open] > summary::after { content: '−'; }
+.mk-picks { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; padding: 0 .75rem .65rem; }
+.mk-picks.mk-multi { grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); }
+.mk-pick { display: flex; justify-content: space-between; align-items: center; gap: .5rem; width: 100%; min-width: 0; }
+.mk-pick .odds-name { font-size: .8rem; }
+.mk-pick b { color: var(--accent-soft); white-space: nowrap; }
+.mk .slip { margin: 0 .75rem .75rem; }
+.odds-pick.in-acca { border-color: var(--accent-mid); }
+.odds-pick.in-acca::after { content: 'ACCA'; font-size: .55rem; letter-spacing: .06em; color: var(--accent-mid); margin-left: .25rem; }
+
+.acca-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; justify-content: center;
+  padding: .5rem .75rem calc(.5rem + env(safe-area-inset-bottom)); pointer-events: none; }
+.acca-bar > * { pointer-events: auto; }
+.acca-open { display: flex; gap: 1rem; align-items: center; justify-content: space-between; min-width: min(22rem, 100%);
+  background: var(--accent); color: #111; border: 0; border-radius: 999px; padding: .6rem 1.1rem; font-weight: 700;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .5); }
+.acca-open b { font-family: var(--mono); }
+.acca-panel { width: min(32rem, 100%); max-height: 75vh; overflow: auto; background: var(--surface-2); border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg); padding: .9rem 1rem; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); }
+.acca-head { display: flex; justify-content: space-between; align-items: center; }
+.acca-head h3 { margin: 0; }
+.acca-list { list-style: none; padding: 0; margin: .6rem 0; }
+.acca-list li { display: grid; grid-template-columns: 1fr auto auto; gap: .6rem; align-items: center; padding: .45rem 0; border-bottom: 1px solid var(--line); }
+.acca-list li div { min-width: 0; }
+.acca-list li b, .acca-list li span.small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acca-price { font-family: var(--mono); font-weight: 700; color: var(--accent-soft); }
+.acca-total b { font-family: var(--mono); color: var(--accent-soft); font-size: 1.1rem; }
+body:has(.acca-bar) main { padding-bottom: 4.5rem; }
+
+.betcard-legs { list-style: none; margin: 0 0 .4rem; padding: 0; font-size: .85rem; }
+.betcard-legs li { display: grid; grid-template-columns: 1.1rem 1fr auto; gap: .4rem; align-items: baseline; padding: .2rem 0; }
+.betcard-legs small { display: block; color: var(--text-3); font-size: .72rem; }
+.betcard-legs .leg-price { font-family: var(--mono); color: var(--text-2); }
+.leg-won .leg-mark { color: var(--good); }
+.leg-lost .leg-mark { color: var(--live); }
+.leg-lost b { text-decoration: line-through; color: var(--text-2); }
+.leg-void .leg-mark { color: var(--text-3); }

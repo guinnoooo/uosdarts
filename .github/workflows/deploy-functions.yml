@@ -14,6 +14,7 @@ on:
       - "static/js/prices.js"
       - "static/js/outright.js"
       - "static/js/fixtures.js"
+      - "static/js/markets.js"
       - "supabase/functions/**"
       - ".github/workflows/deploy-functions.yml"
   workflow_dispatch:
@@ -37,7 +38,7 @@ jobs:
         with:
           version: latest
       - name: Copy the shared model code in next to the function
-        run: cp static/js/winprob.js static/js/prices.js static/js/outright.js static/js/fixtures.js supabase/functions/place-bet/
+        run: cp static/js/winprob.js static/js/prices.js static/js/outright.js static/js/fixtures.js static/js/markets.js supabase/functions/place-bet/
       - name: Deploy
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
