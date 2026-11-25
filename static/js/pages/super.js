@@ -453,8 +453,8 @@ function futuresPanel() {
   const pending = list.reduce((t, m) => t + m.selections.filter(x => x.proposed).length, 0);
   return `<section class="panel futures-admin">
     <h2>Futures${pending ? ` <span class="fut-pending">${pending} to approve</span>` : ''}</h2>
-    <p class="muted small">Drafts are hidden. A blank price isn't shown. Prices only change when you approve them:
-      suggestions come from form each week and from betting as it happens.</p>
+    <p class="muted small">Drafts are hidden. A blank price isn't shown. Prices only change when you approve them.
+      Refresh suggestions works out moves from form and the betting so far. The weekly model run does it too.</p>
     <div class="row"><button data-futsuggest="1">Refresh suggestions</button></div>
     ${list.map(futureMarketHtml).join('')}
   </section>`;
