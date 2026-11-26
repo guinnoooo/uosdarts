@@ -1,6 +1,7 @@
 // Shareable picture cards: a match result or a GuinnessBet win. Each is
-// drawn on a canvas at Instagram story-ish size (1080 x 1350) and handed to the phone's share sheet. Where the browser can't share
-// files (most desktops), the picture downloads instead.
+// drawn on a canvas at Instagram story-ish size (1080 x 1350) and handed to
+// the phone's share sheet. Where the browser can't share files (most
+// desktops), the picture downloads instead.
 
 const W = 1080, H = 1350;
 const C = {
