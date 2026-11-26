@@ -129,7 +129,7 @@ async function priceOutright(db: any, tournamentId: string, playerId: string) {
     tournament_id: tournamentId, player_id: playerId,
     selection: row.name ?? entrants.find((x: any) => x.player_id === playerId)?.players?.name ?? 'Player',
     market: `${t.data.name}: winner`,
-    price: outrightPrice(row.p),
+    price: outrightPrice(row.p, row.cap),
   };
 }
 

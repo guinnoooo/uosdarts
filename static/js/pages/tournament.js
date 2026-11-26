@@ -3,6 +3,7 @@ import { standings } from '../fixtures.js';
 import { matchCard, setWatching } from '../ui.js';
 import { oomScore } from '../winprob.js';
 import { outrightOdds, outrightPrice } from '../outright.js';
+import { decimalOf } from '../prices.js';
 import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml, quoteSlip, accaBarHtml } from '../betting.js';
 
 const app = document.getElementById('app');
@@ -127,15 +128,18 @@ const outrightOpen = () => !S.t.is_friendly && S.t.status !== 'complete' && S.ma
   && !S.matches.some(m => m.status === 'live' || (m.status === 'complete' && m.player1_id && m.player2_id));
 
 function oddsSection() {
-  const list = S.odds ?? [];
+  // Shortest price first. A capped price can be shorter than the chance
+  // alone would put it, so it moves up the list with it.
+  const dec = x => decimalOf(outrightPrice(x.p, x.cap));
+  const list = [...(S.odds ?? [])].sort((a, b) => dec(a) - dec(b) || b.p - a.p);
   if (list.length < 2) return '';
   const shown = S.oddsAll ? list : list.slice(0, 5);
   const thin = shown.some(x => x.thin);
   const bet = outrightOpen();
   if (!bet) S.slip = null;
   const price = x => bet
-    ? `<button class="odds-pick small-pick${S.slip?.player_id === x.id ? ' on' : ''}" data-obet="${x.id}"><b>${outrightPrice(x.p)}</b></button>`
-    : `<b>${outrightPrice(x.p)}</b>`;
+    ? `<button class="odds-pick small-pick${S.slip?.player_id === x.id ? ' on' : ''}" data-obet="${x.id}"><b>${outrightPrice(x.p, x.cap)}</b></button>`
+    : `<b>${outrightPrice(x.p, x.cap)}</b>`;
   return `<section class="outright"><h2>${bet ? 'Odds' : 'Live odds'} to win the tournament${thin ? '<sup class="odds-star">*</sup>' : ''}</h2>
     ${bet ? slipHtml(S.slip) : ''}
     ${myBetsHtml(S.myBets)}
@@ -370,7 +374,7 @@ app.addEventListener('click', async e => {
   if (ob) {
     const x = (S.odds ?? []).find(o => o.id === ob.dataset.obet);
     if (!x) return;
-    S.slip = { kind: 'outright', tournament_id: id, player_id: x.id, selection: x.name, price: outrightPrice(x.p), stake: S.slip?.stake ?? 100 };
+    S.slip = { kind: 'outright', tournament_id: id, player_id: x.id, selection: x.name, price: outrightPrice(x.p, x.cap), stake: S.slip?.stake ?? 100 };
     loadAccount().then(() => render(), () => render());
     render();
     quoteSlip(S.slip, slipCtx);
