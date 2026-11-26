@@ -1,5 +1,5 @@
 // Shareable picture cards: a match result, a GuinnessBet win or a player's
-// rating. Each is drawn on a canvas at Instagram story-ish size (1080 x 1350)
+// order of merit points. Each is drawn on a canvas at Instagram story-ish size (1080 x 1350)
 // and handed to the phone's share sheet. Where the browser can't share
 // files (most desktops), the picture downloads instead.
 
@@ -111,38 +111,29 @@ export async function betWinCard(b) {
   return c;
 }
 
-// { name, rating, start, points: [{d, r, won}], wins }
-export async function ratingCard(p) {
+// { name, total, rank, events: [{ name, pts, total, won }] }
+export async function oomCard(p) {
   await fontsReady();
   const [c, g] = canvas();
-  header(g, 'Results rating', p.name);
-  const now = Math.round(p.rating);
-  text(g, now, 80, 470, { size: 200, weight: 800, color: C.gold });
-  if (p.start != null) {
-    const d = Math.round(p.rating - p.start);
-    text(g, `${d >= 0 ? '+' : '−'}${Math.abs(d)} this season`, 80, 545, { size: 44, weight: 600, color: d >= 0 ? C.good : C.live });
-  }
-  const pts = (p.points ?? []).map(x => ({ ...x, r: Number(x.r), t: new Date(x.d).getTime() }));
-  if (pts.length >= 2) {
+  header(g, 'Order of merit', p.name);
+  text(g, Number(p.total).toLocaleString('en-GB'), 80, 470, { size: 190, weight: 800, color: C.gold });
+  text(g, `points${p.rank ? ` · #${p.rank} on the OoM` : ''}`, 80, 545, { size: 44, weight: 600, color: C.dim });
+  const ev = p.events ?? [];
+  if (ev.length >= 2) {
     const L = 100, R = W - 100, T = 650, B = 1080;
-    const vals = pts.map(x => x.r).concat(p.start != null ? [Number(p.start)] : []);
-    const lo = Math.min(...vals) - 20, hi = Math.max(...vals) + 20;
-    const x = t => L + (t - pts[0].t) * (R - L) / (pts.at(-1).t - pts[0].t || 1);
-    const y = v => T + (hi - v) * (B - T) / (hi - lo || 1);
+    const hi = ev.at(-1).total * 1.08 || 1;
+    const x = i => L + i * (R - L) / ev.length;
+    const y = v => B - v * (B - T) / hi;
     box(g, 80, T - 40, W - 160, B - T + 80, 22);
-    if (p.start != null) {
-      g.save(); g.setLineDash([12, 12]); g.strokeStyle = C.faint; g.lineWidth = 3;
-      g.beginPath(); g.moveTo(L, y(p.start)); g.lineTo(R, y(p.start)); g.stroke(); g.restore();
-    }
     g.strokeStyle = C.gold; g.lineWidth = 7; g.lineJoin = 'round'; g.lineCap = 'round';
-    g.beginPath(); pts.forEach((q, i) => (i ? g.lineTo(x(q.t), y(q.r)) : g.moveTo(x(q.t), y(q.r)))); g.stroke();
-    for (const q of pts) {
-      if (q.won) { g.beginPath(); g.arc(x(q.t), y(q.r), 22, 0, Math.PI * 2); g.strokeStyle = C.gold; g.lineWidth = 4; g.stroke(); }
-      g.beginPath(); g.arc(x(q.t), y(q.r), 10, 0, Math.PI * 2); g.fillStyle = C.gold; g.fill();
-    }
+    g.beginPath(); g.moveTo(x(0), y(0)); ev.forEach((q, i) => g.lineTo(x(i + 1), y(q.total))); g.stroke();
+    ev.forEach((q, i) => {
+      if (q.won) { g.beginPath(); g.arc(x(i + 1), y(q.total), 22, 0, Math.PI * 2); g.strokeStyle = C.gold; g.lineWidth = 4; g.stroke(); }
+      g.beginPath(); g.arc(x(i + 1), y(q.total), 10, 0, Math.PI * 2); g.fillStyle = C.gold; g.fill();
+    });
   }
-  const wins = pts.filter(q => q.won).length;
-  footer(g, wins ? `${wins} event win${wins === 1 ? '' : 's'} this season` : `${pts.length} nights played this season`);
+  const wins = ev.filter(q => q.won).length;
+  footer(g, wins ? `${wins} event win${wins === 1 ? '' : 's'} this season` : `${ev.length} events with points this season`);
   return c;
 }
 
