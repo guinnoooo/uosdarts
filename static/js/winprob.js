@@ -51,6 +51,7 @@ export const MODEL = {
   ratingCap: 0.6,     // the most the rating can move them, in the model's steps
   sdRef: 27.4,        // a typical spread of visit scores
   sdWeight: 0.5,      // how much a wider spread (a streakier pair) pulls a leg towards 50/50
+  dayForm: 2.3,       // average points a player's level moves from one night to the next (measured 2.3)
 };
 
 // Results rating (Glicko), worked out on the server from every finished
