@@ -329,9 +329,12 @@ function accountsPanel() {
   </section>`;
 }
 
-const BET_STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cancelled: 'Cancelled', cashed_out: 'Cashed out' };
+const BET_STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Bet void', cancelled: 'Cancelled', cashed_out: 'Cashed out' };
 const fmtN = n => Number(n ?? 0).toLocaleString('en-GB');
 const shortWhen = d => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+// An open futures bet can be voided on its own: stake back, shown as "Bet void".
+const voidBtn = b => b.future_id && b.status === 'open' ? ` <button class="link small" data-betvoid="${b.id}">Void</button>` : '';
 
 // Market, then the match or event it belongs to.
 const betWhat = b => [b.market, b.match, b.event && !b.market.includes(b.event) ? b.event : null].filter(Boolean).map(esc).join(' · ');
@@ -350,7 +353,7 @@ function allBetsPanel() {
       <td class="l"><b>${esc(b.account)}</b>: ${esc(b.selection)} at ${esc(b.price)}
         <span class="muted small">${betWhat(b)} · ${shortWhen(b.placed_at)}</span></td>
       <td>${fmtN(b.stake)}</td>
-      <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}</td>
+      <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}${voidBtn(b)}</td>
     </tr>`).join('') || '<tr><td class="muted">No bets match.</td></tr>'}</tbody></table>` : '<p class="muted">No bets yet.</p>'}
   </section>`;
 }
@@ -388,7 +391,7 @@ function accountBetsHtml(list) {
       <td class="l"><b>${esc(b.selection)}</b> at ${esc(b.price)}
         <span class="muted small">${betWhat(b)} · ${shortWhen(b.placed_at)}</span></td>
       <td>${fmtN(b.stake)}</td>
-      <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}</td>
+      <td class="bet-${b.status}">${BET_STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtN(b.payout)}` : b.status === 'open' ? ` · to win ${fmtN(b.returns)}` : ''}${voidBtn(b)}</td>
     </tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -517,7 +520,8 @@ function futureMarketHtml(m) {
            <button data-spadd="${m.id}">Add</button>`
         : `<select data-fm-add><option value="">Add a player…</option>${addable.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
            <button data-futadd="${m.id}">Add</button>`}
-      <button class="danger" data-futrest="${m.id}">Settle everyone left as lost</button>
+      <button class="danger" data-futrest="${m.id}" data-as="lost">Settle everyone left as lost</button>
+      <button data-futrest="${m.id}" data-as="void">Void everyone left</button>
       ${special && !m.selections.some(x => x.bets) ? `<button class="danger" data-spdel="${m.id}">Delete</button>` : ''}
     </div>
   </div>`;
@@ -660,6 +664,11 @@ app.addEventListener('click', async e => {
     S.sel = S.players.find(p => p.id === el.dataset.pick) ?? null;
     if (S.sel) await loadPlayer(S.sel.id);
     render();
+    return;
+  }
+  if (el.dataset.betvoid) {
+    if (!confirm('Void this bet? The stake goes back and it shows as Bet void.')) return;
+    await run(async () => check(await sb.rpc('super_void_bet', { p_bet: Number(el.dataset.betvoid) })), 'Bet void');
     return;
   }
   if (el.dataset.delpts) {
@@ -943,7 +952,7 @@ async function futuresClick(el) {
     const sid = Number(el.dataset.futres);
     const r = q(`[data-fs-res="${sid}"]`).value || null;
     const sel = market?.selections.find(x => x.id === sid);
-    const what = r ? { won: 'a winner', lost: 'a loser', void: 'void (stakes back)' }[r] : 'unsettled (bets back to open)';
+    const what = r ? { won: 'a winner', lost: 'a loser', void: 'void (bets void, stakes back)' }[r] : 'unsettled (bets back to open)';
     if (!confirm(`Settle ${sel?.name ?? 'this'} as ${what}? (${sel?.bets ?? 0} bets)`)) return true;
     await run(async () => check(await sb.rpc('super_future_settle', { p_selection: sid, p_result: r })), 'Settled');
     return true;
@@ -985,8 +994,12 @@ async function futuresClick(el) {
   }
   if (el.dataset.futrest) {
     const left = market?.selections.filter(x => !x.result).length ?? 0;
-    if (!confirm(`Settle the other ${left} in "${market?.title}" as lost? Set winners and voids first.`)) return true;
-    await run(async () => check(await sb.rpc('super_future_settle_rest', { p_market: mid })), 'Market settled');
+    const as = el.dataset.as === 'void' ? 'void' : 'lost';
+    const msg = as === 'void'
+      ? `Void the other ${left} in "${market?.title}"? Their bets get their stakes back. Set any winners first.`
+      : `Settle the other ${left} in "${market?.title}" as lost? Set winners and voids first.`;
+    if (!confirm(msg)) return true;
+    await run(async () => check(await sb.rpc('super_future_settle_rest', { p_market: mid, p_result: as })), 'Market settled');
     return true;
   }
   return false;

@@ -6,7 +6,7 @@
     <nav class="site-nav">
       {{ $p := .RelPermalink }}
       {{ $oom := or (hasPrefix $p (relURL "/order-of-merit/")) (hasPrefix $p (relURL "/pc-oom/")) }}
-      {{ $bet := or (hasPrefix $p (relURL "/odds/")) (hasPrefix $p (relURL "/futures/")) (hasPrefix $p (relURL "/leaderboard/")) }}
+      {{ $bet := or (hasPrefix $p (relURL "/odds/")) (hasPrefix $p (relURL "/futures/")) (hasPrefix $p (relURL "/leaderboard/")) (hasPrefix $p (relURL "/my-bets/")) }}
       {{ $login := or (hasPrefix $p (relURL "/account/")) (hasPrefix $p (relURL "/admin/")) (hasPrefix $p (relURL "/super/")) }}
       <a href="{{ "/" | relURL }}" class="nav-link{{ if .IsHome }} nav-link-active{{ end }}">Match Hub</a>
       <a href="{{ "/order-of-merit/" | relURL }}" class="nav-link{{ if $oom }} nav-link-active{{ end }}"><span class="nav-full">Order of Merit</span><span class="nav-short">OoM</span></a>
