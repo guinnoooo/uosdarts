@@ -60,22 +60,26 @@ function box(g, x, y, w, h, r = 18, fill = C.panel, stroke = C.line) {
 export async function resultCard(r) {
   await fontsReady();
   const [c, g] = canvas();
-  header(g, [r.event, r.round].filter(Boolean).join(' · '), 'Full time');
+  // The event and round once each: a friendly is just "Friendly".
+  header(g, [...new Set([r.event, r.round].filter(Boolean))].join(' · '), 'Full time');
   const side = (n, y) => {
     const won = r.winner === n;
-    box(g, 80, y, W - 160, 190, 22, won ? '#1f1b12' : C.panel, won ? C.gold : C.line);
-    text(g, n === 1 ? r.name1 : r.name2, 130, y + 115, { size: 62, weight: won ? 800 : 600, color: won ? C.text : C.dim, max: W - 420 });
-    text(g, n === 1 ? r.score1 : r.score2, W - 130, y + 130, { size: 120, weight: 800, color: won ? C.gold : C.dim, align: 'right' });
-    if (won) text(g, 'WINNER', 130, y + 160, { size: 24, weight: 700, color: C.gold, spacing: 4 });
+    box(g, 80, y, W - 160, 160, 22, won ? '#1f1b12' : C.panel, won ? C.gold : C.line);
+    text(g, n === 1 ? r.name1 : r.name2, 130, y + 95, { size: 58, weight: won ? 800 : 600, color: won ? C.text : C.dim, max: W - 420 });
+    text(g, n === 1 ? r.score1 : r.score2, W - 130, y + 115, { size: 108, weight: 800, color: won ? C.gold : C.dim, align: 'right' });
+    if (won) text(g, 'WINNER', 130, y + 135, { size: 22, weight: 700, color: C.gold, spacing: 4 });
   };
-  side(1, 330); side(2, 545);
-  text(g, (r.unit ?? 'legs').toUpperCase(), W - 130, 775, { size: 24, weight: 600, color: C.faint, align: 'right', spacing: 3 });
-  const rows = (r.stats ?? []).filter(s => s[1] != null || s[2] != null).slice(0, 5);
+  side(1, 310); side(2, 490);
+  text(g, (r.unit ?? 'legs').toUpperCase(), W - 130, 690, { size: 22, weight: 600, color: C.faint, align: 'right', spacing: 3 });
+  // Every stat from the match page, spaced to fit however many there are.
+  const rows = (r.stats ?? []).filter(s => s[1] != null || s[2] != null);
+  const gap = Math.min(64, 440 / Math.max(rows.length, 1));
   rows.forEach(([label, a, b], i) => {
-    const y = 880 + i * 72;
-    text(g, a ?? '–', 130, y, { size: 46, weight: 700, color: r.winner === 1 ? C.text : C.dim });
-    text(g, label.toUpperCase(), W / 2, y - 6, { size: 24, weight: 600, color: C.faint, align: 'center', spacing: 3 });
-    text(g, b ?? '–', W - 130, y, { size: 46, weight: 700, color: r.winner === 2 ? C.text : C.dim, align: 'right' });
+    const y = 770 + i * gap;
+    text(g, a ?? '–', 130, y, { size: 40, weight: 700, color: r.winner === 1 ? C.text : C.dim, max: 300 });
+    text(g, label.toUpperCase(), W / 2, y - 5, { size: 22, weight: 600, color: C.faint, align: 'center', spacing: 3 });
+    text(g, b ?? '–', W - 130, y, { size: 40, weight: 700, color: r.winner === 2 ? C.text : C.dim, align: 'right', max: 300 });
+    if (i < rows.length - 1) { g.fillStyle = '#1e1e1e'; g.fillRect(130, y + gap / 2 - 8, W - 260, 2); }
   });
   footer(g, r.date);
   return c;
@@ -105,9 +109,9 @@ export async function betWinCard(b) {
 
 // ------------------------------------------------------------ sharing
 
-// Opens a preview of the picture in a pop-up. From there it can be saved
-// (a long press on the picture works on phones too), or sent straight to
-// the share sheet where the phone supports sharing pictures.
+// Opens a preview of the picture in a pop-up. From there it can be saved,
+// or sent straight to the share sheet where the phone supports sharing
+// pictures.
 export async function share(c, { filename = 'uosdarts.png', title = 'UOS Darts', text: msg = '', url = '' } = {}) {
   const blob = await new Promise(r => c.toBlob(r, 'image/png'));
   const file = new File([blob], filename, { type: 'image/png' });
@@ -122,7 +126,6 @@ export async function share(c, { filename = 'uosdarts.png', title = 'UOS Darts',
       <a class="button${canShare ? '' : ' primary'}" data-sp="save" href="${src}" download="${filename.replace(/[^\w.-]/g, '')}">Save image</a>
       <button data-sp="close">Close</button>
     </div>
-    <p class="muted small sp-hint">On a phone you can also press and hold the picture to save it.</p>
   </div>`;
   document.body.appendChild(d);
   const close = () => { d.close(); d.remove(); setTimeout(() => URL.revokeObjectURL(src), 1000); };
