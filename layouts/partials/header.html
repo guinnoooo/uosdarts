@@ -5,17 +5,16 @@
     </a>
     <nav class="site-nav">
       {{ $p := .RelPermalink }}
+      {{ $oom := or (hasPrefix $p (relURL "/order-of-merit/")) (hasPrefix $p (relURL "/pc-oom/")) }}
+      {{ $bet := or (hasPrefix $p (relURL "/odds/")) (hasPrefix $p (relURL "/futures/")) (hasPrefix $p (relURL "/leaderboard/")) }}
+      {{ $login := or (hasPrefix $p (relURL "/account/")) (hasPrefix $p (relURL "/admin/")) (hasPrefix $p (relURL "/super/")) }}
       <a href="{{ "/" | relURL }}" class="nav-link{{ if .IsHome }} nav-link-active{{ end }}">Match Hub</a>
-      <a href="{{ "/order-of-merit/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/order-of-merit/") }} nav-link-active{{ end }}"><span class="nav-full">Order of Merit</span><span class="nav-short">OoM</span></a>
-      <a href="{{ "/pc-oom/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/pc-oom/") }} nav-link-active{{ end }}"><span class="nav-full">PC Order of Merit</span><span class="nav-short">PC OoM</span></a>
+      <a href="{{ "/order-of-merit/" | relURL }}" class="nav-link{{ if $oom }} nav-link-active{{ end }}"><span class="nav-full">Order of Merit</span><span class="nav-short">OoM</span></a>
       <a href="{{ "/dartsity/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/dartsity/") }} nav-link-active{{ end }}">Dartsity</a>
       <a href="{{ "/history/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/history/") }} nav-link-active{{ end }}">History</a>
-      <a href="{{ "/futures/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/futures/") }} nav-link-active{{ end }}">Futures</a>
-      <a href="{{ "/odds/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/odds/") }} nav-link-active{{ end }}">Odds</a>
       <a href="{{ "/fantasy/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/fantasy/") }} nav-link-active{{ end }}">Fantasy</a>
-      <a href="{{ "/leaderboard/" | relURL }}" class="nav-link{{ if hasPrefix $p (relURL "/leaderboard/") }} nav-link-active{{ end }}"><span class="nav-full">Leaderboard</span><span class="nav-short">Ranks</span></a>
-      <a href="{{ "/account/" | relURL }}" class="nav-link nav-link-quiet{{ if hasPrefix $p (relURL "/account/") }} nav-link-active{{ end }}">Account</a>
-      <a href="{{ "/admin/" | relURL }}" class="nav-link nav-link-quiet">Admin</a>
+      <a href="{{ "/odds/" | relURL }}" class="nav-link{{ if $bet }} nav-link-active{{ end }}">GuinnessBet</a>
+      <a href="{{ "/account/" | relURL }}" class="nav-link nav-link-quiet{{ if $login }} nav-link-active{{ end }}">Log in</a>
     </nav>
   </div>
 </header>

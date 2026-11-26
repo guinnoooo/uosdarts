@@ -18,13 +18,7 @@ const check = r => { if (r.error) throw r.error; return r.data; };
 
 async function loadInner() {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session || session.user.is_anonymous) {
-    app.innerHTML = `<div class="panel narrow center">
-      <h2>Super admin</h2>
-      <p class="muted">Sign in on the <a href="/admin/">admin page</a> first.</p>
-    </div>`;
-    return;
-  }
+  if (!session || session.user.is_anonymous) { location.replace('/account/?next=/super/'); return; }
 
   S.role = check(await sb.rpc('my_admin_role'));
   if (S.role !== 'super') {

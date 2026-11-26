@@ -1,0 +1,10 @@
+{{/* Sub-pages under one nav tab. Pass the page and the group: "oom" or "bet". */}}
+{{ $p := .page.RelPermalink }}
+{{ $groups := dict
+  "oom" (slice (dict "url" "/order-of-merit/" "label" "Order of Merit") (dict "url" "/pc-oom/" "label" "PC Order of Merit"))
+  "bet" (slice (dict "url" "/odds/" "label" "Odds") (dict "url" "/futures/" "label" "Futures") (dict "url" "/leaderboard/" "label" "Leaderboard")) }}
+<nav class="subnav" aria-label="Sections">
+  {{ range index $groups .group }}
+  <a href="{{ .url | relURL }}" class="subnav-link{{ if hasPrefix $p (relURL .url) }} subnav-active{{ end }}"{{ if hasPrefix $p (relURL .url) }} aria-current="page"{{ end }}>{{ .label }}</a>
+  {{ end }}
+</nav>
