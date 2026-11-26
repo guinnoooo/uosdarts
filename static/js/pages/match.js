@@ -264,7 +264,7 @@ async function shareResult(url, title) {
   const f = v => (v == null || Number.isNaN(v) ? null : v);
   const { resultCard, share } = await import('../share-card.js');
   const c = await resultCard({
-    event: m.tournament?.name, round: matchLabel(m, S.koRounds),
+    event: isFriendly() ? 'Friendly' : m.tournament?.name, round: isFriendly() ? null : matchLabel(m, S.koRounds),
     date: new Date(m.finished_at ?? m.updated_at ?? Date.now()).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
     name1: nameOf(1), name2: nameOf(2),
     score1: sets ? m.p1_sets : m.p1_legs, score2: sets ? m.p2_sets : m.p2_legs, unit: sets ? 'sets' : 'legs',
@@ -272,9 +272,12 @@ async function shareResult(url, title) {
     stats: S.visits.length ? [
       ['Average', f(a.avg?.toFixed(2)), f(b.avg?.toFixed(2))],
       ['First 9', f(a.first9?.toFixed(2)), f(b.first9?.toFixed(2))],
+      ['100+', a.ton, b.ton],
+      ['140+', a.ton40, b.ton40],
       ['180s', a.max, b.max],
       ['High checkout', a.hiCheckout || null, b.hiCheckout || null],
       ['Best leg', a.bestLeg ? `${a.bestLeg} darts` : null, b.bestLeg ? `${b.bestLeg} darts` : null],
+      ['Doubles', a.dblAt ? `${a.dblHit}/${a.dblAt} (${a.dblPct.toFixed(0)}%)` : null, b.dblAt ? `${b.dblHit}/${b.dblAt} (${b.dblPct.toFixed(0)}%)` : null],
     ] : [],
   });
   await share(c, { filename: `${title.replace(/[^\w]+/g, '-').toLowerCase()}.png`, title, text: title, url });
