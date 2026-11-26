@@ -104,7 +104,6 @@ function oomHtml(events, oom) {
       <text x="${W - R}" y="${H - 6}" text-anchor="end" class="pp-axis">${esc(pts.at(-1).name)}</text>
     </svg>
     <figcaption class="pp-tip small muted">${top.toLocaleString('en-GB')} points${oom ? ` · #${oom.rank} on the OoM` : ''}. Gold rings are event wins. Tap a point for the event.</figcaption>
-    <button class="link small" data-act="share-oom">Share</button>
   </figure>`;
 }
 
@@ -161,12 +160,6 @@ async function run() {
     <section class="panel"><h2>Events</h2>${eventsHtml(d.events)}</section>
     <section class="panel"><h2>Recent matches</h2>${matchesHtml(d.matches)}</section>
     ${honours ? `<section class="panel">${honours}</section>` : ''}`;
-  app.querySelector('[data-act="share-oom"]')?.addEventListener('click', async () => {
-    const { oomCard, share } = await import('../share-card.js');
-    const ev = oomPoints(d.events);
-    const c = await oomCard({ name: p.name, total: ev.at(-1).total, rank: d.oom?.rank, events: ev });
-    await share(c, { filename: `${slug}-oom.png`, title: `${p.name}: order of merit`, url: location.href });
-  });
   // Tap or hover a point to see what it was. Each chart has its own caption.
   const avgPts = d.events.filter(e => e.avg != null && e.day);
   const tips = {
