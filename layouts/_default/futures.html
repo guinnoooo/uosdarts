@@ -1,5 +1,6 @@
 {{ define "main" }}
 <div class="wrap app-wrap">
+  {{ partial "subnav.html" (dict "page" . "group" "bet") }}
   <div id="app"><p class="muted">Loading…</p></div>
 </div>
 {{ end }}

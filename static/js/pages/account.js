@@ -1,15 +1,19 @@
 // Account: sign up with an email, log in, reset a password, and see your
 // tokens and bets. An account only exists once the email is confirmed (the
 // database makes it then), and it's what the chat and betting need.
+// Committee members log in here too, with their username, and are taken
+// straight to the admin (or super admin) page.
 
-import { sb, esc, toast, qs } from '../db.js';
+import { sb, esc, toast, qs, toLoginEmail } from '../db.js';
 import { loadAccount, fmtTokens, betCard, cashOut } from '../betting.js';
 
 const app = document.getElementById('app');
 const next = qs('next');
 const here = `${location.origin}/account/${next ? `?next=${encodeURIComponent(next)}` : ''}`;
 
-let S = { view: 'login', email: '', sent: null, recovering: false };
+let S = { view: 'login', email: '', sent: null, recovering: false, scorer: false };
+
+const roleNow = async () => (await sb.rpc('my_admin_role')).data ?? null;
 
 const when = d => new Date(d).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -50,8 +54,9 @@ function formsHtml() {
     </section>`;
   }
   return `<section class="panel account-box">${tabs}
+    ${S.scorer ? '<p class="muted small">You are scoring a match on this device. Logging in ends that, so hand the match over first.</p>' : ''}
     <form id="f-login" autocomplete="on">
-      <label>Email <input name="email" type="email" required autocomplete="email" value="${esc(S.email)}"></label>
+      <label>Email or username <input name="email" type="text" required autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(S.email)}"></label>
       <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
       <button class="primary">Log in</button>
     </form>
@@ -70,7 +75,21 @@ function recoverHtml() {
 }
 
 
-function accountHtml(a, bets, email) {
+// Links to the committee pages, for admins and super admins.
+function staffHtml(role) {
+  if (!role) return '';
+  return `<section class="panel account-box">
+    <h2>Committee</h2>
+    <p><a href="/admin/">Admin page</a>${role === 'super' ? ' · <a href="/super/">Super admin</a>' : ''}</p>
+  </section>`;
+}
+
+function accountHtml(a, bets, email, role) {
+  if (!a && role) {
+    return `${staffHtml(role)}<section class="panel account-box">
+      <p class="muted small">${esc(email ?? '')} · <button class="link" data-act="logout">Log out</button></p>
+    </section>`;
+  }
   if (!a) {
     return `<section class="panel account-box">
       <h2>Confirm your email</h2>
@@ -91,13 +110,13 @@ function accountHtml(a, bets, email) {
       <span class="small ${net >= 0 ? 'bet-won' : 'bet-lost'}">${net >= 0 ? '+' : '−'}${fmtTokens(Math.abs(net))}</span></h3></summary>${cards(settled)}</details>` : ''}
     ${cancelled.length ? `<details class="bets-group"><summary><h3 class="bets-head">Cancelled <span class="muted">${cancelled.length}</span></h3></summary>${cards(cancelled)}</details>` : ''}`;
   if (a.can_bet === false) {
-    return `${backLink()}<section class="panel account-box">
+    return `${backLink()}${staffHtml(role)}<section class="panel account-box">
       <h2>${esc(a.display_name)}</h2>
       <p class="muted">Admin account: chat only.</p>
       <p class="muted small">${esc(a.email ?? '')} · <button class="link" data-act="logout">Log out</button></p>
     </section>`;
   }
-  return `${backLink()}<section class="panel account-box">
+  return `${backLink()}${staffHtml(role)}<section class="panel account-box">
       <h2>${esc(a.display_name)}</h2>
       ${a.banned ? '<p class="error">Blocked from chat and betting.</p>' : ''}
       <div class="token-row">
@@ -113,8 +132,12 @@ function accountHtml(a, bets, email) {
 async function render() {
   if (S.recovering) { app.innerHTML = recoverHtml(); return; }
   const { data: { session } } = await sb.auth.getSession();
-  if (!session || session.user.is_anonymous) { app.innerHTML = backLink() + formsHtml(); return; }
-  const a = await loadAccount(true);
+  if (!session || session.user.is_anonymous) {
+    S.scorer = !!session?.user?.is_anonymous;
+    app.innerHTML = backLink() + formsHtml();
+    return;
+  }
+  const [a, role] = await Promise.all([loadAccount(true), roleNow()]);
   const bets = a ? ((await sb.rpc('my_bets', { p_limit: 100 })).data ?? []) : [];
   // Fresh from the confirmation link, with somewhere to go back to.
   if (a && next && sessionStorage.getItem('uosdarts:justConfirmed')) {
@@ -122,7 +145,7 @@ async function render() {
     location.replace(next);
     return;
   }
-  app.innerHTML = accountHtml(a, bets, session.user.email);
+  app.innerHTML = accountHtml(a, bets, session.user.email, role);
 }
 
 app.addEventListener('click', async e => {
@@ -169,13 +192,17 @@ app.addEventListener('submit', async e => {
       S.sent = S.email;
       render();
     } else if (f.id === 'f-login') {
+      // A username (no @) is a committee login, kept under the site's own domain.
       S.email = v('email');
-      const { error } = await sb.auth.signInWithPassword({ email: S.email, password: f.elements.password.value });
+      const { error } = await sb.auth.signInWithPassword({ email: toLoginEmail(S.email), password: f.elements.password.value });
       if (error) {
         if (/confirm/i.test(error.message)) { S.sent = S.email; render(); return; }
-        throw new Error(/invalid/i.test(error.message) ? 'Wrong email or password' : error.message);
+        throw new Error(/invalid/i.test(error.message) ? 'Wrong email, username or password' : error.message);
       }
       if (next) { location.href = next; return; }
+      const role = await roleNow();
+      if (role === 'super') { location.href = '/super/'; return; }
+      if (role) { location.href = '/admin/'; return; }
       render();
     } else if (f.id === 'f-forgot') {
       S.email = v('email');

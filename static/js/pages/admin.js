@@ -1,4 +1,4 @@
-import { sb, showLoadError, esc, toast, fmtDate, matchLabel, toLoginEmail, toUsername, MATCH_SELECT } from '../db.js';
+import { sb, showLoadError, esc, toast, fmtDate, matchLabel, toUsername, MATCH_SELECT } from '../db.js';
 import { roundRobin, allocateGroups, buildBracket, standings, bracketPlan } from '../fixtures.js';
 
 const app = document.getElementById('app');
@@ -18,7 +18,7 @@ const check = r => { if (r.error) throw r.error; return r.data; };
 
 async function initInner() {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session || session.user.is_anonymous) return renderLogin(!!session?.user?.is_anonymous);
+  if (!session || session.user.is_anonymous) { location.replace('/account/?next=/admin/'); return; }
   const { data } = await sb.from('admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
   if (!data) {
     app.innerHTML = `<div class="panel"><p>You're not an admin.</p>
@@ -31,17 +31,6 @@ async function initInner() {
   }
   S.role = (await sb.rpc('my_admin_role')).data ?? 'admin';
   await refresh();
-}
-
-function renderLogin(asScorer = false) {
-  app.innerHTML = `<form class="panel narrow" data-form="login">
-    <h2>Committee sign in</h2>
-    ${asScorer ? '<p class="muted small">You are currently signed in as a scorer. Signing in here will end that, so hand over any match you are scoring first.</p>' : ''}
-    <label>Username <input name="username" type="text" autocomplete="username" required autofocus></label>
-    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
-    <button class="primary">Sign in</button>
-    <a href="/" class="muted small">Back to the public site</a>
-  </form>`;
 }
 
 async function signOut() {
@@ -943,13 +932,6 @@ app.addEventListener('submit', async e => {
   const data = Object.fromEntries(new FormData(f));
   const kind = f.dataset.form;
 
-  if (kind === 'login') {
-    const { error } = await sb.auth.signInWithPassword({
-      email: toLoginEmail(data.username), password: data.password,
-    });
-    if (error) toast(error.message); else init();
-    return;
-  }
   if (kind === 'new-player') {
     const name = (data.name ?? '').trim();
     await run(async () => {
