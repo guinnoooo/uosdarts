@@ -5,6 +5,9 @@
 // the share of those run-throughs they win.
 
 import { legChance, legFor, chanceFromScore, MODEL } from './winprob.js';
+
+const logit = p => Math.log(p / (1 - p));
+const sigmoid = x => 1 / (1 + Math.exp(-x));
 import { standings, buildBracket } from './fixtures.js';
 
 const RUNS = 3000;
@@ -58,11 +61,25 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
     p2_rating: fig.get(b)?.rating, p2_rd: fig.get(b)?.rd, p2_sd: fig.get(b)?.sd,
   });
   const legMemo = new Map();
-  const leg = (a, b) => {
+  const base = (a, b) => {
     const k = `${a}|${b}`;
-    if (!legMemo.has(k)) legMemo.set(k, legChance(pv(a, b)));
+    if (!legMemo.has(k)) legMemo.set(k, logit(legChance(pv(a, b))));
     return legMemo.get(k);
   };
+  // Everyone has better and worse nights. Each run-through gives every
+  // player a level for the night, a few average points either side of their
+  // usual one, and it holds for all their matches that night. Without it the
+  // run-throughs treat every match as a fresh draw, and a favourite who has
+  // to win six or seven in a row comes out far too short.
+  let day = new Map();
+  const dayOf = id => {
+    if (!day.has(id)) {
+      const u = Math.max(rand(), 1e-12), v = rand();
+      day.set(id, MODEL.dayForm * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
+    }
+    return day.get(id);
+  };
+  const leg = (a, b) => sigmoid(base(a, b) + (dayOf(a) - dayOf(b)) / MODEL.scale);
   // A match played out from its current legs: returns [winner side, p1 legs, p2 legs].
   // Who threw first isn't known here, so it's a coin flip (as the bull off
   // roughly is), and the throw alternates leg by leg from there.
@@ -143,6 +160,7 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
   if (t.format === 'groups' && labels.length > 1) return [];
 
   for (let run = 0; run < RUNS; run++) {
+    day = new Map();
     let champ;
     if (needGroups) {
       // Play the rest of the groups, then draw the knockout as the admin page does.
