@@ -1494,3 +1494,16 @@ body:has(.acca-bar) main { padding-bottom: 4.5rem; }
 @keyframes ic-prog { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .ic-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 @media (min-width: 900px) { .ic { max-width: 560px; } .ic-p img, .ic-ph { width: 110px; height: 110px; } }
+
+/* Share card preview pop-up (share-card.js). */
+.share-preview { border: 0; padding: 0; background: transparent; max-width: min(92vw, 460px); width: 100%; }
+.share-preview::backdrop { background: rgba(0, 0, 0, .78); }
+.sp-inner { display: flex; flex-direction: column; gap: .7rem; }
+.sp-inner img { width: 100%; height: auto; max-height: 72vh; object-fit: contain; border-radius: 12px; border: 1px solid var(--line); background: #0e0e0e; }
+.sp-btns { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+.sp-btns .button {
+  font-size: .88rem; color: var(--text); background: var(--surface-2); border: 1px solid var(--line-strong);
+  border-radius: var(--r); padding: .48rem .85rem; text-decoration: none; display: inline-flex; align-items: center;
+}
+.sp-btns .button.primary { background: var(--accent); border-color: var(--accent); color: #17150c; font-weight: 600; }
+.sp-hint { text-align: center; margin: 0; }

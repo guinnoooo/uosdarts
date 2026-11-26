@@ -105,20 +105,37 @@ export async function betWinCard(b) {
 
 // ------------------------------------------------------------ sharing
 
+// Opens a preview of the picture in a pop-up. From there it can be saved
+// (a long press on the picture works on phones too), or sent straight to
+// the share sheet where the phone supports sharing pictures.
 export async function share(c, { filename = 'uosdarts.png', title = 'UOS Darts', text: msg = '', url = '' } = {}) {
   const blob = await new Promise(r => c.toBlob(r, 'image/png'));
   const file = new File([blob], filename, { type: 'image/png' });
-  try {
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title, text: [msg, url].filter(Boolean).join(' ') });
-      return 'shared';
+  const src = URL.createObjectURL(blob);
+  const canShare = !!navigator.canShare?.({ files: [file] });
+  const d = document.createElement('dialog');
+  d.className = 'share-preview';
+  d.innerHTML = `<div class="sp-inner">
+    <img src="${src}" alt="${title.replace(/[<>&"]/g, '')}">
+    <div class="sp-btns">
+      ${canShare ? '<button class="primary" data-sp="share">Share</button>' : ''}
+      <a class="button${canShare ? '' : ' primary'}" data-sp="save" href="${src}" download="${filename.replace(/[^\w.-]/g, '')}">Save image</a>
+      <button data-sp="close">Close</button>
+    </div>
+    <p class="muted small sp-hint">On a phone you can also press and hold the picture to save it.</p>
+  </div>`;
+  document.body.appendChild(d);
+  const close = () => { d.close(); d.remove(); setTimeout(() => URL.revokeObjectURL(src), 1000); };
+  d.addEventListener('click', async e => {
+    if (e.target === d) return close();   // tap outside the picture
+    const b = e.target.closest('[data-sp]');
+    if (!b) return;
+    if (b.dataset.sp === 'close') return close();
+    if (b.dataset.sp === 'share') {
+      try { await navigator.share({ files: [file], title, text: [msg, url].filter(Boolean).join(' ') }); } catch { /* closed */ }
     }
-  } catch (e) {
-    if (e?.name === 'AbortError') return 'closed';   // they closed the share sheet
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  return 'downloaded';
+  });
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  d.showModal();
+  return 'shown';
 }
