@@ -86,7 +86,7 @@ export async function myBetsOn({ matchId = null, tournamentId = null }) {
   return error ? [] : data ?? [];
 }
 
-const STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Refunded', cancelled: 'Cancelled', cashed_out: 'Cashed out' };
+const STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Bet void', cancelled: 'Cancelled', cashed_out: 'Cashed out' };
 const hhmm = d => new Date(d).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 export const statusText = b => `${STATUS[b.status] ?? b.status}${b.status === 'won' || b.status === 'cashed_out' ? ` +${fmtTokens(b.payout)}`
   : b.status === 'open' ? ` · to win ${fmtTokens(b.returns)}` : ''}`;

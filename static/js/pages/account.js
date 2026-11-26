@@ -1,11 +1,11 @@
 // Account: sign up with an email, log in, reset a password, and see your
-// tokens and bets. An account only exists once the email is confirmed (the
+// tokens. Bets are on GuinnessBet › My Bets. An account only exists once the email is confirmed (the
 // database makes it then), and it's what the chat and betting need.
 // Committee members log in here too, with their username, and are taken
 // straight to the admin (or super admin) page.
 
 import { sb, esc, toast, qs, toLoginEmail } from '../db.js';
-import { loadAccount, fmtTokens, betCard, cashOut } from '../betting.js';
+import { loadAccount, fmtTokens } from '../betting.js';
 
 const app = document.getElementById('app');
 const next = qs('next');
@@ -84,7 +84,7 @@ function staffHtml(role) {
   </section>`;
 }
 
-function accountHtml(a, bets, email, role) {
+function accountHtml(a, email, role) {
   if (!a && role) {
     return `${staffHtml(role)}<section class="panel account-box">
       <p class="muted small">${esc(email ?? '')} · <button class="link" data-act="logout">Log out</button></p>
@@ -97,18 +97,6 @@ function accountHtml(a, bets, email, role) {
       <button data-act="logout">Log out</button>
     </section>`;
   }
-  // Open bets first, then settled ones, with cancelled bets folded away.
-  const open = bets.filter(b => b.status === 'open');
-  const settled = bets.filter(b => ['won', 'lost', 'void', 'cashed_out'].includes(b.status));
-  const cancelled = bets.filter(b => b.status === 'cancelled');
-  const cards = list => `<div class="betcards">${list.map(b => betCard(b)).join('')}</div>`;
-  const net = settled.reduce((t, b) => t + Number(b.payout ?? 0) - (b.status === 'void' ? 0 : Number(b.stake)), 0);
-  const list = !bets.length ? '<p class="muted">No bets yet.</p>' : `
-    <h3 class="bets-head">Open <span class="muted">${open.length}</span></h3>
-    ${open.length ? cards(open) : '<p class="muted small">Nothing open right now.</p>'}
-    ${settled.length ? `<details class="bets-group" open><summary><h3 class="bets-head">Settled <span class="muted">${settled.length}</span>
-      <span class="small ${net >= 0 ? 'bet-won' : 'bet-lost'}">${net >= 0 ? '+' : '−'}${fmtTokens(Math.abs(net))}</span></h3></summary>${cards(settled)}</details>` : ''}
-    ${cancelled.length ? `<details class="bets-group"><summary><h3 class="bets-head">Cancelled <span class="muted">${cancelled.length}</span></h3></summary>${cards(cancelled)}</details>` : ''}`;
   if (a.can_bet === false) {
     return `${backLink()}${staffHtml(role)}<section class="panel account-box">
       <h2>${esc(a.display_name)}</h2>
@@ -124,9 +112,9 @@ function accountHtml(a, bets, email, role) {
         <div><span class="muted small">In open bets</span><b>${fmtTokens(a.in_play)}</b></div>
       </div>
       <p class="muted small">+250 on ${when(a.next_topup)}</p>
+      <p><a href="/my-bets/">Your bets are on GuinnessBet › My Bets</a></p>
       <p class="muted small">${esc(a.email ?? '')} · <button class="link" data-act="logout">Log out</button></p>
-    </section>
-    <section class="panel"><h2>Your bets</h2>${list}</section>`;
+    </section>`;
 }
 
 async function render() {
@@ -138,29 +126,16 @@ async function render() {
     return;
   }
   const [a, role] = await Promise.all([loadAccount(true), roleNow()]);
-  const bets = a ? ((await sb.rpc('my_bets', { p_limit: 100 })).data ?? []) : [];
   // Fresh from the confirmation link, with somewhere to go back to.
   if (a && next && sessionStorage.getItem('uosdarts:justConfirmed')) {
     sessionStorage.removeItem('uosdarts:justConfirmed');
     location.replace(next);
     return;
   }
-  app.innerHTML = accountHtml(a, bets, session.user.email, role);
+  app.innerHTML = accountHtml(a, session.user.email, role);
 }
 
 app.addEventListener('click', async e => {
-  const co = e.target.closest('[data-cashout]');
-  if (co) { if (await cashOut(co)) render(); return; }
-  const c = e.target.closest('[data-cancelbet]');
-  if (c) {
-    if (!confirm('Cancel this bet?')) return;
-    c.disabled = true;
-    const { error } = await sb.rpc('cancel_bet', { p_bet: Number(c.dataset.cancelbet) });
-    if (error) { toast(error.message); c.disabled = false; return; }
-    toast('Bet cancelled', false);
-    render();
-    return;
-  }
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const act = b.dataset.act;
