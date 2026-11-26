@@ -130,7 +130,10 @@ export function betCard(b, { context = null } = {}) {
     : ['To return', b.returns];
   const ctx = b.kind === 'acca' ? 'GuinnessBet acca' : context ?? ([b.market, b.tournament && !String(b.market ?? '').includes(b.tournament) ? b.tournament : null].filter(Boolean).join(' · ')
     || document.title.split(' · ')[0].trim());
-  const actions = cancelButton(b);
+  const shareable = b.status === 'won' || b.status === 'cashed_out';
+  const shareData = shareable ? esc(JSON.stringify({ selection: b.kind === 'acca' ? `${b.legs?.length ?? ''}-fold acca` : b.selection,
+    market: b.kind === 'acca' ? null : ctx, price: b.price, stake: b.stake, paid: b.payout, cashedOut: b.status === 'cashed_out', legs: b.kind === 'acca' ? (b.legs ?? []).map(l => ({ label: l.label })) : null })) : '';
+  const actions = [cancelButton(b), shareable ? `<button class="link" data-sharebet="${shareData}">Share</button>` : ''].filter(Boolean).join(' ');
   return `<article class="betcard betcard-${esc(st)}">
     <header class="betcard-top">
       <span class="betcard-ctx">${esc(ctx || 'Bet')}</span>
@@ -149,6 +152,17 @@ export function betCard(b, { context = null } = {}) {
     ${actions ? `<div class="betcard-actions">${actions}</div>` : ''}
   </article>`;
 }
+
+// A Share button on a winning bet card makes a picture of it.
+document.addEventListener('click', async e => {
+  const btn = e.target.closest?.('[data-sharebet]');
+  if (!btn) return;
+  e.preventDefault();
+  let b; try { b = JSON.parse(btn.dataset.sharebet); } catch { return; }
+  const { betWinCard, share } = await import('./share-card.js');
+  const how = await share(await betWinCard(b), { filename: 'guinnessbet-win.png', title: 'GuinnessBet', text: `${b.selection} at ${b.price}`, url: 'https://uosdarts.com/odds/' });
+  if (how === 'downloaded') toast('Picture saved', false);
+});
 
 export function myBetsHtml(list) {
   if (!list?.length) return '';
