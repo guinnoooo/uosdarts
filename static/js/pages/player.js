@@ -1,5 +1,5 @@
-// A player's own page: /player/?p=<slug>. Season stats, their average at
-// each event as a chart, every event this season, recent matches and their
+// A player's own page: /player/?p=<slug>. Season stats, their results
+// rating through the season and their average at each event as charts, every event this season, recent matches and their
 // honours. One database call plus the history file.
 
 import { sb, esc, qs } from '../db.js';
@@ -71,6 +71,42 @@ function chartHtml(events, seasonAvg) {
   </figure>`;
 }
 
+// Their results rating through the season: where it stood at the end of
+// each day they played, spaced by date. Days they won an event get a gold
+// ring. The dashed line is where they started the season.
+function ratingHtml(h) {
+  const pts = (h?.points ?? []).map(p => ({ ...p, r: Number(p.r), t: new Date(p.d).getTime() }));
+  if (pts.length < 2) return '';
+  const W = Math.max(300, Math.min(760, (app.clientWidth || 640) - 40)), H = 220, L = 38, R = 10, T = 14, B = 24;
+  const start = h.start != null ? Number(h.start) : null;
+  const vals = pts.map(p => p.r).concat(start != null ? [start] : []);
+  const step = Math.max(...vals) - Math.min(...vals) > 200 ? 100 : 50;
+  const lo = Math.floor((Math.min(...vals) - 15) / step) * step, hi = Math.ceil((Math.max(...vals) + 15) / step) * step;
+  const t0 = pts[0].t, t1 = pts.at(-1).t;
+  const x = t => L + (t - t0) * (W - L - R) / (t1 - t0 || 1);
+  const y = v => T + (hi - v) * (H - T - B) / (hi - lo || 1);
+  const ticks = [];
+  for (let v = lo; v <= hi; v += step) ticks.push(v);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.r).toFixed(1)}`).join('');
+  return `<figure class="pp-chart" data-chart="rating">
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Results rating through the season">
+      ${ticks.map(v => `<g><line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="pp-grid"/>
+        <text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" class="pp-axis">${v}</text></g>`).join('')}
+      ${start != null ? `<line x1="${L}" x2="${W - R}" y1="${y(start)}" y2="${y(start)}" class="pp-ref"/>
+        <text x="${L + 4}" y="${y(start) - 5}" class="pp-axis">Season start ${Math.round(start)}</text>` : ''}
+      <path d="${line}" class="pp-line"/>
+      ${pts.map((p, i) => `<g class="pp-pt" tabindex="0" data-i="${i}">
+        <circle cx="${x(p.t)}" cy="${y(p.r)}" r="12" class="pp-hit"/>
+        ${p.won ? `<circle cx="${x(p.t)}" cy="${y(p.r)}" r="8" class="pp-win"/>` : ''}
+        <circle cx="${x(p.t)}" cy="${y(p.r)}" r="4.5" class="pp-dot"/>
+        <title>${esc(p.event ?? '')} ${day(p.d)}: ${Math.round(p.r)}</title></g>`).join('')}
+      <text x="${L}" y="${H - 6}" class="pp-axis">${esc(day(pts[0].d))}</text>
+      <text x="${W - R}" y="${H - 6}" text-anchor="end" class="pp-axis">${esc(day(pts.at(-1).d))}</text>
+    </svg>
+    <figcaption class="pp-tip small muted">Now ${Math.round(pts.at(-1).r)}${start != null ? ` (${pts.at(-1).r >= start ? '+' : '−'}${Math.abs(Math.round(pts.at(-1).r - start))} this season)` : ''}. Gold rings are event wins. Tap a point for the day.</figcaption>
+  </figure>`;
+}
+
 function eventsHtml(events) {
   if (!events.length) return '<p class="muted">No events this season yet.</p>';
   return `<div class="pp-scroll"><table class="lb-table pp-events"><thead><tr>
@@ -100,6 +136,8 @@ async function run() {
   if (error) throw error;
   if (!d) { app.innerHTML = `<p class="muted">No player called "${esc(slug)}".</p>`; return; }
   const p = d.player;
+  const rh = (await sb.rpc('rating_history', { p_player: p.id })).data ?? null;
+  const rating = ratingHtml(rh);
   const y = YAML[slug] ?? {};
   document.title = `${p.name} · ${document.title.split(' · ').at(-1)}`;
   const stars = (n, label, cls) => Number(n) > 0 ? `<span class="award ${cls}">${'<span class="award-star">★</span>'.repeat(Number(n))} ${label}</span>` : '';
@@ -118,21 +156,29 @@ async function run() {
       </div>
     </section>
     <section class="panel"><h2>Stats</h2>${statsHtml(d)}<p class="small muted">Averages are from every match scored on the site. Counts are this season plus earlier ones.</p></section>
+    ${rating ? `<section class="panel"><h2>Results rating</h2>${rating}</section>` : ''}
     ${chartHtml(d.events, d.career?.avg) ? `<section class="panel"><h2>Average by event</h2>${chartHtml(d.events, d.career?.avg)}</section>` : ''}
     <section class="panel"><h2>Events</h2>${eventsHtml(d.events)}</section>
     <section class="panel"><h2>Recent matches</h2>${matchesHtml(d.matches)}</section>
     ${honours ? `<section class="panel">${honours}</section>` : ''}`;
-  const pts = d.events.filter(e => e.avg != null && e.day);
-  app.querySelectorAll('.pp-pt').forEach(g => {
-    const show = () => {
-      app.querySelectorAll('.pp-pt.on').forEach(x => x.classList.remove('on'));
-      g.classList.add('on');
-      const e = pts[Number(g.dataset.i)];
-      app.querySelector('.pp-tip').innerHTML = `<b>${esc(e.name)}</b> · ${day(e.day)} · average <b>${Number(e.avg).toFixed(2)}</b>`;
-    };
-    g.addEventListener('click', show);
-    g.addEventListener('mouseenter', show);
-    g.addEventListener('focus', show);
+  // Tap or hover a point to see what it was. Each chart has its own caption.
+  const avgPts = d.events.filter(e => e.avg != null && e.day);
+  const tips = {
+    rating: i => { const e = rh.points[i]; return `<b>${esc(e.event ?? 'Matches')}</b> · ${day(e.d)} · rating <b>${Math.round(Number(e.r))}</b>${e.won ? ' · 🏆 won' : ''}`; },
+    avg: i => { const e = avgPts[i]; return `<b>${esc(e.name)}</b> · ${day(e.day)} · average <b>${Number(e.avg).toFixed(2)}</b>`; },
+  };
+  app.querySelectorAll('.pp-chart').forEach(fig => {
+    const tip = tips[fig.dataset.chart ?? 'avg'];
+    fig.querySelectorAll('.pp-pt').forEach(g => {
+      const show = () => {
+        fig.querySelectorAll('.pp-pt.on').forEach(x => x.classList.remove('on'));
+        g.classList.add('on');
+        fig.querySelector('.pp-tip').innerHTML = tip(Number(g.dataset.i));
+      };
+      g.addEventListener('click', show);
+      g.addEventListener('mouseenter', show);
+      g.addEventListener('focus', show);
+    });
   });
 }
 

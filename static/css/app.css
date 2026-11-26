@@ -1333,6 +1333,7 @@ button.chat-who:hover { text-decoration: underline; }
 .pp-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .pp-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; pointer-events: none; }
 .pp-hit { fill: transparent; cursor: pointer; }
+.pp-win { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .8; pointer-events: none; }
 .pp-pt.on .pp-dot, .pp-pt:hover .pp-dot { r: 6.5; }
 .pp-pt:focus { outline: none; }
 .pp-tip { margin-top: .4rem; min-height: 1.3em; }
