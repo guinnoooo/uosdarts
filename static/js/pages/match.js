@@ -277,8 +277,7 @@ async function shareResult(url, title) {
       ['Best leg', a.bestLeg ? `${a.bestLeg} darts` : null, b.bestLeg ? `${b.bestLeg} darts` : null],
     ] : [],
   });
-  const how = await share(c, { filename: `${title.replace(/[^\w]+/g, '-').toLowerCase()}.png`, title, text: title, url });
-  if (how === 'downloaded') toast('Picture saved', false);
+  await share(c, { filename: `${title.replace(/[^\w]+/g, '-').toLowerCase()}.png`, title, text: title, url });
 }
 
 // Which set a leg belongs to, worked out from the legs before it.

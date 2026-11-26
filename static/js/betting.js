@@ -160,8 +160,7 @@ document.addEventListener('click', async e => {
   e.preventDefault();
   let b; try { b = JSON.parse(btn.dataset.sharebet); } catch { return; }
   const { betWinCard, share } = await import('./share-card.js');
-  const how = await share(await betWinCard(b), { filename: 'guinnessbet-win.png', title: 'GuinnessBet', text: `${b.selection} at ${b.price}`, url: 'https://uosdarts.com/odds/' });
-  if (how === 'downloaded') toast('Picture saved', false);
+  await share(await betWinCard(b), { filename: 'guinnessbet-win.png', title: 'GuinnessBet', text: `${b.selection} at ${b.price}`, url: 'https://uosdarts.com/odds/' });
 });
 
 export function myBetsHtml(list) {
