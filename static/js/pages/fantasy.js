@@ -110,12 +110,14 @@ function squadHtml() {
       return `<li class="fx-slot empty${sel}${i === 5 ? ' bench' : ''}" data-slot="${i}">${photo(null, '+', 'fx-photo')}${head}
         <span class="muted small">${S.pick !== null && S.squad[S.pick] && S.pick !== i ? 'Move here' : 'Tap to pick'}</span></li>`;
     }
-    return `<li class="fx-slot${sel}${i === 5 ? ' bench' : ''}" data-slot="${i}">
+    // While someone is being moved, every other filled role offers a swap.
+    const swapping = S.pick !== null && S.squad[S.pick] && S.pick !== i;
+    return `<li class="fx-slot${sel}${swapping ? ' swap-target' : ''}${i === 5 ? ' bench' : ''}" data-slot="${i}">
       ${photo(p?.slug, p?.name)}
       ${head}
       <span class="fx-who"><b>${esc(p?.name ?? '?')}</b> <span class="muted">${money(p?.price)}${gain(id)}</span></span>
       <span class="fx-slot-btns">
-        <button class="link" data-move="${i}">${S.pick === i ? 'Cancel' : 'Move'}</button>
+        <button class="link" data-move="${i}">${S.pick === i ? 'Cancel' : swapping ? 'Swap here' : 'Move'}</button>
         <button class="link" data-drop="${i}" title="Remove">✕</button>
       </span></li>`;
   };
@@ -123,7 +125,7 @@ function squadHtml() {
     <div class="fx-head"><h2>Your team</h2>${scoringButton}</div>
     <label>Team name <input id="fx-name" maxlength="30" value="${esc(S.name)}"></label>
     <p class="small muted">Locks ${when(t.locks_at)}</p>
-    ${S.pick !== null && S.squad[S.pick] ? `<p class="small fx-hint">Tap a role to move ${esc(byId(S.squad[S.pick])?.name ?? 'them')}.</p>` : ''}
+    ${S.pick !== null && S.squad[S.pick] ? `<p class="small fx-hint">Tap a role to move ${esc(byId(S.squad[S.pick])?.name ?? 'them')}, or another player to swap them round.</p>` : ''}
     <ol class="fx-squad">${S.squad.map(slot).join('')}</ol>
     <p class="small"><b class="${left < 0 ? 'error' : ''}">${money(left)}</b> in the bank
       ${t.first_squad ? '' : ` · ${ch} change${ch === 1 ? '' : 's'}${onNow === 'wildcard' ? ' (free, Wildcard)' : hit ? `, <span class="error">−${hit} points</span>` : ' (1 free)'}`}</p>
@@ -367,7 +369,13 @@ app.addEventListener('click', async e => {
   }
   if (b.dataset.move) {
     const i = Number(b.dataset.move);
-    S.pick = S.pick === i ? null : i;
+    // A second player tapped while one is being moved: swap the two roles.
+    if (S.pick !== null && S.pick !== i && S.squad[S.pick]) {
+      [S.squad[S.pick], S.squad[i]] = [S.squad[i], S.squad[S.pick]];
+      S.pick = null;
+    } else {
+      S.pick = S.pick === i ? null : i;
+    }
     render();
     return;
   }
