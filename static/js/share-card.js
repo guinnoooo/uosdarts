@@ -24,7 +24,9 @@ function canvas() {
   return [c, g];
 }
 
-function text(g, s, x, y, { size = 40, weight = 400, color = C.text, align = 'left', max = null, spacing = 0 } = {}) {
+// `mid: true` puts the middle of capitals and figures exactly on y, so
+// labels and numbers of different sizes sit centred in the same row.
+function text(g, s, x, y, { size = 40, weight = 400, color = C.text, align = 'left', max = null, spacing = 0, mid = false } = {}) {
   g.font = `${weight} ${size}px ${F}`;
   g.fillStyle = color; g.textAlign = align; g.textBaseline = 'alphabetic';
   if ('letterSpacing' in g) g.letterSpacing = `${spacing}px`;
@@ -32,6 +34,10 @@ function text(g, s, x, y, { size = 40, weight = 400, color = C.text, align = 'le
   if (max) {   // shrink to fit rather than run off the card
     let sz = size;
     while (sz > 18 && g.measureText(str).width > max) { sz -= 2; g.font = `${weight} ${sz}px ${F}`; }
+  }
+  if (mid) {
+    const m = g.measureText('H0');
+    y += (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
   }
   g.fillText(str, x, y);
   if ('letterSpacing' in g) g.letterSpacing = '0px';
@@ -73,13 +79,16 @@ export async function resultCard(r) {
   text(g, (r.unit ?? 'legs').toUpperCase(), W - 130, 690, { size: 22, weight: 600, color: C.faint, align: 'right', spacing: 3 });
   // Every stat from the match page, spaced to fit however many there are.
   const rows = (r.stats ?? []).filter(s => s[1] != null || s[2] != null);
-  const gap = Math.min(64, 440 / Math.max(rows.length, 1));
+  // Equal bands between the score boxes and the footer line; each row's
+  // figures and label are centred in their band, dividers sit on the edges.
+  const top = 720, bottom = 1170;
+  const gap = Math.min(70, (bottom - top) / Math.max(rows.length, 1));
   rows.forEach(([label, a, b], i) => {
-    const y = 770 + i * gap;
-    text(g, a ?? '–', 130, y, { size: 40, weight: 700, color: r.winner === 1 ? C.text : C.dim, max: 300 });
-    text(g, label.toUpperCase(), W / 2, y - 5, { size: 22, weight: 600, color: C.faint, align: 'center', spacing: 3 });
-    text(g, b ?? '–', W - 130, y, { size: 40, weight: 700, color: r.winner === 2 ? C.text : C.dim, align: 'right', max: 300 });
-    if (i < rows.length - 1) { g.fillStyle = '#1e1e1e'; g.fillRect(130, y + gap / 2 - 8, W - 260, 2); }
+    const cy = top + gap * (i + .5);
+    if (i) { g.fillStyle = '#1e1e1e'; g.fillRect(130, Math.round(top + gap * i) - 1, W - 260, 2); }
+    text(g, a ?? '–', 130, cy, { size: 40, weight: 700, color: r.winner === 1 ? C.text : C.dim, max: 300, mid: true });
+    text(g, label.toUpperCase(), W / 2, cy, { size: 22, weight: 600, color: C.faint, align: 'center', spacing: 3, mid: true });
+    text(g, b ?? '–', W - 130, cy, { size: 40, weight: 700, color: r.winner === 2 ? C.text : C.dim, align: 'right', max: 300, mid: true });
   });
   footer(g, r.date);
   return c;
