@@ -998,6 +998,13 @@ a.back-link.plain { display: inline-block; margin-bottom: .6rem; font-size: .9re
 
 .archive-filters { margin-bottom: 1rem; }
 .archive-types { width: auto; flex-wrap: wrap; margin-bottom: .6rem; }
+/* The five types don't fit in one joined bar on a phone, and wrapping a
+   joined bar leaves broken borders. Separate pills wrap cleanly instead. */
+.seg.archive-types { display: flex; gap: .4rem; border: 0; border-radius: 0; overflow: visible; }
+.seg.archive-types label, .seg.archive-types label + label {
+  border: 1px solid var(--line-strong, #3a3a3a); border-radius: 999px; padding: .4rem .9rem;
+}
+.seg.archive-types label:has(input:checked) { border-color: var(--accent); }
 .archive-filters .row { align-items: flex-end; }
 .archive-filters label.grow { flex: 1 1 200px; }
 
