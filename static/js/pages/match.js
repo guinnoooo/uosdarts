@@ -257,6 +257,30 @@ function finalBoard() {
   </div>`;
 }
 
+// The result as a picture card, for the share sheet.
+async function shareResult(url, title) {
+  const m = S.match, sets = !!m.sets_to_win;
+  const a = playerStats(S.visits, S.legs, 1), b = playerStats(S.visits, S.legs, 2);
+  const f = v => (v == null || Number.isNaN(v) ? null : v);
+  const { resultCard, share } = await import('../share-card.js');
+  const c = await resultCard({
+    event: m.tournament?.name, round: matchLabel(m, S.koRounds),
+    date: new Date(m.finished_at ?? m.updated_at ?? Date.now()).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
+    name1: nameOf(1), name2: nameOf(2),
+    score1: sets ? m.p1_sets : m.p1_legs, score2: sets ? m.p2_sets : m.p2_legs, unit: sets ? 'sets' : 'legs',
+    winner: winnerSide(m),
+    stats: S.visits.length ? [
+      ['Average', f(a.avg?.toFixed(2)), f(b.avg?.toFixed(2))],
+      ['First 9', f(a.first9?.toFixed(2)), f(b.first9?.toFixed(2))],
+      ['180s', a.max, b.max],
+      ['High checkout', a.hiCheckout || null, b.hiCheckout || null],
+      ['Best leg', a.bestLeg ? `${a.bestLeg} darts` : null, b.bestLeg ? `${b.bestLeg} darts` : null],
+    ] : [],
+  });
+  const how = await share(c, { filename: `${title.replace(/[^\w]+/g, '-').toLowerCase()}.png`, title, text: title, url });
+  if (how === 'downloaded') toast('Picture saved', false);
+}
+
 // Which set a leg belongs to, worked out from the legs before it.
 function setOf(leg) {
   let set = 1, a = 0, b = 0;
@@ -1143,8 +1167,10 @@ app.addEventListener('click', async e => {
     render();
   } else if (act === 'share') {
     // Phones get the share sheet (WhatsApp and so on); elsewhere copy the link.
+    // A finished match shares a picture of the result with the link.
     const url = location.href.split('#')[0];
     const title = `${nameOf(1)} v ${nameOf(2)}`;
+    if (S.match.status === 'complete') { await shareResult(url, title); return; }
     try {
       if (navigator.share) await navigator.share({ title, text: `Watch ${title} live`, url });
       else { await navigator.clipboard.writeText(url); toast('Link copied', false); }

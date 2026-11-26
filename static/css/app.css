@@ -1137,6 +1137,7 @@ button.chat-who:hover { text-decoration: underline; }
 .fx-slot .fx-slot-btns { grid-area: btns; display: flex; gap: .6rem; align-items: center; }
 .fx-slot.empty { cursor: pointer; opacity: .85; }
 .fx-slot.picking { background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 8px; }
+.fx-slot.swap-target { outline: 1px dashed var(--accent-dim, #6b5a33); outline-offset: -1px; border-radius: 8px; }
 .fx-slot.bench { margin-top: .3rem; }
 .fx-photo { width: 3rem; height: 3rem; border-radius: 50%; object-fit: cover; background: var(--surface, #222); }
 .fx-thumb { width: 1.8rem; height: 1.8rem; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface, #222); }
@@ -1333,6 +1334,7 @@ button.chat-who:hover { text-decoration: underline; }
 .pp-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .pp-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; pointer-events: none; }
 .pp-hit { fill: transparent; cursor: pointer; }
+.pp-win { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .8; pointer-events: none; }
 .pp-pt.on .pp-dot, .pp-pt:hover .pp-dot { r: 6.5; }
 .pp-pt:focus { outline: none; }
 .pp-tip { margin-top: .4rem; min-height: 1.3em; }
