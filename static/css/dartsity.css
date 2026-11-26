@@ -77,12 +77,12 @@
      "Archivo Black"  heavy and wider, more newspaper than poster
      "Oswald"         condensed and lighter, more restrained
 
-   font-weight stays at 800 so the Inter fallback is heavy if the font
+   font-weight stays at 800 so the fallback is heavy if the font
    fails to load; font-synthesis-weight stops the browser faux-bolding a
    face that only has one weight.
    --------------------------------------------------------------------- */
 .ds-title {
-  font-family: "Anton", Inter, system-ui, sans-serif;
+  font-family: "Anton", "D-DIN PRO", system-ui, sans-serif;
   font-synthesis-weight: none;
   /* Bounded by the window's height as well as its width, so a big title can
      never push the line-up off a short screen. */
@@ -299,7 +299,7 @@
     linear-gradient(180deg, #090909, #0d0d0e);
 }
 .ds-outro h2 {
-  font-family: "Anton", Inter, system-ui, sans-serif;
+  font-family: "Anton", "D-DIN PRO", system-ui, sans-serif;
   font-synthesis-weight: none;
   font-size: max(44px, min(11vw, 18vh, 150px)); margin: 0 0 14px;
   line-height: 1.02; padding-bottom: .06em;

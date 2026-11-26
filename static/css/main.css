@@ -1,3 +1,10 @@
+/* D-DIN (SIL Open Font Licence, Datto Inc.: static/fonts/d-din/OFL.txt). */
+@font-face { font-family: "D-DIN PRO"; font-weight: 400; font-style: normal; font-display: swap; src: url("../fonts/d-din/D-DIN-PRO-400-Regular.woff2") format("woff2"); }
+@font-face { font-family: "D-DIN PRO"; font-weight: 500; font-style: normal; font-display: swap; src: url("../fonts/d-din/D-DIN-PRO-500-Medium.woff2") format("woff2"); }
+@font-face { font-family: "D-DIN PRO"; font-weight: 600; font-style: normal; font-display: swap; src: url("../fonts/d-din/D-DIN-PRO-600-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "D-DIN PRO"; font-weight: 700; font-style: normal; font-display: swap; src: url("../fonts/d-din/D-DIN-PRO-700-Bold.woff2") format("woff2"); }
+@font-face { font-family: "D-DIN PRO"; font-weight: 800; font-style: normal; font-display: swap; src: url("../fonts/d-din/D-DIN-PRO-800-ExtraBold.woff2") format("woff2"); }
+
 :root {
   --black: #0d0d0d;
   --panel: #151515;
@@ -8,7 +15,7 @@
   --silver: #b0b0b0;
   --bronze: #b5793d;
   --gold-soft: #b8963f;
-  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font: "D-DIN PRO", "Bahnschrift", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }

@@ -6,9 +6,9 @@
   <title>{{ if .IsHome }}{{ .Site.Title }}{{ else }}{{ .Title }} · {{ .Site.Title }}{{ end }}</title>
   <meta name="description" content="{{ .Site.Params.societyName }} — tournaments, live scoring and the order of merit.">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  {{/* D-DIN, served from the site itself so every device shows the same font. */}}
+  <link rel="preload" href="{{ "fonts/d-din/D-DIN-PRO-400-Regular.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ "fonts/d-din/D-DIN-PRO-700-Bold.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
 
   {{/* The page scripts import these shared modules, whose URLs Hugo can't
        version from here. The import map points them at a versioned URL so a
