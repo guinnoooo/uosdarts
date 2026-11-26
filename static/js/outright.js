@@ -38,10 +38,13 @@ const ladderValue = f => (f === 'Evens' ? 1 : f.split('/').reduce((a, b) => a / 
 const implied = f => 1 / (ladderValue(f) + 1);
 const MARGIN = 1.2;
 
-export function outrightPrice(p) {
+// `cap` is the longest price allowed for this player in this tournament
+// (outright_caps, e.g. '75/1'). It only ever shortens the price.
+export function outrightPrice(p, cap = null) {
   const target = Math.min(0.95, Math.max(p * MARGIN, implied('500/1')));
   let best = LADDER[0];
   for (const f of LADDER) if (implied(f) >= target) best = f;
+  if (cap && /^\d+\/\d+$/.test(cap) && ladderValue(best) > ladderValue(cap)) return cap;
   return best;
 }
 
@@ -208,7 +211,7 @@ export function outrightOdds({ figures, oom, t, entrants, matches }) {
     .map(([id, w]) => {
       const f = fig.get(id);
       const thin = (Number(f?.career?.darts) || 0) < MODEL.thinDarts && f?.prov == null;
-      return { id, name: players.get(id)?.name ?? f?.name ?? '?', p: w / RUNS, thin };
+      return { id, name: players.get(id)?.name ?? f?.name ?? '?', p: w / RUNS, thin, cap: f?.cap ?? null };
     })
     .sort((a, b) => b.p - a.p);
 }
