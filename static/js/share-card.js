@@ -21,14 +21,6 @@ function canvas() {
   c.width = W; c.height = H;
   const g = c.getContext('2d');
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
-  // A faint dartboard in the corner, so it's recognisably ours.
-  g.save(); g.globalAlpha = .07; g.strokeStyle = C.gold; g.lineWidth = 6;
-  for (const r of [420, 330, 250, 150, 60]) { g.beginPath(); g.arc(W - 40, 120, r, 0, Math.PI * 2); g.stroke(); }
-  for (let i = 0; i < 20; i++) {
-    const a = i * Math.PI / 10;
-    g.beginPath(); g.moveTo(W - 40 + 60 * Math.cos(a), 120 + 60 * Math.sin(a)); g.lineTo(W - 40 + 420 * Math.cos(a), 120 + 420 * Math.sin(a)); g.stroke();
-  }
-  g.restore();
   return [c, g];
 }
 
