@@ -84,6 +84,10 @@ async function loadInner() {
   }
   render();
   watch();
+  // Spectators get a short intro card as the match starts.
+  if (S.match.status === 'live' && !isScorer()) {
+    import('../intro-card.js').then(x => x.maybeShowIntro({ match: S.match, round: matchLabel(S.match, S.koRounds), scoring: isScorer(), nameOf })).catch(() => {});
+  }
 }
 const reload = debounce(load, 120);
 
