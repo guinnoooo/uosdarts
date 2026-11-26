@@ -5,7 +5,7 @@ import { sb, esc } from '../db.js';
 import { loadAccount, account, slipHtml, slipEvent, betCard } from '../betting.js';
 
 const app = document.getElementById('app');
-const S = { markets: [], bets: [], slip: null, all: new Set(), open: new Set() };
+const S = { markets: [], bets: [], slip: null, all: new Set(), open: new Set(), betsOpen: new Set() };
 const SHOW = 8;
 
 const when = d => new Date(d).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -67,7 +67,9 @@ function marketHtml(m) {
     ${m.rules ? `<p class="muted small">${esc(m.rules)}</p>` : ''}
     ${state ? `<p class="small">${esc(state)}</p>` : ''}
     ${slipHere ? slipHtml(S.slip) : ''}
-    ${mine.length ? `<div class="my-bets"><h3>Your bets</h3><div class="betcards">${mine.map(b => betCard(b)).join('')}</div></div>` : ''}
+    ${mine.length ? `<details class="my-bets fut-mybets" data-fbets="${m.id}"${S.betsOpen.has(m.id) ? ' open' : ''}>
+      <summary><h3>Your bets <span class="muted">${mine.length}</span></h3></summary>
+      <div class="betcards">${mine.map(b => betCard(b)).join('')}</div></details>` : ''}
     ${list.length ? `<table class="outright-list futures-list"><tbody>${shown.map(s => `<tr>
       <td class="l">${esc(s.name)}</td><td>${cell(s)}</td></tr>`).join('')}</tbody></table>
     ${list.length > SHOW ? `<button class="link" data-fall="${m.id}">${S.all.has(m.id) ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}`
@@ -93,6 +95,14 @@ const ctx = {
 };
 
 app.addEventListener('input', e => { slipEvent(e, ctx); });
+// Your bets on a market fold away; remember which are open across redraws.
+app.addEventListener('toggle', e => {
+  const d = e.target.closest?.('[data-fbets]');
+  if (!d) return;
+  const id = Number(d.dataset.fbets);
+  if (d.open) S.betsOpen.add(id); else S.betsOpen.delete(id);
+}, true);
+
 app.addEventListener('click', async e => {
   const fold = e.target.closest('[data-fopen]');
   if (fold) {
