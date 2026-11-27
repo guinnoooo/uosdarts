@@ -1533,3 +1533,21 @@ tr.mu-first td { border-top: 2px solid var(--line-strong); }
 /* Arrow on/off next to a futures price on the super admin page. */
 .fut-price-cell { white-space: nowrap; }
 .fut-arrow-tg { margin-left: .4rem; }
+
+/* Superboosts: first in their comp on the Odds page. */
+.ob-boosts { display: flex; flex-direction: column; gap: .6rem; margin-bottom: .9rem; }
+.ob-boost {
+  border: 1px solid var(--accent); border-radius: 12px; padding: .7rem .8rem;
+  background: linear-gradient(135deg, rgba(201, 169, 97, .16), rgba(201, 169, 97, .03) 60%);
+}
+.ob-boost-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: .35rem; }
+.ob-boost-tag { color: var(--accent); font-weight: 800; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; }
+.ob-boost-row { display: flex; align-items: center; gap: .8rem; }
+.ob-boost-what { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .15rem; }
+.ob-boost-what b { font-size: 1rem; line-height: 1.25; }
+.ob-boost-pick { flex: none; display: flex; flex-direction: column; align-items: center; min-width: 4.6rem; padding: .35rem .7rem; }
+.ob-boost-pick b { font-size: 1.15rem; }
+.ob-was, .betcard-was { color: var(--text-3); font-size: .78rem; text-decoration-thickness: 2px; }
+.betcard-was { margin-right: .4rem; }
+.betcard-odds .betcard-was { color: rgba(23, 21, 12, .55); }
+.ob-boost .slip { margin-top: .6rem; }

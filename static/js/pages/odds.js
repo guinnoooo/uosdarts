@@ -6,36 +6,57 @@
 import { sb, esc, matchLabel } from '../db.js';
 import { oomScores, matchChance, isThin } from '../winprob.js';
 import { bookPrices } from '../prices.js';
-import { matchMarkets, pickLabel } from '../markets.js';
-import { loadAccount, slipEvent, accaBarHtml, accaHas, accaToggle, accaPicks } from '../betting.js';
+import { matchMarkets, pickLabel, legTitle } from '../markets.js';
+import { loadAccount, slipEvent, slipHtml, accaBarHtml, accaHas, accaToggle, accaPicks } from '../betting.js';
 
 const app = document.getElementById('app');
-const S = { matches: [], oom: [], open: new Set(), more: new Set(), markets: new Map(), loaded: false, error: null };
+const S = { matches: [], oom: [], boosts: [], slip: null, open: new Set(), more: new Set(), markets: new Map(), loaded: false, error: null };
 
 const day = d => (d ? new Date(d).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '');
 
 async function load() {
-  const [board] = await Promise.all([sb.rpc('odds_board'), loadAccount().catch(() => null)]);
+  const [board, boosts] = await Promise.all([sb.rpc('odds_board'), sb.rpc('open_boosts'), loadAccount().catch(() => null)]);
   if (board.error) { S.error = board.error.message; render(); return; }
+  S.boosts = boosts.data ?? [];
   S.oom = board.data?.oom ?? [];
   S.matches = (board.data?.matches ?? []).map(m => {
     const pv = { ...m.preview, oom: oomScores(S.oom, m.name1, m.name2) };
     return { ...m, pv, prices: bookPrices(matchChance(pv, m)), thin: isThin(pv) };
   });
   // The first event starts open; the rest are folded up.
-  if (!S.loaded && S.matches.length) S.open.add(S.matches[0].tournament_id);
+  const gs = groups();
+  if (!S.loaded && gs.length) S.open.add(gs[0].id);
   S.loaded = true;
   render();
 }
 
-// Grouped by event, in the order the server sent them (soonest first).
+// Grouped by event, in the order the server sent them (soonest first). A
+// comp with superboosts shows even before its matches are drawn.
 function groups() {
   const out = new Map();
-  for (const m of S.matches) {
-    if (!out.has(m.tournament_id)) out.set(m.tournament_id, { id: m.tournament_id, name: m.tournament, starts: m.starts_at, list: [] });
-    out.get(m.tournament_id).list.push(m);
-  }
-  return [...out.values()];
+  const add = (id, name, starts) => {
+    const key = id ?? 'boosts';
+    if (!out.has(key)) out.set(key, { id: key, name, starts, list: [], boosts: [] });
+    return out.get(key);
+  };
+  for (const b of S.boosts) add(b.tournament_id, b.tournament, b.starts_at).boosts.push(b);
+  for (const m of S.matches) add(m.tournament_id, m.tournament, m.starts_at).list.push(m);
+  return [...out.values()].sort((a, b) => (a.starts ? new Date(a.starts) : Infinity) - (b.starts ? new Date(b.starts) : Infinity));
+}
+
+// Superboosts: first in their comp. The old price struck through, the
+// boosted one to tap. A single bet, not part of an acca.
+function boostsHtml(g) {
+  if (!g.boosts.length) return '';
+  return `<div class="ob-boosts">${g.boosts.map(b => `<div class="ob-boost">
+      <div class="ob-boost-top"><span class="ob-boost-tag">⚡ Superboost</span>${b.max_stake ? `<span class="muted small">Max stake ${b.max_stake}</span>` : ''}</div>
+      <div class="ob-boost-row">
+        <div class="ob-boost-what"><b>${esc(b.title)}</b>${b.detail ? `<span class="muted small">${esc(b.detail)}</span>` : ''}</div>
+        <button class="odds-pick ob-boost-pick${S.slip?.boost_id === b.id ? ' on' : ''}" data-boost="${b.id}">
+          ${b.was ? `<s class="ob-was">${esc(b.was)}</s>` : ''}<b>${esc(b.price)}</b></button>
+      </div>
+      ${S.slip?.boost_id === b.id ? slipHtml(S.slip) : ''}
+    </div>`).join('')}</div>`;
 }
 
 const title = m => `${m.name1} v ${m.name2}`;
@@ -68,7 +89,7 @@ function matchCard(m) {
       ${more ? (more.length ? more.map(mk => `<div class="ob-mk">
           <span class="ob-mk-title">${esc(mk.title)}</span>
           <div class="mk-picks${mk.multi ? ' mk-multi' : ''}">${mk.outcomes.map(o =>
-            pickBtn({ match_id: m.id, market: mk.key, pick: o.pick, label: pickLabel(mk, o), title: `${title(m)}: ${mk.title}`, price: o.price },
+            pickBtn({ match_id: m.id, market: mk.key, pick: o.pick, label: pickLabel(mk, o), title: legTitle(title(m), mk), price: o.price },
               o.label, o.price, ' small-pick mk-pick')).join('')}</div>
         </div>`).join('') : '<p class="muted small">No other markets for this match.</p>') : ''}
     </details>
@@ -77,7 +98,8 @@ function matchCard(m) {
 
 function groupMeta(g) {
   const inAcca = accaPicks().filter(x => g.list.some(m => m.id === x.match_id)).length;
-  return `${esc(day(g.starts))} · ${g.list.length} match${g.list.length === 1 ? '' : 'es'}${inAcca ? ` · <b>${inAcca} in acca</b>` : ''}`;
+  return [esc(day(g.starts)), g.boosts.length ? `${g.boosts.length} superboost${g.boosts.length === 1 ? '' : 's'}` : '',
+    g.list.length ? `${g.list.length} match${g.list.length === 1 ? '' : 'es'}` : '', inAcca ? `<b>${inAcca} in acca</b>` : ''].filter(Boolean).join(' · ');
 }
 
 // A tap only changes one match's buttons, its event's count and the acca
@@ -117,7 +139,7 @@ function render() {
           <span class="ob-group-name">${esc(g.name)}</span>
           <span class="ob-group-meta">${groupMeta(g)}</span>
         </summary>
-        <div class="ob-list">${S.open.has(g.id) ? g.list.map(matchCard).join('') : ''}</div>
+        <div class="ob-list">${S.open.has(g.id) ? boostsHtml(g) + g.list.map(matchCard).join('') : ''}</div>
       </details>`;
     }).join('') : '<div class="card empty"><p>No matches to bet on right now.</p></div>'}
     ${thin ? '<p class="muted small odds-note">* Little data on a player, so these odds are rough</p>' : ''}
@@ -141,9 +163,18 @@ app.addEventListener('toggle', e => {
   }
 }, true);
 
-const ctx = { slip: () => null, set: () => {}, render: () => render(), changed: async () => {} };
+const ctx = { slip: () => S.slip, set: v => { S.slip = v; }, render: () => render(), changed: async () => { await loadAccount(true); } };
 app.addEventListener('input', e => { slipEvent(e, ctx); });
 app.addEventListener('click', async e => {
+  const bb = e.target.closest('[data-boost]');
+  if (bb) {
+    const boost = S.boosts.find(x => x.id === Number(bb.dataset.boost));
+    if (!boost) return;
+    S.slip = S.slip?.boost_id === boost.id ? null
+      : { kind: 'boost', boost_id: boost.id, selection: boost.title, price: boost.price, stake: S.slip?.stake ?? Math.min(100, boost.max_stake ?? 100) };
+    render();
+    return;
+  }
   const b = e.target.closest('[data-add]');
   if (b) {
     let sel;

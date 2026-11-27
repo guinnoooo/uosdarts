@@ -34,7 +34,7 @@ async function loadInner() {
   // Everything the page shows, fetched at once rather than one after another.
   const rpc = (fn, args) => sb.rpc(fn, args);
   const [players, admins, friendliesOn, hubsOn, friendlies, openFriendlies, accounts, futures, fantasy,
-    fxScoring, fxTeams, allBets, accBets, seeds, futCats] = await Promise.all([
+    fxScoring, fxTeams, allBets, accBets, seeds, futCats, boosts, comps] = await Promise.all([
     sb.from('players').select('*').order('name'),
     rpc('super_list_admins'),
     rpc('friendlies_enabled'),
@@ -50,6 +50,9 @@ async function loadInner() {
     S.accBetsFor ? rpc('super_account_bets', { p_user: S.accBetsFor }) : Promise.resolve({ data: null }),
     sb.from('player_seeds').select('player_id, rating'),
     rpc('super_future_categories'),
+    rpc('super_boosts'),
+    sb.from('tournaments').select('id, name, starts_at, status').is('deleted_at', null).eq('is_friendly', false)
+      .neq('status', 'complete').order('starts_at', { ascending: true, nullsFirst: false }).limit(40),
   ]);
   S.players = check(players);
   S.admins = check(admins);
@@ -60,6 +63,8 @@ async function loadInner() {
   S.accounts = check(accounts) ?? [];
   S.futures = check(futures) ?? [];
   S.futCats = check(futCats) ?? [];
+  S.boosts = check(boosts) ?? [];
+  S.comps = check(comps) ?? [];
   S.fantasy = check(fantasy) ?? [];
   S.fxScoring = check(fxScoring) ?? [];
   S.fxTeams = check(fxTeams) ?? null;
@@ -447,6 +452,48 @@ function fantasyScoringPanel() {
   </section>`;
 }
 
+// Superboosts: hand-priced bets at better odds, shown first in their comp on
+// the Odds page as "was 4/1, now 6/1". Optional max stake per person.
+const BOOST_STATUS = { draft: 'Draft (hidden)', open: 'Open', closed: 'Closed' };
+function boostForm(b) {
+  const id = b?.id ?? 'new';
+  const settled = b?.status === 'settled';
+  const comps = (S.comps ?? []).concat(b?.tournament_id && !(S.comps ?? []).some(c => c.id === b.tournament_id) ? [{ id: b.tournament_id, name: b.tournament }] : []);
+  return `<div class="fut-market boost-admin" data-bx="${id}">
+    ${b ? `<h3>${esc(b.title)}${settled ? ` <span class="muted small">settled ${esc(b.result)}</span>` : ''}</h3>` : ''}
+    <div class="new-player-grid">
+      <label>Comp <select data-bx-comp><option value="">None (own heading)</option>${comps.map(c => `<option value="${c.id}"${c.id === b?.tournament_id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+      <label>Was <input type="text" data-bx-was value="${esc(b?.was_price ?? '')}" placeholder="e.g. 4/1"></label>
+      <label>Now <input type="text" data-bx-price value="${esc(b?.price ?? '')}" placeholder="e.g. 6/1"></label>
+      <label>Max stake <input type="number" min="10" step="10" data-bx-max value="${b?.max_stake ?? ''}" placeholder="No limit"></label>
+      <label>Status <select data-bx-status${settled ? ' disabled' : ''}>${Object.entries(BOOST_STATUS).map(([k, v]) => `<option value="${k}"${(b?.status ?? 'draft') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label>Betting closes <input type="datetime-local" data-bx-closes value="${localInput(b?.closes_at)}"></label>
+    </div>
+    <label>What it is <input type="text" data-bx-title value="${esc(b?.title ?? '')}" placeholder="e.g. Mikey Guinness to win PC 10 and hit a 180"></label>
+    <label>Small print <input type="text" data-bx-detail value="${esc(b?.detail ?? '')}" placeholder="Optional, e.g. Both must happen"></label>
+    <div class="row">
+      <button class="primary" data-bxsave>${b ? 'Save' : 'Add superboost'}</button>
+      ${b ? `<span class="muted small">${b.bets} bet${b.bets === 1 ? '' : 's'} · ${fmtN(b.staked)} staked · ${fmtN(b.liability)} to pay if it wins</span>` : ''}
+    </div>
+    ${b ? `<div class="row">
+      <select data-bx-res><option value=""${b.result ? '' : ' selected'}>Not settled</option>${['won', 'lost', 'void'].map(r => `<option${b.result === r ? ' selected' : ''}>${r}</option>`).join('')}</select>
+      <button data-bxsettle>Settle</button>
+      ${b.bets ? '' : '<button class="danger" data-bxdel>Delete</button>'}
+    </div>` : ''}
+  </div>`;
+}
+function boostsPanel() {
+  const list = S.boosts ?? [];
+  return `<section class="panel futures-admin">
+    <h2>Superboosts${list.filter(b => b.status === 'open').length ? ` <span class="fut-pending">${list.filter(b => b.status === 'open').length} open</span>` : ''}</h2>
+    <p class="muted small">Shown first in their comp on the Odds page, the old price struck through. Single bets only, not in accas.
+      Drafts are hidden. Settle with won, lost or void.</p>
+    <h3>New superboost</h3>
+    ${boostForm(null)}
+    ${list.map(boostForm).join('')}
+  </section>`;
+}
+
 // Futures and specials, grouped by category. Categories are the headings
 // on the Futures page: add, rename, reorder or delete them here, and move
 // markets between them or up and down within one.
@@ -638,7 +685,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${allBetsPanel()}${futuresPanel()}${fantasyTeamsPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${allBetsPanel()}${boostsPanel()}${futuresPanel()}${fantasyTeamsPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   applyFolds();
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
@@ -751,6 +798,7 @@ app.addEventListener('click', async e => {
     render();
     return;
   }
+  if (await boostsClick(el)) return;
   if (await futuresClick(el)) return;
   if (await fantasyClick(el)) return;
   if (await fantasyScoringClick(el)) return;
@@ -959,6 +1007,39 @@ async function fantasyClick(el) {
     const v = Number(box.querySelector('[data-fx-addprice]').value);
     if (!pid || !v) { toast('Pick a player and give them a price'); return true; }
     await run(async () => check(await sb.rpc('super_fantasy_set_prices', { p_prices: { [pid]: v } })), 'Added');
+    return true;
+  }
+  return false;
+}
+
+async function boostsClick(el) {
+  const box = el.closest('[data-bx]');
+  if (!box) return false;
+  const q = sel => box.querySelector(sel);
+  const id = box.dataset.bx === 'new' ? null : Number(box.dataset.bx);
+  const b = S.boosts.find(x => x.id === id);
+  if (el.dataset.bxsave != null) {
+    const status = q('[data-bx-status]').value;
+    if (status === 'open' && b?.status !== 'open' && !confirm('Open this superboost for betting?')) return true;
+    const closes = q('[data-bx-closes]').value;
+    const max = q('[data-bx-max]').value.trim();
+    await run(async () => check(await sb.rpc('super_boost_save', {
+      p_id: id, p_tournament: q('[data-bx-comp]').value || null, p_title: q('[data-bx-title]').value, p_detail: q('[data-bx-detail]').value,
+      p_was: q('[data-bx-was]').value, p_price: q('[data-bx-price]').value, p_max: max ? Number(max) : null,
+      p_status: status, p_closes_at: closes ? new Date(closes).toISOString() : null,
+    })), id ? 'Superboost saved' : 'Superboost added');
+    return true;
+  }
+  if (el.dataset.bxsettle != null) {
+    const r = q('[data-bx-res]').value || null;
+    const msg = r ? { won: `Settle as WON? ${b.bets} bet${b.bets === 1 ? '' : 's'} get paid.`, lost: 'Settle as lost?', void: 'Void it? Stakes go back.' }[r] : 'Unsettle it? Bets go back to open.';
+    if (!confirm(msg)) return true;
+    await run(async () => check(await sb.rpc('super_boost_settle', { p_boost: id, p_result: r })), 'Settled');
+    return true;
+  }
+  if (el.dataset.bxdel != null) {
+    if (!confirm('Delete this superboost? Nobody has bet on it.')) return true;
+    await run(async () => check(await sb.rpc('super_boost_delete', { p_id: id })), 'Deleted');
     return true;
   }
   return false;
