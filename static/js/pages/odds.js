@@ -6,7 +6,7 @@
 import { sb, esc, matchLabel } from '../db.js';
 import { oomScores, matchChance, isThin } from '../winprob.js';
 import { bookPrices } from '../prices.js';
-import { matchMarkets, pickLabel } from '../markets.js';
+import { matchMarkets, pickLabel, legTitle } from '../markets.js';
 import { loadAccount, slipEvent, accaBarHtml, accaHas, accaToggle, accaPicks } from '../betting.js';
 
 const app = document.getElementById('app');
@@ -68,7 +68,7 @@ function matchCard(m) {
       ${more ? (more.length ? more.map(mk => `<div class="ob-mk">
           <span class="ob-mk-title">${esc(mk.title)}</span>
           <div class="mk-picks${mk.multi ? ' mk-multi' : ''}">${mk.outcomes.map(o =>
-            pickBtn({ match_id: m.id, market: mk.key, pick: o.pick, label: pickLabel(mk, o), title: `${title(m)}: ${mk.title}`, price: o.price },
+            pickBtn({ match_id: m.id, market: mk.key, pick: o.pick, label: pickLabel(mk, o), title: legTitle(title(m), mk), price: o.price },
               o.label, o.price, ' small-pick mk-pick')).join('')}</div>
         </div>`).join('') : '<p class="muted small">No other markets for this match.</p>') : ''}
     </details>

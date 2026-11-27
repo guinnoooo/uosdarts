@@ -5,7 +5,7 @@ import { mountChat } from '../chat.js';
 import { oomScores, matchChance, liveChance, pctPair, isThin, teamPreview } from '../winprob.js';
 import { bookPrices } from '../prices.js';
 import { loadAccount, slipHtml, slipEvent, myBetsOn, myBetsHtml, quoteSlip, accaBarHtml, accaHas } from '../betting.js';
-import { matchMarkets, marketsAllowed, pickLabel } from '../markets.js';
+import { matchMarkets, marketsAllowed, pickLabel, legTitle } from '../markets.js';
 import { checkout, minDarts, isValidVisit, playerStats, QUICK_SCORES } from '../darts.js';
 
 const app = document.getElementById('app');
@@ -691,7 +691,7 @@ function openMarketSlip(key, pick) {
   if (!o) return;
   const label = pickLabel(mk, o);
   S.slip = { kind: 'sels', selection: label, price: o.price, stake: S.slip?.stake ?? 100, accaable: true,
-    sels: [{ match_id: id, market: key, pick, label, title: `${nameOf(1)} v ${nameOf(2)}: ${mk.title}`, price: o.price }] };
+    sels: [{ match_id: id, market: key, pick, label, title: legTitle(`${nameOf(1)} v ${nameOf(2)}`, mk), price: o.price }] };
   loadAccount().then(render, render);
   render();
   quoteSlip(S.slip, betCtx);

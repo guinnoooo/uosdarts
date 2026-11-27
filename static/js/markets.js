@@ -217,3 +217,10 @@ export function matchMarkets(pv, m, figs, names) {
 export function pickLabel(mk, o) {
   return ['cs', 'hcap'].includes(mk.key) ? o.label : `${mk.title}: ${o.label}`;
 }
+
+// The line under a pick on a slip or bet card: the match, plus the market
+// name only where the pick's own label doesn't already say it (correct
+// score and handicap picks read like "Liam English 2-0").
+export function legTitle(matchTitle, mk) {
+  return ['cs', 'hcap'].includes(mk.key) ? `${matchTitle}: ${mk.title}` : matchTitle;
+}

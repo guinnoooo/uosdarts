@@ -132,7 +132,7 @@ export function betCard(b, { context = null } = {}) {
     || document.title.split(' · ')[0].trim());
   const shareable = b.status === 'won' || b.status === 'cashed_out';
   const shareData = shareable ? esc(JSON.stringify({ selection: b.kind === 'acca' ? `${b.legs?.length ?? ''}-fold acca` : b.selection,
-    market: b.kind === 'acca' ? null : ctx, price: b.price, stake: b.stake, paid: b.payout, cashedOut: b.status === 'cashed_out', legs: b.kind === 'acca' ? (b.legs ?? []).map(l => ({ label: l.label })) : null })) : '';
+    market: b.kind === 'acca' ? null : ctx, price: b.price, stake: b.stake, paid: b.payout, cashedOut: b.status === 'cashed_out', legs: b.kind === 'acca' ? (b.legs ?? []).map(l => ({ label: l.label, title: l.title, price: l.price })) : null })) : '';
   const actions = [cancelButton(b), shareable ? `<button class="link" data-sharebet="${shareData}">Share</button>` : ''].filter(Boolean).join(' ');
   return `<article class="betcard betcard-${esc(st)}">
     <header class="betcard-top">

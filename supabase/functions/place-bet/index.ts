@@ -15,7 +15,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { MODEL, oomScore, matchChance } from './winprob.js';
 import { previewFor, matchPrices, decimalOf } from './prices.js';
 import { outrightOdds, outrightPrice } from './outright.js';
-import { MK, matchMarkets, pickLabel } from './markets.js';
+import { MK, matchMarkets, pickLabel, legTitle } from './markets.js';
 
 const MATCH_SELECT =
   '*, p1:players!matches_player1_id_fkey(id,name), p2:players!matches_player2_id_fkey(id,name)';
@@ -207,7 +207,7 @@ async function priceSelection(db: any, oomRows: unknown[], matchId: string, mark
   if (!mk || !o) throw new Error(`That market isn't available for ${title}`);
   return {
     match_id: matchId, market, pick, line: mk.line ?? null, fav: mk.fav ?? null,
-    title: `${title}: ${mk.title}`, label: pickLabel(mk, o),
+    title: legTitle(title, mk), label: pickLabel(mk, o),
     price: o.price, decimal: o.decimal,
   };
 }

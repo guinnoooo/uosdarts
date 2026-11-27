@@ -98,20 +98,50 @@ export async function resultCard(r) {
 export async function betWinCard(b) {
   await fontsReady();
   const [c, g] = canvas();
-  header(g, 'GuinnessBet', b.cashedOut ? 'Cashed out' : 'Winner');
-  box(g, 80, 330, W - 160, 300, 22, '#1f1b12', C.gold);
-  text(g, b.selection, 130, 440, { size: 64, weight: 800, max: W - 460 });
-  text(g, b.market ?? '', 130, 505, { size: 32, color: C.dim, max: W - 460 });
-  box(g, W - 330, 385, 200, 100, 14, C.gold, null);
-  text(g, b.price, W - 230, 455, { size: 56, weight: 800, color: '#111', align: 'center', max: 180 });
-  if (b.legs?.length) text(g, `${b.legs.length}-fold acca`, 130, 590, { size: 30, weight: 600, color: C.gold });
   const tok = n => Number(n ?? 0).toLocaleString('en-GB');
-  text(g, 'STAKE', 130, 760, { size: 26, weight: 600, color: C.faint, spacing: 4 });
-  text(g, tok(b.stake), 130, 840, { size: 80, weight: 700, color: C.dim });
-  text(g, b.cashedOut ? 'CASHED OUT FOR' : 'PAID', W - 130, 760, { size: 26, weight: 600, color: C.faint, spacing: 4, align: 'right' });
-  text(g, tok(b.paid), W - 130, 840, { size: 80, weight: 800, color: C.good, align: 'right' });
-  const profit = Number(b.paid) - Number(b.stake);
-  text(g, `+${tok(profit)} tokens`, W / 2, 1010, { size: 92, weight: 800, color: C.gold, align: 'center' });
+  header(g, b.boost ? 'GuinnessBet superboost' : 'GuinnessBet', b.cashedOut ? 'Cashed out' : 'Winner');
+  const legs = b.legs ?? [];
+  let y;
+  if (legs.length) {
+    // An acca: the fold and its odds, then every pick with its price.
+    box(g, 80, 310, W - 160, 130, 22, '#1f1b12', C.gold);
+    text(g, `${legs.length}-fold acca`, 130, 395, { size: 58, weight: 800, max: W - 460 });
+    box(g, W - 330, 330, 200, 90, 14, C.gold, null);
+    text(g, b.price, W - 230, 375, { size: 52, weight: 800, color: '#111', align: 'center', max: 180, mid: true });
+    const shown = legs.slice(0, 6);
+    const gap = Math.min(92, 520 / shown.length);
+    shown.forEach((l, i) => {
+      const top = 480 + i * gap;
+      text(g, '✓', 100, top + 34, { size: 34, weight: 700, color: C.good });
+      text(g, l.label, 150, top + 34, { size: 36, weight: 700, max: W - 420 });
+      if (l.title) text(g, l.title, 150, top + 70, { size: 24, color: C.dim, max: W - 420 });
+      text(g, l.price ?? '', W - 110, top + 34, { size: 36, weight: 700, color: C.gold, align: 'right' });
+    });
+    if (legs.length > shown.length) text(g, `+${legs.length - shown.length} more`, 150, 480 + shown.length * gap + 30, { size: 26, color: C.dim });
+    y = 1040;
+    text(g, 'STAKE', 130, y, { size: 24, weight: 600, color: C.faint, spacing: 4 });
+    text(g, tok(b.stake), 130, y + 64, { size: 60, weight: 700, color: C.dim });
+    text(g, b.cashedOut ? 'CASHED OUT FOR' : 'PAID', W - 130, y, { size: 24, weight: 600, color: C.faint, spacing: 4, align: 'right' });
+    text(g, tok(b.paid), W - 130, y + 64, { size: 60, weight: 800, color: C.good, align: 'right' });
+    text(g, `+${tok(Number(b.paid) - Number(b.stake))}`, W / 2, y + 64, { size: 60, weight: 800, color: C.gold, align: 'center' });
+  } else {
+    box(g, 80, 330, W - 160, 300, 22, '#1f1b12', C.gold);
+    text(g, b.selection, 130, 440, { size: 64, weight: 800, max: W - 460 });
+    text(g, b.market ?? '', 130, 505, { size: 32, color: C.dim, max: W - 460 });
+    box(g, W - 330, 385, 200, 100, 14, C.gold, null);
+    text(g, b.price, W - 230, 435, { size: 56, weight: 800, color: '#111', align: 'center', max: 180, mid: true });
+    if (b.was) {   // a superboost: the old price, struck through
+      text(g, b.was, W - 230, 540, { size: 40, weight: 600, color: C.dim, align: 'center', mid: true });
+      g.font = `600 40px ${F}`;
+      const w = g.measureText(b.was).width;
+      g.fillStyle = C.dim; g.fillRect(W - 230 - w / 2 - 6, 538, w + 12, 4);
+    }
+    text(g, 'STAKE', 130, 760, { size: 26, weight: 600, color: C.faint, spacing: 4 });
+    text(g, tok(b.stake), 130, 840, { size: 80, weight: 700, color: C.dim });
+    text(g, b.cashedOut ? 'CASHED OUT FOR' : 'PAID', W - 130, 760, { size: 26, weight: 600, color: C.faint, spacing: 4, align: 'right' });
+    text(g, tok(b.paid), W - 130, 840, { size: 80, weight: 800, color: C.good, align: 'right' });
+    text(g, `+${tok(Number(b.paid) - Number(b.stake))} tokens`, W / 2, 1010, { size: 92, weight: 800, color: C.gold, align: 'center' });
+  }
   footer(g, 'Tokens only. No real money.');
   return c;
 }
