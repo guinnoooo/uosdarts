@@ -34,7 +34,7 @@ async function loadInner() {
   // Everything the page shows, fetched at once rather than one after another.
   const rpc = (fn, args) => sb.rpc(fn, args);
   const [players, admins, friendliesOn, hubsOn, friendlies, openFriendlies, accounts, futures, fantasy,
-    fxScoring, fxTeams, allBets, accBets, seeds] = await Promise.all([
+    fxScoring, fxTeams, allBets, accBets, seeds, futCats] = await Promise.all([
     sb.from('players').select('*').order('name'),
     rpc('super_list_admins'),
     rpc('friendlies_enabled'),
@@ -49,6 +49,7 @@ async function loadInner() {
     rpc('super_all_bets', { p_limit: 500 }),
     S.accBetsFor ? rpc('super_account_bets', { p_user: S.accBetsFor }) : Promise.resolve({ data: null }),
     sb.from('player_seeds').select('player_id, rating'),
+    rpc('super_future_categories'),
   ]);
   S.players = check(players);
   S.admins = check(admins);
@@ -58,6 +59,7 @@ async function loadInner() {
   S.openFriendlies = check(openFriendlies) ?? [];
   S.accounts = check(accounts) ?? [];
   S.futures = check(futures) ?? [];
+  S.futCats = check(futCats) ?? [];
   S.fantasy = check(fantasy) ?? [];
   S.fxScoring = check(fxScoring) ?? [];
   S.fxTeams = check(fxTeams) ?? null;
@@ -445,44 +447,62 @@ function fantasyScoringPanel() {
   </section>`;
 }
 
+// Futures and specials, grouped by category. Categories are the headings
+// on the Futures page: add, rename, reorder or delete them here, and move
+// markets between them or up and down within one.
 function futuresPanel() {
-  const list = (S.futures ?? []).filter(m => m.kind !== 'special');
-  if (!list.length) return '';
+  const cats = S.futCats ?? [];
+  const list = S.futures ?? [];
   const pending = list.reduce((t, m) => t + m.selections.filter(x => x.proposed).length, 0);
+  const catOpts = sel => cats.map(c => `<option value="${c.id}"${c.id === sel ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+  const groups = cats.map(c => ({ c, markets: list.filter(m => m.category_id === c.id) }));
+  const loose = list.filter(m => !cats.some(c => c.id === m.category_id));
   return `<section class="panel futures-admin">
-    <h2>Futures${pending ? ` <span class="fut-pending">${pending} to approve</span>` : ''}</h2>
+    <h2>Futures and specials${pending ? ` <span class="fut-pending">${pending} to approve</span>` : ''}</h2>
     <p class="muted small">Drafts are hidden. A blank price isn't shown. Prices only change when you approve them.
-      Refresh suggestions works out moves from form and the betting so far. The weekly model run does it too.</p>
+      Refresh suggestions works out moves for player markets from form and the betting so far. The weekly model run does it too.</p>
     <div class="row"><button data-futsuggest="1">Refresh suggestions</button></div>
-    ${list.map(futureMarketHtml).join('')}
-  </section>`;
-}
 
-// Specials: custom markets with options typed in by hand. They show on the
-// Futures page under their own heading and settle like any other future.
-function specialsPanel() {
-  const list = (S.futures ?? []).filter(m => m.kind === 'special');
-  return `<section class="panel futures-admin">
-    <h2>Specials</h2>
-    <p class="muted small">New specials start as drafts, hidden until you open them.</p>
-    <div class="row"><input type="text" id="sp-title" placeholder="e.g. Will anyone hit a 9-darter this season?" style="flex:1">
-      <button class="primary" data-act="sp-create">Create</button></div>
-    ${list.map(futureMarketHtml).join('')}
+    <h3>Categories</h3>
+    <p class="muted small">The headings on the Futures page, in this order.</p>
+    <table class="points-list fut-cats"><tbody>${cats.map((c, i) => `<tr>
+      <td class="l"><input type="text" data-fc-name="${c.id}" value="${esc(c.name)}"></td>
+      <td class="small muted">${c.markets} market${c.markets === 1 ? '' : 's'}</td>
+      <td class="fut-move"><button data-fcmove="${c.id}" data-dir="-1"${i ? '' : ' disabled'} title="Up">↑</button><button data-fcmove="${c.id}" data-dir="1"${i < cats.length - 1 ? '' : ' disabled'} title="Down">↓</button></td>
+      <td><button data-fcsave="${c.id}">Rename</button>${c.markets ? '' : ` <button class="link" data-fcdel="${c.id}" title="Delete">✕</button>`}</td>
+    </tr>`).join('')}</tbody></table>
+    <div class="row"><input type="text" id="fc-new" placeholder="New category, e.g. Ham Cup specials" style="flex:1">
+      <button data-act="fc-create">Add category</button></div>
+
+    <h3>New market</h3>
+    <p class="muted small">Starts as a draft, hidden until you open it.</p>
+    <div class="row"><input type="text" id="fm-new-title" placeholder="e.g. Will anyone hit a 9-darter this season?" style="flex:1"></div>
+    <div class="row">
+      <select id="fm-new-kind"><option value="special">Typed options (Yes / No…)</option><option value="player">Players</option></select>
+      <select id="fm-new-cat">${catOpts(cats.at(-1)?.id)}</select>
+      <button class="primary" data-act="fm-create">Create</button>
+    </div>
+
+    ${groups.map(g => `<div class="fut-cat-group"><h3 class="fut-cat-head">${esc(g.c.name)}</h3>
+      ${g.markets.length ? g.markets.map((m, i) => futureMarketHtml(m, { first: !i, last: i === g.markets.length - 1, catOpts })).join('') : '<p class="muted small">No markets yet.</p>'}</div>`).join('')}
+    ${loose.length ? `<div class="fut-cat-group"><h3 class="fut-cat-head">No category</h3>${loose.map(m => futureMarketHtml(m, { first: true, last: true, catOpts })).join('')}</div>` : ''}
   </section>`;
 }
 
 // Decimal odds from "5/2" or "Evens", for comparing prices.
 const frac = p => { if (!p) return Infinity; if (/^evens$/i.test(p)) return 2; const [a, b] = String(p).split('/').map(Number); return b ? 1 + a / b : Infinity; };
 
-function futureMarketHtml(m) {
+function futureMarketHtml(m, { first = true, last = true, catOpts = null } = {}) {
   const special = m.kind === 'special';
   const inMarket = new Set(m.selections.map(s => s.player_id));
   const addable = S.players.filter(p => !inMarket.has(p.id));
   const staked = m.selections.reduce((t, s) => t + Number(s.staked), 0);
   const liability = m.selections.reduce((t, s) => t + Number(s.liability), 0);
   return `<div class="fut-market" data-fm="${m.id}">
-    <h3>${esc(m.title)}</h3>
+    <h3 class="fut-market-head" data-fold="${esc(m.title)}">${esc(m.title)}
+      <span class="fut-move"><button data-fmmove="${m.id}" data-dir="-1"${first ? ' disabled' : ''} title="Up">↑</button><button data-fmmove="${m.id}" data-dir="1"${last ? ' disabled' : ''} title="Down">↓</button></span></h3>
     <div class="new-player-grid">
+      ${catOpts ? `<label>Category <select data-fm-cat>${catOpts(m.category_id)}</select></label>` : ''}
       <label>Title <input type="text" data-fm-title value="${esc(m.title)}"></label>
       <label>Status <select data-fm-status>${Object.entries(FUT_STATUS).map(([k, v]) =>
         `<option value="${k}"${m.status === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
@@ -522,7 +542,7 @@ function futureMarketHtml(m) {
            <button data-futadd="${m.id}">Add</button>`}
       <button class="danger" data-futrest="${m.id}" data-as="lost">Settle everyone left as lost</button>
       <button data-futrest="${m.id}" data-as="void">Void everyone left</button>
-      ${special && !m.selections.some(x => x.bets) ? `<button class="danger" data-spdel="${m.id}">Delete</button>` : ''}
+      ${!m.selections.some(x => x.bets) ? `<button class="danger" data-spdel="${m.id}">Delete</button>` : ''}
     </div>
   </div>`;
 }
@@ -592,7 +612,7 @@ function render() {
       <h1>Super admin</h1>
       <a href="/admin/" class="muted small">Tournament admin</a>
     </div>
-    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${allBetsPanel()}${futuresPanel()}${specialsPanel()}${fantasyTeamsPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
+    ${playersPanel()}${playerPanel()}${reviewPanel()}${accountsPanel()}${allBetsPanel()}${futuresPanel()}${fantasyTeamsPanel()}${fantasyPanel()}${fantasyScoringPanel()}${friendlyPanel()}${hubPanel()}${chatPanel()}${adminsPanel()}`;
   applyFolds();
   const f = app.querySelector('#p-filter');
   if (f && S.filter) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
@@ -607,7 +627,7 @@ const FOLD_KEY = 'uosdarts:superFolds';
 const OPEN_BY_DEFAULT = new Set(['Players', 'Friendlies to check']);
 let FOLDS = {};
 try { FOLDS = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') ?? {}; } catch { FOLDS = {}; }
-const foldKey = h => (h.tagName === 'H3' ? 'market:' : '') + h.textContent.replace(/\s*\(\d+\)\s*$/, '').trim();
+const foldKey = h => (h.tagName === 'H3' ? 'market:' : '') + (h.dataset.fold ?? h.textContent.replace(/\s*\(\d+\)\s*$/, '').trim());
 
 function applyFolds() {
   app.querySelectorAll('section.panel > h2, .fut-market > h3').forEach(h => {
@@ -630,6 +650,7 @@ function toggleFold(h) {
 }
 
 app.addEventListener('click', e => {
+  if (e.target.closest('button')) return;   // e.g. the ↑ ↓ buttons in a market heading
   const h = e.target.closest('.fold-head');
   if (h) toggleFold(h);
 });
@@ -747,10 +768,18 @@ app.addEventListener('click', async e => {
       S.showReviewed = !S.showReviewed;
       render();
       break;
-    case 'sp-create': {
-      const title = val('#sp-title');
-      if (!title) { toast('Give the special a title'); break; }
-      await run(async () => check(await sb.rpc('super_special_create', { p_title: title })), 'Special created as a draft. Add the options.');
+    case 'fm-create': {
+      const title = val('#fm-new-title');
+      if (!title) { toast('Give the market a title'); break; }
+      const kind = val('#fm-new-kind');
+      await run(async () => check(await sb.rpc('super_future_create', { p_title: title, p_category: Number(val('#fm-new-cat')), p_kind: kind })),
+        `Created as a draft. Add the ${kind === 'player' ? 'players' : 'options'}.`);
+      break;
+    }
+    case 'fc-create': {
+      const name = val('#fc-new');
+      if (!name) { toast('Name the category first'); break; }
+      await run(async () => check(await sb.rpc('super_future_category', { p_id: null, p_name: name })), `${name} added`);
       break;
     }
     case 'add-player': {
@@ -910,6 +939,23 @@ async function fantasyClick(el) {
 }
 
 async function futuresClick(el) {
+  if (el.dataset.fcmove || el.dataset.fmmove) {
+    const what = el.dataset.fcmove ? 'category' : 'market';
+    await run(async () => check(await sb.rpc('super_future_move', { p_what: what, p_id: Number(el.dataset.fcmove || el.dataset.fmmove), p_dir: Number(el.dataset.dir) })), 'Moved');
+    return true;
+  }
+  if (el.dataset.fcsave) {
+    const id = Number(el.dataset.fcsave);
+    const name = document.querySelector(`[data-fc-name="${id}"]`).value.trim();
+    await run(async () => check(await sb.rpc('super_future_category', { p_id: id, p_name: name })), 'Renamed');
+    return true;
+  }
+  if (el.dataset.fcdel) {
+    const c = S.futCats.find(x => x.id === Number(el.dataset.fcdel));
+    if (!confirm(`Delete the "${c?.name}" category? It has no markets.`)) return true;
+    await run(async () => check(await sb.rpc('super_future_category_delete', { p_id: c.id })), 'Category deleted');
+    return true;
+  }
   if (el.dataset.futsuggest) {
     await run(async () => check(await sb.rpc('super_future_suggest')), 'Suggestions updated');
     return true;
@@ -942,10 +988,14 @@ async function futuresClick(el) {
     const closes = q('[data-fm-closes]').value;
     if (status === 'open' && market?.status !== 'open'
       && !confirm(`Open "${market?.title}" for betting?`)) return true;
-    await run(async () => check(await sb.rpc('super_future_market', {
-      p_market: mid, p_title: q('[data-fm-title]').value, p_rules: q('[data-fm-rules]').value,
-      p_status: status, p_closes_at: closes ? new Date(closes).toISOString() : null,
-    })), 'Market saved');
+    const cat = Number(q('[data-fm-cat]')?.value) || null;
+    await run(async () => {
+      check(await sb.rpc('super_future_market', {
+        p_market: mid, p_title: q('[data-fm-title]').value, p_rules: q('[data-fm-rules]').value,
+        p_status: status, p_closes_at: closes ? new Date(closes).toISOString() : null,
+      }));
+      if (cat && cat !== market?.category_id) check(await sb.rpc('super_future_set_category', { p_market: mid, p_category: cat }));
+    }, 'Market saved');
     return true;
   }
   if (el.dataset.futres) {
@@ -989,7 +1039,7 @@ async function futuresClick(el) {
   }
   if (el.dataset.spdel) {
     if (!confirm(`Delete "${market?.title}"? Nobody has bet on it.`)) return true;
-    await run(async () => check(await sb.rpc('super_special_delete', { p_market: mid })), 'Special deleted');
+    await run(async () => check(await sb.rpc('super_special_delete', { p_market: mid })), 'Market deleted');
     return true;
   }
   if (el.dataset.futrest) {

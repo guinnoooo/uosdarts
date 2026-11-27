@@ -1,4 +1,5 @@
-// Futures: Ham Cup winner, the Dartsity markets and any Specials. Prices are set by hand
+// Futures: Ham Cup winner, the Dartsity markets, Specials and any other
+// categories the super admin adds. Prices are set by hand
 // on the super admin page, and a bet keeps the price it was placed at.
 
 import { sb, esc } from '../db.js';
@@ -78,13 +79,20 @@ function marketHtml(m) {
   </section>`;
 }
 
+// Markets come grouped by category, in the order the super admin set.
+// With more than one category each gets a heading.
 function render() {
-  const main = S.markets.filter(m => m.kind !== 'special');
-  const specials = S.markets.filter(m => m.kind === 'special');
-  app.innerHTML = S.markets.length
-    ? main.map(marketHtml).join('')
-      + (specials.length ? `<h2 class="futures-group">Specials</h2>${specials.map(marketHtml).join('')}` : '')
-    : '<section class="panel"><h2>Futures</h2><p class="muted">No markets open yet.</p></section>';
+  if (!S.markets.length) {
+    app.innerHTML = '<section class="panel"><h2>Futures</h2><p class="muted">No markets open yet.</p></section>';
+    return;
+  }
+  const groups = [];
+  for (const m of S.markets) {
+    const name = m.category ?? (m.kind === 'special' ? 'Specials' : 'Futures');
+    if (groups.at(-1)?.name !== name) groups.push({ name, list: [] });
+    groups.at(-1).list.push(m);
+  }
+  app.innerHTML = groups.map(g => `${groups.length > 1 ? `<h2 class="futures-group">${esc(g.name)}</h2>` : ''}${g.list.map(marketHtml).join('')}`).join('');
 }
 
 const ctx = {
