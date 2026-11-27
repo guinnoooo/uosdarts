@@ -39,6 +39,21 @@ function moved(s) {
     aria-label="${inward ? 'Shortened' : 'Drifted'} from ${esc(s.was)}">${inward ? '▼' : '▲'}</span>`;
 }
 
+// A matchup market: one row per pairing, A and their price on the left,
+// B and theirs on the right. Each side is its own bet.
+function matchupsHtml(list, cell) {
+  const pairs = [];
+  for (const s of list) {
+    if (pairs.at(-1)?.[0].pair === s.pair && pairs.at(-1).length < 2) pairs.at(-1).push(s);
+    else pairs.push([s]);
+  }
+  return `<div class="mu-list">${pairs.map(([a, b]) => `<div class="mu-row">
+    <span class="mu-name">${esc(a.name)}</span><span class="mu-p">${cell(a)}</span>
+    <span class="mu-v">v</span>
+    ${b ? `<span class="mu-p">${cell(b)}</span><span class="mu-name r">${esc(b.name)}</span>` : ''}
+  </div>`).join('')}</div>`;
+}
+
 function marketHtml(m) {
   const mine = S.bets.filter(b => b.future_market === m.id);
   const list = m.selections;
@@ -71,11 +86,12 @@ function marketHtml(m) {
     ${mine.length ? `<details class="my-bets fut-mybets" data-fbets="${m.id}"${S.betsOpen.has(m.id) ? ' open' : ''}>
       <summary><h3>Your bets <span class="muted">${mine.length}</span></h3></summary>
       <div class="betcards">${mine.map(b => betCard(b)).join('')}</div></details>` : ''}
-    ${list.length ? `<table class="outright-list futures-list"><tbody>${shown.map(s => `<tr>
+    ${!list.length ? '<p class="muted">No prices yet.</p>'
+      : m.kind === 'matchup' ? matchupsHtml(list, cell)
+      : `<table class="outright-list futures-list"><tbody>${shown.map(s => `<tr>
       <td class="l">${esc(s.name)}</td><td>${cell(s)}</td></tr>`).join('')}</tbody></table>
-    ${list.length > SHOW ? `<button class="link" data-fall="${m.id}">${S.all.has(m.id) ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}`
-    : '<p class="muted">No prices yet.</p>'}
-    ${m.open && m.kind !== 'special' ? '<p class="muted small">Others available on request.</p>' : ''}
+    ${list.length > SHOW ? `<button class="link" data-fall="${m.id}">${S.all.has(m.id) ? 'Show fewer' : `Show all ${list.length}`}</button>` : ''}`}
+    ${m.open && m.kind === 'player' ? '<p class="muted small">Others available on request.</p>' : ''}
   </section>`;
 }
 
@@ -132,7 +148,9 @@ app.addEventListener('click', async e => {
     const m = S.markets.find(x => x.selections.some(s => s.id === id));
     const s = m?.selections.find(x => x.id === id);
     if (!s?.price) return;
-    S.slip = { kind: 'future', future_id: id, market: m.id, selection: s.name, price: s.price, stake: S.slip?.stake ?? 100 };
+    // In a matchup the slip says who they're up against, as the bet will.
+    const opp = s.pair != null ? m.selections.find(x => x.pair === s.pair && x.id !== s.id) : null;
+    S.slip = { kind: 'future', future_id: id, market: m.id, selection: opp ? `${s.name} (v ${opp.name})` : s.name, price: s.price, stake: S.slip?.stake ?? 100 };
     render();
     return;
   }
