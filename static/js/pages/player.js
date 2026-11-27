@@ -71,39 +71,55 @@ function chartHtml(events, seasonAvg) {
   </figure>`;
 }
 
-// Their order of merit points building up through the season, event by
-// event. Event wins get a gold ring.
-function oomPoints(events) {
-  let total = 0;
-  return events.filter(e => Number(e.points) > 0)
-    .map(e => ({ ...e, pts: Number(e.points), total: (total += Number(e.points)), won: e.reached === 'winner' }));
+// Their order of merit points building up through the season, a week at a
+// time from the first OoM event, so a week with no points shows as a flat
+// step and a hollow dot. Weeks they won an event get a gold ring.
+const DAY = 86400000;
+const monday = d => { const t = new Date(`${String(d).slice(0, 10)}T12:00:00Z`); t.setUTCDate(t.getUTCDate() - ((t.getUTCDay() + 6) % 7)); return t.getTime(); };
+function oomWeeks(events, from, to) {
+  const dated = events.filter(e => Number(e.points) > 0 && e.day);
+  if (!dated.length) return [];
+  const start = monday(from ?? dated.map(e => e.day).sort()[0]);
+  // Up to the latest week anyone scored points, so a PC they missed still shows.
+  const end = Math.max(monday(to ?? dated.map(e => e.day).sort().at(-1)), ...dated.map(e => monday(e.day)));
+  const weeks = [];
+  let total = events.filter(e => Number(e.points) > 0 && !e.day).reduce((t, e) => t + Number(e.points), 0);
+  for (let w = start; w <= end; w += 7 * DAY) {
+    const inWeek = dated.filter(e => monday(e.day) === w);
+    const pts = inWeek.reduce((t, e) => t + Number(e.points), 0);
+    total += pts;
+    weeks.push({ w, pts, total, names: inWeek.map(e => e.name), won: inWeek.some(e => e.reached === 'winner') });
+  }
+  return weeks;
 }
-function oomHtml(events, oom) {
-  const pts = oomPoints(events);
-  if (pts.length < 2) return '';
+function oomHtml(events, oom, from, to) {
+  const wk = oomWeeks(events, from, to);
+  if (!wk.length || !wk.at(-1).total) return '';
   const W = Math.max(300, Math.min(760, (app.clientWidth || 640) - 40)), H = 220, L = 46, R = 12, T = 14, B = 24;
-  const top = pts.at(-1).total;
+  const top = wk.at(-1).total;
   const step = top > 4000 ? 1000 : top > 1600 ? 500 : 200;
   const hi = Math.ceil((top * 1.08) / step) * step;
-  const x = i => L + i * (W - L - R) / pts.length;   // a step for each event, from zero
+  const x = i => L + (i + 1) * (W - L - R) / wk.length;   // the line starts from zero a week earlier
   const y = v => T + (hi - v) * (H - T - B) / (hi || 1);
   const ticks = [];
   for (let v = 0; v <= hi; v += step) ticks.push(v);
-  const line = `M${x(0)},${y(0)}` + pts.map((p, i) => `L${x(i + 1).toFixed(1)},${y(p.total).toFixed(1)}`).join('');
+  const line = `M${L},${y(0)}` + wk.map((p, i) => `L${x(i).toFixed(1)},${y(p.total).toFixed(1)}`).join('');
+  const label = i => new Date(wk[i].w).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   return `<figure class="pp-chart" data-chart="oom">
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Order of merit points through the season">
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Order of merit points week by week">
       ${ticks.map(v => `<g><line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="pp-grid"/>
         <text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" class="pp-axis">${v.toLocaleString('en-GB')}</text></g>`).join('')}
+      ${wk.map((p, i) => `<line x1="${x(i)}" x2="${x(i)}" y1="${T}" y2="${H - B}" class="pp-grid pp-week"/>`).join('')}
       <path d="${line}" class="pp-line"/>
-      ${pts.map((p, i) => `<g class="pp-pt" tabindex="0" data-i="${i}">
-        <circle cx="${x(i + 1)}" cy="${y(p.total)}" r="12" class="pp-hit"/>
-        ${p.won ? `<circle cx="${x(i + 1)}" cy="${y(p.total)}" r="8" class="pp-win"/>` : ''}
-        <circle cx="${x(i + 1)}" cy="${y(p.total)}" r="4.5" class="pp-dot"/>
-        <title>${esc(p.name)}: +${p.pts}</title></g>`).join('')}
-      <text x="${L}" y="${H - 6}" class="pp-axis">Start</text>
-      <text x="${W - R}" y="${H - 6}" text-anchor="end" class="pp-axis">${esc(pts.at(-1).name)}</text>
+      ${wk.map((p, i) => `<g class="pp-pt" tabindex="0" data-i="${i}">
+        <circle cx="${x(i)}" cy="${y(p.total)}" r="12" class="pp-hit"/>
+        ${p.won ? `<circle cx="${x(i)}" cy="${y(p.total)}" r="8" class="pp-win"/>` : ''}
+        <circle cx="${x(i)}" cy="${y(p.total)}" r="4.5" class="${p.pts ? 'pp-dot' : 'pp-dot pp-none'}"/>
+        <title>w/c ${label(i)}: ${p.pts ? `+${p.pts}` : 'no points'}</title></g>`).join('')}
+      <text x="${x(0)}" y="${H - 6}" text-anchor="middle" class="pp-axis">${esc(label(0))}</text>
+      <text x="${W - R}" y="${H - 6}" text-anchor="end" class="pp-axis">${esc(label(wk.length - 1))}</text>
     </svg>
-    <figcaption class="pp-tip small muted">${top.toLocaleString('en-GB')} points${oom ? ` · #${oom.rank} on the OoM` : ''}. Gold rings are event wins. Tap a point for the event.</figcaption>
+    <figcaption class="pp-tip small muted">${top.toLocaleString('en-GB')} points${oom ? ` · #${oom.rank} on the OoM` : ''}. One line per week; hollow dots are weeks with no points, gold rings are event wins.</figcaption>
   </figure>`;
 }
 
@@ -136,7 +152,7 @@ async function run() {
   if (error) throw error;
   if (!d) { app.innerHTML = `<p class="muted">No player called "${esc(slug)}".</p>`; return; }
   const p = d.player;
-  const oomChart = oomHtml(d.events, d.oom);
+  const oomChart = oomHtml(d.events, d.oom, d.oom_from, d.oom_to);
   const y = YAML[slug] ?? {};
   document.title = `${p.name} · ${document.title.split(' · ').at(-1)}`;
   const stars = (n, label, cls) => Number(n) > 0 ? `<span class="award ${cls}">${'<span class="award-star">★</span>'.repeat(Number(n))} ${label}</span>` : '';
@@ -163,7 +179,13 @@ async function run() {
   // Tap or hover a point to see what it was. Each chart has its own caption.
   const avgPts = d.events.filter(e => e.avg != null && e.day);
   const tips = {
-    oom: i => { const e = oomPoints(d.events)[i]; return `<b>${esc(e.name)}</b>${e.day ? ` · ${day(e.day)}` : ''} · +${e.pts} points (${e.total.toLocaleString('en-GB')} total)${e.won ? ' · 🏆 won' : ''}`; },
+    oom: i => {
+      const e = oomWeeks(d.events, d.oom_from, d.oom_to)[i];
+      const wc = new Date(e.w).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      return e.pts
+        ? `<b>${esc(e.names.join(', '))}</b> · w/c ${wc} · +${e.pts} points (${e.total.toLocaleString('en-GB')} total)${e.won ? ' · 🏆 won' : ''}`
+        : `w/c ${wc} · <b>no points</b> (${e.total.toLocaleString('en-GB')} total)`;
+    },
     avg: i => { const e = avgPts[i]; return `<b>${esc(e.name)}</b> · ${day(e.day)} · average <b>${Number(e.avg).toFixed(2)}</b>`; },
   };
   app.querySelectorAll('.pp-chart').forEach(fig => {
