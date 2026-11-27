@@ -1509,3 +1509,13 @@ body:has(.acca-bar) main { padding-bottom: 4.5rem; }
 }
 .sp-btns .button.primary { background: var(--accent); border-color: var(--accent); color: #17150c; font-weight: 600; }
 .sp-hint { text-align: center; margin: 0; }
+
+/* Futures categories on the super admin page. */
+.fut-cats input[type="text"] { width: 100%; }
+.fut-move { white-space: nowrap; }
+.fut-move button { padding: .2rem .5rem; min-width: 2rem; }
+.fut-move button + button { margin-left: .25rem; }
+.fut-market-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.fut-market-head .fut-move { font-size: .85rem; font-weight: 400; }
+.fut-cat-group { border-top: 1px solid var(--line); margin-top: 1.2rem; padding-top: .4rem; }
+.fut-cat-head { color: var(--accent); }
