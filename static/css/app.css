@@ -1519,3 +1519,13 @@ body:has(.acca-bar) main { padding-bottom: 4.5rem; }
 .fut-market-head .fut-move { font-size: .85rem; font-weight: 400; }
 .fut-cat-group { border-top: 1px solid var(--line); margin-top: 1.2rem; padding-top: .4rem; }
 .fut-cat-head { color: var(--accent); }
+
+/* Matchup markets on the Futures page: "A [price] v [price] B" per row. */
+.mu-list { display: flex; flex-direction: column; }
+.mu-row { display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: .5rem; padding: .55rem 0; }
+.mu-row + .mu-row { border-top: 1px solid var(--line); }
+.mu-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.mu-name.r { text-align: right; }
+.mu-v { color: var(--text-3); font-size: .8rem; }
+.mu-p { display: inline-flex; align-items: center; gap: .2rem; white-space: nowrap; }
+tr.mu-first td { border-top: 2px solid var(--line-strong); }

@@ -478,7 +478,7 @@ function futuresPanel() {
     <p class="muted small">Starts as a draft, hidden until you open it.</p>
     <div class="row"><input type="text" id="fm-new-title" placeholder="e.g. Will anyone hit a 9-darter this season?" style="flex:1"></div>
     <div class="row">
-      <select id="fm-new-kind"><option value="special">Typed options (Yes / No…)</option><option value="player">Players</option></select>
+      <select id="fm-new-kind"><option value="special">Typed options (Yes / No…)</option><option value="matchup">Matchups (A v B pairings)</option><option value="player">Players</option></select>
       <select id="fm-new-cat">${catOpts(cats.at(-1)?.id)}</select>
       <button class="primary" data-act="fm-create">Create</button>
     </div>
@@ -493,7 +493,10 @@ function futuresPanel() {
 const frac = p => { if (!p) return Infinity; if (/^evens$/i.test(p)) return 2; const [a, b] = String(p).split('/').map(Number); return b ? 1 + a / b : Infinity; };
 
 function futureMarketHtml(m, { first = true, last = true, catOpts = null } = {}) {
-  const special = m.kind === 'special';
+  // Typed options and matchups have no model suggestions; matchups show as
+  // pairings, each side settled on its own (both void if they go out together).
+  const special = m.kind !== 'player';
+  const matchup = m.kind === 'matchup';
   const inMarket = new Set(m.selections.map(s => s.player_id));
   const addable = S.players.filter(p => !inMarket.has(p.id));
   const staked = m.selections.reduce((t, s) => t + Number(s.staked), 0);
@@ -513,9 +516,9 @@ function futureMarketHtml(m, { first = true, last = true, catOpts = null } = {})
       <span class="muted small">${fmtN(staked)} staked · ${fmtN(liability)} to pay if every open bet wins</span></div>
     ${m.selections.some(x => x.proposed) ? `<div class="row fut-approve-row"><b>${m.selections.filter(x => x.proposed).length} suggested move${m.selections.filter(x => x.proposed).length === 1 ? '' : 's'}</b>
       <button class="primary" data-futapproveall="${m.id}">Approve all</button></div>` : ''}
-    <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">${special ? 'Option' : 'Player'}</th>${special ? '' : '<th>Suggested</th>'}<th>Price</th><th>Bets</th><th>Result</th></tr></thead>
-    <tbody>${m.selections.map(s => `<tr>
-      <td class="l">${esc(s.name)}</td>
+    <div class="fut-scroll"><table class="points-list"><thead><tr><th class="l">${matchup ? 'Pairing' : special ? 'Option' : 'Player'}</th>${special ? '' : '<th>Suggested</th>'}<th>Price</th><th>Bets</th><th>Result</th></tr></thead>
+    <tbody>${m.selections.map((s, i, all) => `<tr${matchup && s.pair !== all[i - 1]?.pair ? ' class="mu-first"' : ''}>
+      <td class="l">${matchup ? `<span class="muted small">${s.pair !== all[i - 1]?.pair ? `#${s.pair}` : 'v'}</span> ` : ''}${esc(s.name)}</td>
       ${special ? '' : `<td class="fut-sugg">${esc(s.suggested ?? '')}</td>`}
       <td><input class="fut-price" data-fs-price="${s.id}" data-orig="${esc(s.price ?? '')}" data-sugg="${esc(s.suggested ?? '')}" value="${esc(s.price ?? '')}" placeholder="off"></td>
       <td class="small">${s.bets ? `${s.bets} · ${fmtN(s.staked)}` : ''}</td>
@@ -524,7 +527,9 @@ function futureMarketHtml(m, { first = true, last = true, catOpts = null } = {})
           ${['won', 'lost', 'void'].map(r => `<option${s.result === r ? ' selected' : ''}>${r}</option>`).join('')}
         </select>
         <button data-futres="${s.id}">Set</button>
-        ${s.bets ? '' : `<button class="link" data-futrm="${s.id}" title="Remove">✕</button>`}</td>
+        ${matchup
+          ? (s.pair !== all[i - 1]?.pair && !all.some(x => x.pair === s.pair && x.bets) ? `<button class="link" data-murm="${s.pair}" title="Remove pairing">✕</button>` : '')
+          : s.bets ? '' : `<button class="link" data-futrm="${s.id}" title="Remove">✕</button>`}</td>
     </tr>${s.proposed ? `<tr class="fut-sugg-row"><td colspan="${special ? 4 : 5}">
       <span class="fut-to ${frac(s.proposed) < frac(s.price) ? 'in' : 'out'}">${frac(s.proposed) < frac(s.price) ? '▼ Shorten' : '▲ Drift'} to ${esc(s.proposed)}</span>
       <button class="primary small-btn" data-futok="${s.id}">Approve</button><button class="small-btn" data-futno="${s.id}">Reject</button>
@@ -534,13 +539,23 @@ function futureMarketHtml(m, { first = true, last = true, catOpts = null } = {})
       <button class="primary" data-futprices="${m.id}">Save prices</button>
     </div>
     <div class="row">
-      ${special
+      ${matchup
+        ? `<input type="text" data-mu-a list="mu-players" placeholder="Name A" style="flex:1">
+           <input type="text" data-mu-ap placeholder="Price" style="width:5rem">
+           <span class="muted">v</span>
+           <input type="text" data-mu-b list="mu-players" placeholder="Name B" style="flex:1">
+           <input type="text" data-mu-bp placeholder="Price" style="width:5rem">
+           <button data-muadd="${m.id}">Add pairing</button>
+           <datalist id="mu-players">${S.players.map(p => `<option value="${esc(p.name)}">`).join('')}</datalist>
+    </div>
+    <div class="row">`
+        : special
         ? `<input type="text" data-sp-name placeholder="Option, e.g. Yes" style="flex:1">
            <input type="text" data-sp-price placeholder="Price" style="width:5rem">
            <button data-spadd="${m.id}">Add</button>`
         : `<select data-fm-add><option value="">Add a player…</option>${addable.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
            <button data-futadd="${m.id}">Add</button>`}
-      <button class="danger" data-futrest="${m.id}" data-as="lost">Settle everyone left as lost</button>
+      ${matchup ? '' : `<button class="danger" data-futrest="${m.id}" data-as="lost">Settle everyone left as lost</button>`}
       <button data-futrest="${m.id}" data-as="void">Void everyone left</button>
       ${!m.selections.some(x => x.bets) ? `<button class="danger" data-spdel="${m.id}">Delete</button>` : ''}
     </div>
@@ -773,7 +788,7 @@ app.addEventListener('click', async e => {
       if (!title) { toast('Give the market a title'); break; }
       const kind = val('#fm-new-kind');
       await run(async () => check(await sb.rpc('super_future_create', { p_title: title, p_category: Number(val('#fm-new-cat')), p_kind: kind })),
-        `Created as a draft. Add the ${kind === 'player' ? 'players' : 'options'}.`);
+        `Created as a draft. Add the ${{ player: 'players', matchup: 'pairings' }[kind] ?? 'options'}.`);
       break;
     }
     case 'fc-create': {
@@ -1035,6 +1050,19 @@ async function futuresClick(el) {
     if (!name) { toast('Type the option first'); return true; }
     await run(async () => check(await sb.rpc('super_special_add', { p_market: mid, p_name: name, p_price: q('[data-sp-price]').value.trim() || null })),
       `${name} added`);
+    return true;
+  }
+  if (el.dataset.muadd) {
+    const a = q('[data-mu-a]').value.trim(), b = q('[data-mu-b]').value.trim();
+    if (!a || !b) { toast('Type both names'); return true; }
+    await run(async () => check(await sb.rpc('super_matchup_add', {
+      p_market: mid, p_a: a, p_a_price: q('[data-mu-ap]').value.trim() || null, p_b: b, p_b_price: q('[data-mu-bp]').value.trim() || null,
+    })), `${a} v ${b} added`);
+    return true;
+  }
+  if (el.dataset.murm) {
+    if (!confirm('Remove this pairing?')) return true;
+    await run(async () => check(await sb.rpc('super_matchup_remove', { p_market: mid, p_pair: Number(el.dataset.murm) })), 'Pairing removed');
     return true;
   }
   if (el.dataset.spdel) {
