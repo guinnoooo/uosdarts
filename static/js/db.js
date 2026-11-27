@@ -51,10 +51,13 @@ export const hasPlayers = m => !!((m.player1_id || m.p1_name) && (m.player2_id |
 // 1 or 2 for the winner, or null. Friendlies have no winner_id, so the legs decide.
 export function winnerSide(m) {
   if (m.winner_id) return m.winner_id === m.player1_id ? 1 : 2;
-  // Friendlies and team games can have a typed name on one or both sides,
-  // and then there's no winner_id, so the score decides.
-  if (m.status === 'complete' && (m.p1_name || m.p2_name)) {
-    return (m.sets_to_win ? m.p1_sets > m.p2_sets : m.p1_legs > m.p2_legs) ? 1 : 2;
+  // Friendlies and team games can have typed names or counted players
+  // instead of player ids, and then there's no winner_id, so the score
+  // decides (as match_winner_side does in the database).
+  if (m.status === 'complete') {
+    const [a, b] = m.sets_to_win ? [m.p1_sets, m.p2_sets] : [m.p1_legs, m.p2_legs];
+    if (a > b) return 1;
+    if (b > a) return 2;
   }
   return null;
 }
