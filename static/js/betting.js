@@ -128,11 +128,13 @@ export function betCard(b, { context = null } = {}) {
     : st === 'void' || st === 'cancelled' ? ['Returned', b.stake]
     : st === 'lost' ? ['Returns', 0]
     : ['To return', b.returns];
-  const ctx = b.kind === 'acca' ? 'GuinnessBet acca' : context ?? ([b.market, b.tournament && !String(b.market ?? '').includes(b.tournament) ? b.tournament : null].filter(Boolean).join(' · ')
+  const boostWas = b.kind === 'boost' ? String(b.market ?? '').match(/\(was (.+)\)/)?.[1] ?? null : null;
+  const ctx = b.kind === 'acca' ? 'GuinnessBet acca' : b.kind === 'boost' ? 'GuinnessBet superboost' : context ?? ([b.market, b.tournament && !String(b.market ?? '').includes(b.tournament) ? b.tournament : null].filter(Boolean).join(' · ')
     || document.title.split(' · ')[0].trim());
   const shareable = b.status === 'won' || b.status === 'cashed_out';
   const shareData = shareable ? esc(JSON.stringify({ selection: b.kind === 'acca' ? `${b.legs?.length ?? ''}-fold acca` : b.selection,
-    market: b.kind === 'acca' ? null : ctx, price: b.price, stake: b.stake, paid: b.payout, cashedOut: b.status === 'cashed_out', legs: b.kind === 'acca' ? (b.legs ?? []).map(l => ({ label: l.label, title: l.title, price: l.price })) : null })) : '';
+    market: b.kind === 'acca' ? null : b.kind === 'boost' ? 'Superboost' : ctx, price: b.price, stake: b.stake, paid: b.payout,
+    boost: b.kind === 'boost', was: boostWas, cashedOut: b.status === 'cashed_out', legs: b.kind === 'acca' ? (b.legs ?? []).map(l => ({ label: l.label, title: l.title, price: l.price })) : null })) : '';
   const actions = [cancelButton(b), shareable ? `<button class="link" data-sharebet="${shareData}">Share</button>` : ''].filter(Boolean).join(' ');
   return `<article class="betcard betcard-${esc(st)}">
     <header class="betcard-top">
@@ -143,7 +145,7 @@ export function betCard(b, { context = null } = {}) {
       ? `<div class="betcard-sel"><span>${b.legs.length}-fold acca</span><span class="betcard-odds">${esc(b.price)}</span></div>
          <ul class="betcard-legs">${b.legs.map(l => `<li class="leg-${esc(l.status)}"><span class="leg-mark" aria-hidden="true">${LEG_MARK[l.status] ?? ''}</span>
            <span><b>${esc(l.label)}</b><small>${esc(l.title)}</small></span><span class="leg-price">${esc(l.price)}</span></li>`).join('')}</ul>`
-      : `<div class="betcard-sel"><span>${esc(b.selection)}</span><span class="betcard-odds">${esc(b.price)}</span></div>`}
+      : `<div class="betcard-sel"><span>${esc(b.selection)}</span><span class="betcard-odds">${boostWas ? `<s class="betcard-was">${esc(boostWas)}</s>` : ''}${esc(b.price)}</span></div>`}
     <div class="betcard-nums">
       <div><span>Stake</span><b>${fmtTokens(b.stake)}</b></div>
       <div><span>${label}</span><b>${fmtTokens(value)}</b></div>
@@ -173,7 +175,12 @@ export function myBetsHtml(list) {
 }
 
 async function placeBet(slip) {
-  // Futures are priced by hand, so the database checks the price itself.
+  // Superboosts and futures are priced by hand, so the database checks the price itself.
+  if (slip.kind === 'boost') {
+    const { data, error } = await sb.rpc('place_boost_bet', { p_boost: slip.boost_id, p_price: slip.price, p_stake: Number(slip.stake) });
+    if (error) throw new Error(error.message);
+    return data;
+  }
   if (slip.kind === 'future') {
     const { data, error } = await sb.rpc('place_future_bet', { p_selection: slip.future_id, p_price: slip.price, p_stake: Number(slip.stake) });
     if (error) throw new Error(error.message);
@@ -215,7 +222,7 @@ function applyPrices(sels, prices) {
 // betting server up (the first request after a quiet spell is the slow one)
 // and catches a moved price before the person presses Place.
 export async function quoteSlip(slip, ctx) {
-  if (slip.kind === 'future') return;
+  if (slip.kind === 'future' || slip.kind === 'boost') return;
   if (slip.kind === 'sels') {
     try {
       const data = await invoke(selsBody(slip.sels, { quote: true }));

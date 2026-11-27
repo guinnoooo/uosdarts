@@ -126,8 +126,8 @@ export async function betWinCard(b) {
     text(g, `+${tok(Number(b.paid) - Number(b.stake))}`, W / 2, y + 64, { size: 60, weight: 800, color: C.gold, align: 'center' });
   } else {
     box(g, 80, 330, W - 160, 300, 22, '#1f1b12', C.gold);
-    text(g, b.selection, 130, 440, { size: 64, weight: 800, max: W - 460 });
-    text(g, b.market ?? '', 130, 505, { size: 32, color: C.dim, max: W - 460 });
+    text(g, b.selection, 130, 440, { size: 64, weight: 800, max: W - 500 });
+    text(g, b.market ?? '', 130, 505, { size: 32, color: C.dim, max: W - 500 });
     box(g, W - 330, 385, 200, 100, 14, C.gold, null);
     text(g, b.price, W - 230, 435, { size: 56, weight: 800, color: '#111', align: 'center', max: 180, mid: true });
     if (b.was) {   // a superboost: the old price, struck through
