@@ -492,6 +492,17 @@ function futuresPanel() {
 // Decimal odds from "5/2" or "Evens", for comparing prices.
 const frac = p => { if (!p) return Infinity; if (/^evens$/i.test(p)) return 2; const [a, b] = String(p).split('/').map(Number); return b ? 1 + a / b : Infinity; };
 
+// The green/red arrow on the Futures page for a price that moved this week.
+// Tap to hide it for this selection (it stays hidden until shown again).
+function arrowToggle(s) {
+  const moved = s.was && s.price && frac(s.was) !== frac(s.price);
+  if (!moved && !s.hide_move) return '';
+  if (s.hide_move) return `<button class="link small fut-arrow-tg" data-futarrow="${s.id}" data-hide="0" title="The arrow is hidden. Tap to show it again.">arrow off</button>`;
+  const inward = frac(s.price) < frac(s.was);
+  return `<button class="link small fut-arrow-tg" data-futarrow="${s.id}" data-hide="1" title="Showing ${inward ? 'in' : 'out'} from ${esc(s.was)}. Tap to hide it.">
+    <span class="fut-arrow ${inward ? 'in' : 'out'}">${inward ? '▼' : '▲'}</span> hide</button>`;
+}
+
 function futureMarketHtml(m, { first = true, last = true, catOpts = null } = {}) {
   // Typed options and matchups have no model suggestions; matchups show as
   // pairings, each side settled on its own (both void if they go out together).
@@ -520,7 +531,7 @@ function futureMarketHtml(m, { first = true, last = true, catOpts = null } = {})
     <tbody>${m.selections.map((s, i, all) => `<tr${matchup && s.pair !== all[i - 1]?.pair ? ' class="mu-first"' : ''}>
       <td class="l">${matchup ? `<span class="muted small">${s.pair !== all[i - 1]?.pair ? `#${s.pair}` : 'v'}</span> ` : ''}${esc(s.name)}</td>
       ${special ? '' : `<td class="fut-sugg">${esc(s.suggested ?? '')}</td>`}
-      <td><input class="fut-price" data-fs-price="${s.id}" data-orig="${esc(s.price ?? '')}" data-sugg="${esc(s.suggested ?? '')}" value="${esc(s.price ?? '')}" placeholder="off"></td>
+      <td class="fut-price-cell"><input class="fut-price" data-fs-price="${s.id}" data-orig="${esc(s.price ?? '')}" data-sugg="${esc(s.suggested ?? '')}" value="${esc(s.price ?? '')}" placeholder="off">${arrowToggle(s)}</td>
       <td class="small">${s.bets ? `${s.bets} · ${fmtN(s.staked)}` : ''}</td>
       <td><select data-fs-res="${s.id}">
           <option value=""${s.result ? '' : ' selected'}>–</option>
@@ -1020,6 +1031,12 @@ async function futuresClick(el) {
     const what = r ? { won: 'a winner', lost: 'a loser', void: 'void (bets void, stakes back)' }[r] : 'unsettled (bets back to open)';
     if (!confirm(`Settle ${sel?.name ?? 'this'} as ${what}? (${sel?.bets ?? 0} bets)`)) return true;
     await run(async () => check(await sb.rpc('super_future_settle', { p_selection: sid, p_result: r })), 'Settled');
+    return true;
+  }
+  if (el.dataset.futarrow) {
+    const hide = el.dataset.hide === '1';
+    await run(async () => check(await sb.rpc('super_future_hide_move', { p_selection: Number(el.dataset.futarrow), p_hide: hide })),
+      hide ? 'Arrow hidden' : 'Arrow shown');
     return true;
   }
   if (el.dataset.futrm) {

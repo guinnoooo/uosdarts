@@ -1529,3 +1529,7 @@ body:has(.acca-bar) main { padding-bottom: 4.5rem; }
 .mu-v { color: var(--text-3); font-size: .8rem; }
 .mu-p { display: inline-flex; align-items: center; gap: .2rem; white-space: nowrap; }
 tr.mu-first td { border-top: 2px solid var(--line-strong); }
+
+/* Arrow on/off next to a futures price on the super admin page. */
+.fut-price-cell { white-space: nowrap; }
+.fut-arrow-tg { margin-left: .4rem; }
